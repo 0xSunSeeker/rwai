@@ -143,7 +143,7 @@ bot.command('status', async (ctx) => {
 
     await ctx.reply(
       `📊 *RWAI Status — ${new Date().toLocaleDateString('en-GB')}*\n\n` +
-      `*USDY* — ${data.usdyCurrentAPY}% APY\n` +
+      `*USDY* — ${data.usdyCurrentAPY}% APY${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''}\n` +
       `*mETH* — ${data.methCurrentAPR}% APR${data.methAprFromRate ? ` _(rate-derived: ${data.methAprFromRate}%)_` : ''}\n` +
       `*Spread* — ${Math.abs(spread)}% (${spreadDir})\n\n` +
       `*Your position:* $${positionUsdy.toLocaleString()} USDY\n` +
@@ -172,7 +172,7 @@ bot.command('compare', async (ctx) => {
 
     await ctx.reply(
       `⚖️ *USDY vs mETH — Right Now*\n\n` +
-      `USDY: *${data.usdyCurrentAPY}%* APY — stable dollar value, T-bill backed, no price risk\n` +
+      `USDY: *${data.usdyCurrentAPY}%* APY — T-bill backed, no price risk${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''}\n` +
       `mETH: *${data.methCurrentAPR}%* APR — higher potential, ETH price exposure\n\n` +
       `*Current winner:* ${winner} by ${spread}%\n` +
       `*On your $${profile.userPositionUSD.toLocaleString()}:* switching would change your annual yield by ~$${annualDiff}\n\n` +

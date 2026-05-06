@@ -1,23 +1,64 @@
+import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
-export async function fetchUSDYData() {
+// USDY token on Mantle Mainnet (OFT bridge wrapper)
+// APY is set by Ondo's oracle on Ethereum — not readable on Mantle directly.
+// We fetch APY from DeFiLlama (which reads Ondo's oracle) and pair it with
+// live on-chain TVL from Mantle to prove real protocol integration.
+const USDY_MANTLE = "0x5be26527e817998a7206475496fde1e68957c5a6";
+const ERC20_ABI   = ["function totalSupply() view returns (uint256)"];
+
+async function fetchUSDYMantleTVL() {
   try {
-    // rwa.xyz API is dead — use DefiLlama, preferring the Mantle chain pool
-    const response = await fetch("https://yields.llama.fi/pools", {
-      headers: { "Accept": "application/json" }
-    });
-    const data = await response.json();
+    const provider = new ethers.JsonRpcProvider(
+      process.env.MANTLE_RPC ?? "https://rpc.mantle.xyz"
+    );
+    const contract = new ethers.Contract(USDY_MANTLE, ERC20_ABI, provider);
+    const raw = await contract.totalSupply();
+    // USDY is 18 decimals, pegged ~$1 — supply ≈ TVL in USD
+    return parseFloat(ethers.formatEther(raw));
+  } catch (err) {
+    console.warn("USDY Mantle TVL fetch failed:", err.message);
+    return null;
+  }
+}
+
+export async function fetchUSDYData() {
+  // Fetch APY and on-chain TVL in parallel
+  const [tvl, poolData] = await Promise.allSettled([
+    fetchUSDYMantleTVL(),
+    fetch("https://yields.llama.fi/pools", { headers: { "Accept": "application/json" } })
+      .then(r => r.json()),
+  ]);
+
+  // On-chain TVL from Mantle RPC
+  const mantleTVL = tvl.status === "fulfilled" ? tvl.value : null;
+  if (mantleTVL) console.log(`USDY on Mantle: $${(mantleTVL / 1e6).toFixed(2)}M TVL (live RPC)`);
+
+  // APY from DeFiLlama (Ondo oracle aggregated)
+  try {
+    const data = poolData.value;
     const pool =
       data.data.find(p => p.project === "ondo-yield-assets" && p.symbol === "USDY" && p.chain === "Mantle") ??
       data.data.find(p => p.project === "ondo-yield-assets" && p.symbol === "USDY");
     const currentAPY = parseFloat(pool?.apy ?? 3.55);
-    const apy7d = parseFloat(pool?.apyBase7d ?? currentAPY);
-    const apy30d = parseFloat(pool?.apyMean30d ?? currentAPY);
-    return { currentAPY, apy7d, apy30d, source: "defillama", fetchedAt: new Date().toISOString() };
+    const apy7d      = parseFloat(pool?.apyBase7d  ?? currentAPY);
+    const apy30d     = parseFloat(pool?.apyMean30d ?? currentAPY);
+    return {
+      currentAPY, apy7d, apy30d,
+      mantleTVL,           // live from Mantle RPC
+      source: "defillama+onchain",
+      fetchedAt: new Date().toISOString(),
+    };
   } catch (err) {
-    console.error("USDY fetch failed — using fallback:", err.message);
-    return { currentAPY: 3.55, apy7d: 3.55, apy30d: 3.55, source: "fallback", fetchedAt: new Date().toISOString() };
+    console.error("USDY APY fetch failed — using fallback:", err.message);
+    return {
+      currentAPY: 3.55, apy7d: 3.55, apy30d: 3.55,
+      mantleTVL,
+      source: "fallback",
+      fetchedAt: new Date().toISOString(),
+    };
   }
 }
 
@@ -110,6 +151,7 @@ export async function fetchAllYieldData(previousSnapshot = null) {
     usdyPreviousAPY: previousSnapshot?.usdyCurrentAPY ?? usdy.currentAPY,
     usdyApy7d: usdy.apy7d,
     usdyApy30d: usdy.apy30d,
+    usdyMantleTVL: usdy.mantleTVL ?? null,  // live from Mantle RPC
     methCurrentAPR: meth.currentAPR,
     methPreviousAPR: previousSnapshot?.methCurrentAPR ?? meth.currentAPR,
     methApy7d: meth.apy7d,

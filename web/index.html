@@ -75,10 +75,11 @@
     /* ── YIELD TICKER ── */
     .ticker-section { max-width: 860px; margin: 0 auto 2rem; padding: 0 2rem; }
     .ticker-grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px;
       background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
     }
-    @media (max-width: 600px) { .ticker-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) { .ticker-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 420px) { .ticker-grid { grid-template-columns: 1fr; } }
     .ticker-card { background: var(--surface); padding: 1.75rem 2rem; }
     .ticker-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.6rem; }
     .ticker-value { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; color: var(--green); font-variant-numeric: tabular-nums; }
@@ -86,6 +87,11 @@
     @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
     .ticker-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
     .ticker-spread .ticker-value { color: var(--yellow); }
+    .risk-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.5rem;
+      font-size: 0.7rem; font-weight: 600; color: var(--muted);
+    }
+    .risk-dots { letter-spacing: -1px; }
 
     /* ── NETWORK PROMPT ── */
     .network-prompt { max-width: 860px; margin: 0 auto 2rem; padding: 0 2rem; display: none; }
@@ -258,16 +264,24 @@
         <div class="ticker-label">USDY — Ondo Finance</div>
         <div class="ticker-value loading" id="usdy-apy">—</div>
         <div class="ticker-sub">Tokenized US Treasuries</div>
-      </div>
-      <div class="ticker-card ticker-spread">
-        <div class="ticker-label">Spread (USDY − mETH)</div>
-        <div class="ticker-value loading" id="spread">—</div>
-        <div class="ticker-sub" id="spread-sub">Loading live data…</div>
+        <div class="risk-badge"><span class="risk-dots" id="usdy-risk-dots">●○○○○</span> Risk 1/5 — Very Low</div>
       </div>
       <div class="ticker-card">
         <div class="ticker-label">mETH — Mantle Staking</div>
         <div class="ticker-value loading" id="meth-apr">—</div>
         <div class="ticker-sub">Liquid staked ETH</div>
+        <div class="risk-badge"><span class="risk-dots">●●●○○</span> Risk 3/5 — Medium</div>
+      </div>
+      <div class="ticker-card">
+        <div class="ticker-label">cmETH — Auto-compound</div>
+        <div class="ticker-value loading" id="cmeth-apy">—</div>
+        <div class="ticker-sub">Compounding mETH vault</div>
+        <div class="risk-badge"><span class="risk-dots">●●●○○</span> Risk 3/5 — Medium</div>
+      </div>
+      <div class="ticker-card ticker-spread">
+        <div class="ticker-label">Spread (USDY − mETH)</div>
+        <div class="ticker-value loading" id="spread">—</div>
+        <div class="ticker-sub" id="spread-sub">Loading live data…</div>
       </div>
     </div>
   </div>
@@ -395,13 +409,16 @@ async function loadYields() {
     const { data } = await res.json();
     const usdyPool = data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle')
                   ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY');
-    const methPool = data.find(p => p.project === 'meth-protocol');
+    const methPool = data.find(p => p.pool === 'b9f2f00a-ba96-4589-a171-dde979a23d87')
+                  ?? data.find(p => p.project === 'meth-protocol');
     liveUSDYApy = parseFloat(usdyPool?.apy ?? 3.55);
-    const meth  = parseFloat(methPool?.apy ?? 1.0);
-    const spread = (liveUSDYApy - meth).toFixed(2);
+    const methApr  = parseFloat(methPool?.apy ?? 1.0);
+    const cmethApy = parseFloat(((Math.pow(1 + methApr / 100 / 365, 365) - 1) * 100).toFixed(2));
+    const spread = (liveUSDYApy - methApr).toFixed(2);
     const set = (id, val) => { const el = document.getElementById(id); el.textContent = val; el.classList.remove('loading'); };
     set('usdy-apy', liveUSDYApy.toFixed(2) + '%');
-    set('meth-apr', meth.toFixed(2) + '%');
+    set('meth-apr', methApr.toFixed(2) + '%');
+    set('cmeth-apy', cmethApy.toFixed(2) + '%');
     set('spread', spread + '%');
     const wide = parseFloat(spread) >= 1.5;
     const sub = document.getElementById('spread-sub');
@@ -410,7 +427,7 @@ async function loadYields() {
     const dy = document.getElementById('dash-yield');
     if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
   } catch {
-    ['usdy-apy','meth-apr','spread'].forEach(id => { const el=document.getElementById(id); el.textContent='—'; el.classList.remove('loading'); });
+    ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => { const el=document.getElementById(id); el.textContent='—'; el.classList.remove('loading'); });
     document.getElementById('spread-sub').textContent = 'Could not load live data';
   }
 }

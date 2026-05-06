@@ -78,10 +78,10 @@ function appendPrediction(prediction, yieldData) {
   const entry = {
     ...prediction,
     loggedAt: new Date().toISOString(),
-    // Store yield snapshot so we can resolve accuracy after 24h
     yieldAtPrediction: {
       usdyAPY: yieldData.usdyCurrentAPY,
       methAPR: yieldData.methCurrentAPR,
+      cmethAPY: yieldData.cmethCurrentAPY,
     },
     resolved: false,
   };
@@ -116,19 +116,28 @@ function resolveOldPredictions(currentYield) {
       if (age < TWENTY_FOUR_HOURS) return line;
 
       // Determine actual direction for each asset
-      const actualUsdy = toDirection(p.yieldAtPrediction.usdyAPY, currentYield.usdyCurrentAPY);
-      const actualMeth = toDirection(p.yieldAtPrediction.methAPR, currentYield.methCurrentAPR);
+      const actualUsdy  = toDirection(p.yieldAtPrediction.usdyAPY,  currentYield.usdyCurrentAPY);
+      const actualMeth  = toDirection(p.yieldAtPrediction.methAPR,   currentYield.methCurrentAPR);
+      const actualCmeth = p.yieldAtPrediction.cmethAPY != null
+        ? toDirection(p.yieldAtPrediction.cmethAPY, currentYield.cmethCurrentAPY)
+        : null;
 
-      const usdyCorrect = p.usdyPrediction.direction === actualUsdy;
-      const methCorrect = p.methPrediction.direction === actualMeth;
+      const usdyCorrect  = p.usdyPrediction.direction  === actualUsdy;
+      const methCorrect  = p.methPrediction.direction  === actualMeth;
+      const cmethCorrect = actualCmeth != null && p.cmethPrediction
+        ? p.cmethPrediction.direction === actualCmeth
+        : null;
 
       resolved++;
       return JSON.stringify({
         ...p,
         resolved: true,
         resolvedAt: new Date().toISOString(),
-        usdyPrediction: { ...p.usdyPrediction, correct: usdyCorrect, actualDirection: actualUsdy },
-        methPrediction: { ...p.methPrediction, correct: methCorrect, actualDirection: actualMeth },
+        usdyPrediction:  { ...p.usdyPrediction,  correct: usdyCorrect,  actualDirection: actualUsdy },
+        methPrediction:  { ...p.methPrediction,  correct: methCorrect,  actualDirection: actualMeth },
+        ...(p.cmethPrediction && actualCmeth != null
+          ? { cmethPrediction: { ...p.cmethPrediction, correct: cmethCorrect, actualDirection: actualCmeth } }
+          : {}),
       });
     });
 
@@ -139,9 +148,11 @@ function resolveOldPredictions(currentYield) {
       // Update agentAccuracy in userProfile so promptEngine uses the real number
       const allParsed = updated.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
       const done = allParsed.filter(p => p.resolved);
-      const total = done.length * 2;
+      const total = done.reduce((n, p) => n + (p.cmethPrediction ? 3 : 2), 0);
       const correct = done.reduce((n, p) =>
-        n + (p.usdyPrediction.correct ? 1 : 0) + (p.methPrediction.correct ? 1 : 0), 0);
+        n + (p.usdyPrediction.correct ? 1 : 0)
+          + (p.methPrediction.correct ? 1 : 0)
+          + (p.cmethPrediction?.correct ? 1 : 0), 0);
       if (total > 0 && existsSync(PROFILE_PATH)) {
         try {
           const profile = JSON.parse(readFileSync(PROFILE_PATH, "utf8"));
@@ -162,7 +173,7 @@ async function runAgentLoop() {
   try {
     // Step 1 — Fetch live yield data
     const yieldData = await fetchAllYieldData(previousSnapshot);
-    console.log(`USDY: ${yieldData.usdyCurrentAPY}% | mETH: ${yieldData.methCurrentAPR}% | T-bill: ${yieldData.tbillRate}%`);
+    console.log(`USDY: ${yieldData.usdyCurrentAPY}% | mETH: ${yieldData.methCurrentAPR}% | cmETH: ${yieldData.cmethCurrentAPY}% | T-bill: ${yieldData.tbillRate}%`);
 
     // Step 2 — Resolve any predictions that are now 24h old
     resolveOldPredictions(yieldData);

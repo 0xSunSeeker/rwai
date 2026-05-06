@@ -5,9 +5,9 @@
 
 import { Telegraf, Markup } from 'telegraf';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { generateExplanation, generateInsight } from './promptEngine.js';
+import { generateExplanation, generateInsight, generateStrategy } from './promptEngine.js';
 import { logDecision } from './reputation.js';
-import { fetchYieldData, shouldAlert } from './dataFetcher.js';
+import { fetchYieldData, shouldAlert, RISK_PROFILES } from './dataFetcher.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -58,11 +58,12 @@ bot.start(async (ctx) => {
   const name = ctx.from.first_name || 'there';
   await ctx.reply(
     `👋 Hey ${name}! I'm RWAI — your autonomous RWA yield agent on Mantle.\n\n` +
-    `I monitor your USDY and mETH positions 24/7, explain yield changes in plain English, and propose rebalances when the math makes sense.\n\n` +
+    `I monitor USDY, mETH, and cmETH on Mantle 24/7, explain yield changes in plain English, and propose rebalances when the math makes sense.\n\n` +
     `Here's what I can do:\n` +
     `/status — your current yield snapshot\n` +
-    `/compare — USDY vs mETH right now\n` +
-    `/explain — what is USDY or mETH?\n` +
+    `/compare — USDY vs mETH vs cmETH with risk profiles\n` +
+    `/strategy — get a personalised yield strategy\n` +
+    `/explain — what is USDY, mETH, or cmETH?\n` +
     `/history — recent agent decisions\n` +
     `/setup — choose your delegation tier\n\n` +
     `I'll message you automatically when something worth knowing happens. 🟢`
@@ -143,8 +144,9 @@ bot.command('status', async (ctx) => {
 
     await ctx.reply(
       `📊 *RWAI Status — ${new Date().toLocaleDateString('en-GB')}*\n\n` +
-      `*USDY* — ${data.usdyCurrentAPY}% APY${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''}\n` +
-      `*mETH* — ${data.methCurrentAPR}% APR${data.methAprFromRate ? ` _(rate-derived: ${data.methAprFromRate}%)_` : ''}\n` +
+      `*USDY* — ${data.usdyCurrentAPY}% APY${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''} _(risk 1/5)_\n` +
+      `*mETH* — ${data.methCurrentAPR}% APR${data.methAprFromRate ? ` _(rate-derived: ${data.methAprFromRate}%)_` : ''} _(risk 3/5)_\n` +
+      `*cmETH* — ${data.cmethCurrentAPY}% APY _(auto-compounding mETH, risk 3/5)_\n` +
       `*Spread* — ${Math.abs(spread)}% (${spreadDir})\n\n` +
       `*Your position:* $${positionUsdy.toLocaleString()} USDY\n` +
       `*Est. annual yield:* $${annualYield}\n` +
@@ -161,26 +163,51 @@ bot.command('status', async (ctx) => {
 
 // ─── /compare ────────────────────────────────────────────────────────────────
 bot.command('compare', async (ctx) => {
-  await ctx.reply('⚖️ Comparing USDY vs mETH...');
+  await ctx.reply('⚖️ Comparing USDY vs mETH vs cmETH...');
 
   try {
     const profile = loadProfile();
     const data = await getYieldSnapshot();
-    const spread = Math.abs(data.usdyCurrentAPY - data.methCurrentAPR).toFixed(2);
-    const winner = data.usdyCurrentAPY > data.methCurrentAPR ? 'USDY' : 'mETH';
-    const annualDiff = (profile.userPositionUSD * spread / 100).toFixed(0);
+    const pos = profile.userPositionUSD;
+
+    const spread = (data.usdyCurrentAPY - data.methCurrentAPR).toFixed(2);
+    const annual = (pct) => (pos * pct / 100).toFixed(0);
+
+    // Risk dots helper: filled ● / empty ○
+    const riskDots = (score, max = 5) =>
+      '●'.repeat(score) + '○'.repeat(max - score);
 
     await ctx.reply(
-      `⚖️ *USDY vs mETH — Right Now*\n\n` +
-      `USDY: *${data.usdyCurrentAPY}%* APY — T-bill backed, no price risk${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''}\n` +
-      `mETH: *${data.methCurrentAPR}%* APR — higher potential, ETH price exposure\n\n` +
-      `*Current winner:* ${winner} by ${spread}%\n` +
-      `*On your $${profile.userPositionUSD.toLocaleString()}:* switching would change your annual yield by ~$${annualDiff}\n\n` +
-      `${spread > 1.5 ? '🔔 Spread is wide enough that a rebalance is worth considering.' : '✅ Spread is within normal range. No action needed.'}`,
+      `⚖️ *Yield Comparison — Right Now*\n\n` +
+      `*USDY* — ${data.usdyCurrentAPY}% APY\n` +
+      `Risk: ${riskDots(RISK_PROFILES.USDY.score)} 1/5 — ${RISK_PROFILES.USDY.reason}\n` +
+      `Annual on $${pos.toLocaleString()}: ~$${annual(data.usdyCurrentAPY)}${data.usdyMantleTVL ? ` · $${(data.usdyMantleTVL/1e6).toFixed(1)}M on Mantle` : ''}\n\n` +
+      `*mETH* — ${data.methCurrentAPR}% APR\n` +
+      `Risk: ${riskDots(RISK_PROFILES.mETH.score)} 3/5 — ${RISK_PROFILES.mETH.reason}\n` +
+      `Annual on $${pos.toLocaleString()}: ~$${annual(data.methCurrentAPR)}\n\n` +
+      `*cmETH* — ${data.cmethCurrentAPY}% APY _(auto-compounding mETH)_\n` +
+      `Risk: ${riskDots(RISK_PROFILES.cmETH.score)} 3/5 — ${RISK_PROFILES.cmETH.reason}\n` +
+      `Annual on $${pos.toLocaleString()}: ~$${annual(data.cmethCurrentAPY)}\n\n` +
+      `*USDY vs mETH spread:* ${Math.abs(spread)}% — on your position that's $${(pos * Math.abs(spread) / 100).toFixed(0)}/year\n\n` +
+      `${Math.abs(spread) > 1.5 ? '🔔 Spread is wide. Run /strategy for a recommendation.' : '✅ Spread within normal range.'}`,
       { parse_mode: 'Markdown' }
     );
   } catch (err) {
     await ctx.reply('⚠️ Could not fetch comparison data right now.');
+  }
+});
+
+// ─── /strategy ───────────────────────────────────────────────────────────────
+bot.command('strategy', async (ctx) => {
+  await ctx.reply('🧠 Analysing current yields and your profile...');
+
+  try {
+    const profile = loadProfile();
+    const data = await getYieldSnapshot();
+    const recommendation = await generateStrategy(data, profile);
+    await ctx.reply(`📈 *RWAI Strategy Recommendation*\n\n${recommendation}`, { parse_mode: 'Markdown' });
+  } catch (err) {
+    await ctx.reply('⚠️ Could not generate strategy right now. Try again in a moment.');
   }
 });
 
@@ -209,11 +236,23 @@ bot.command('explain', async (ctx) => {
       `*Price risk:* Yes — if ETH drops, so does the dollar value of your position`,
       { parse_mode: 'Markdown' }
     );
+  } else if (args.includes('CMETH')) {
+    await ctx.reply(
+      `📖 *What is cmETH?*\n\n` +
+      `cmETH is the auto-compounding version of mETH, Mantle's liquid staked ETH token.\n\n` +
+      `*How it works:* Instead of holding mETH directly, you deposit it into the cmETH vault. The vault collects your daily staking rewards and automatically reinvests them — so your mETH balance grows without you doing anything.\n\n` +
+      `*How the yield differs from mETH:* mETH earns ~1.0% APR paid out over time. cmETH converts that APR to a slightly higher effective APY through daily compounding. At 1.0% APR the difference is small (~$0.50/year on $5,000), but it adds up at higher rates.\n\n` +
+      `*Current yield:* Derived from mETH APR (~1.0% APY)\n` +
+      `*Risk level:* Medium — same underlying ETH exposure as mETH, plus vault smart contract risk\n` +
+      `*Price risk:* Yes — value moves with ETH price`,
+      { parse_mode: 'Markdown' }
+    );
   } else {
     await ctx.reply(
       `What would you like me to explain?\n\n` +
       `/explain USDY — what is USDY and how does it earn?\n` +
-      `/explain mETH — what is mETH and how does it earn?`
+      `/explain mETH — what is mETH and how does it earn?\n` +
+      `/explain cmETH — what is cmETH and how does auto-compounding work?`
     );
   }
 });
@@ -229,11 +268,13 @@ bot.command('history', async (ctx) => {
     const all = readFileSync('./data/predictions.jsonl', 'utf8')
       .trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
 
-    // Accuracy: count resolved predictions only
+    // Accuracy: count resolved predictions only (backwards-compatible with pre-cmETH entries)
     const resolved = all.filter(p => p.resolved);
-    const totalCalls  = resolved.length * 2; // USDY + mETH per prediction
+    const totalCalls  = resolved.reduce((n, p) => n + (p.cmethPrediction ? 3 : 2), 0);
     const correctCalls = resolved.reduce((n, p) =>
-      n + (p.usdyPrediction.correct ? 1 : 0) + (p.methPrediction.correct ? 1 : 0), 0);
+      n + (p.usdyPrediction.correct ? 1 : 0)
+        + (p.methPrediction.correct ? 1 : 0)
+        + (p.cmethPrediction?.correct ? 1 : 0), 0);
     const accuracy = totalCalls > 0
       ? Math.round((correctCalls / totalCalls) * 100)
       : null;
@@ -257,13 +298,22 @@ bot.command('history', async (ctx) => {
       const time = new Date(p.loggedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       const usdyMark = p.resolved ? (p.usdyPrediction.correct ? '✅' : '❌') : '⏳';
       const methMark = p.resolved ? (p.methPrediction.correct ? '✅' : '❌') : '⏳';
+      const cmethMark = p.cmethPrediction
+        ? (p.resolved ? (p.cmethPrediction.correct ? '✅' : '❌') : '⏳')
+        : null;
       msg += `*${date} ${time}*\n`;
       msg += `${usdyMark} USDY: ${p.usdyPrediction.direction} (${p.usdyPrediction.confidence}%)`;
       if (p.resolved) msg += ` → actual: ${p.usdyPrediction.actualDirection}`;
       msg += `\n`;
       msg += `${methMark} mETH: ${p.methPrediction.direction} (${p.methPrediction.confidence}%)`;
       if (p.resolved) msg += ` → actual: ${p.methPrediction.actualDirection}`;
-      msg += `\n\n`;
+      msg += `\n`;
+      if (cmethMark) {
+        msg += `${cmethMark} cmETH: ${p.cmethPrediction.direction} (${p.cmethPrediction.confidence}%)`;
+        if (p.resolved) msg += ` → actual: ${p.cmethPrediction.actualDirection}`;
+        msg += `\n`;
+      }
+      msg += `\n`;
     });
 
     await ctx.reply(msg, { parse_mode: 'Markdown' });

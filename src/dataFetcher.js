@@ -2,6 +2,20 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
+// Risk profiles for each monitored asset
+export const RISK_PROFILES = {
+  USDY:  { score: 1, max: 5, label: "Very Low", reason: "US Treasury backed, no price risk" },
+  mETH:  { score: 3, max: 5, label: "Medium",   reason: "ETH price exposure, validator slashing risk" },
+  cmETH: { score: 3, max: 5, label: "Medium",   reason: "ETH price exposure, auto-compound vault" },
+};
+
+// cmETH is auto-compounding mETH (ERC-4626 vault). No standalone DeFiLlama pool exists.
+// Effective APY = (1 + APR/100/365)^365 - 1, expressed as a percentage.
+export function deriveCMETHApy(methAPR) {
+  const daily = methAPR / 100 / 365;
+  return parseFloat(((Math.pow(1 + daily, 365) - 1) * 100).toFixed(4));
+}
+
 // USDY token on Mantle Mainnet (OFT bridge wrapper)
 // APY is set by Ondo's oracle on Ethereum — not readable on Mantle directly.
 // We fetch APY from DeFiLlama (which reads Ondo's oracle) and pair it with
@@ -146,24 +160,35 @@ export async function fetchAllYieldData(previousSnapshot = null) {
   const [usdy, meth, tbill] = await Promise.all([fetchUSDYData(), fetchMETHData(), fetchTBillRate()]);
   const recentMethTrend = trendFromAverages(meth.currentAPR, meth.apy7d, meth.apy30d);
   const recentUsdyTrend = trendFromAverages(usdy.currentAPY, usdy.apy7d, usdy.apy30d);
+
+  // cmETH APY is derived from mETH APR via daily compounding
+  const cmethCurrentAPY = deriveCMETHApy(meth.currentAPR);
+  const cmethPreviousAPY = previousSnapshot?.cmethCurrentAPY ?? cmethCurrentAPY;
+
+  const usdyDelta = Math.abs(usdy.currentAPY - (previousSnapshot?.usdyCurrentAPY ?? usdy.currentAPY));
+  const methDelta  = Math.abs(meth.currentAPR  - (previousSnapshot?.methCurrentAPR  ?? meth.currentAPR));
+  const triggerAsset = usdyDelta >= methDelta ? "USDY" : "mETH";
+
   return {
     usdyCurrentAPY: usdy.currentAPY,
     usdyPreviousAPY: previousSnapshot?.usdyCurrentAPY ?? usdy.currentAPY,
     usdyApy7d: usdy.apy7d,
     usdyApy30d: usdy.apy30d,
-    usdyMantleTVL: usdy.mantleTVL ?? null,  // live from Mantle RPC
+    usdyMantleTVL: usdy.mantleTVL ?? null,
     methCurrentAPR: meth.currentAPR,
     methPreviousAPR: previousSnapshot?.methCurrentAPR ?? meth.currentAPR,
     methApy7d: meth.apy7d,
     methApy30d: meth.apy30d,
-    methAprFromRate: meth.aprFromRate ?? null,   // rate-derived cross-check
+    methAprFromRate: meth.aprFromRate ?? null,
     methPricePerShare: meth.pricePerShare ?? null,
     methDataSource: meth.source,
+    cmethCurrentAPY,
+    cmethPreviousAPY,
     tbillRate: tbill.current,
     recentTbillTrend: tbill.trend,
     recentMethTrend,
     recentUsdyTrend,
-    triggerAsset: Math.abs(usdy.currentAPY - (previousSnapshot?.usdyCurrentAPY ?? usdy.currentAPY)) > Math.abs(meth.currentAPR - (previousSnapshot?.methCurrentAPR ?? meth.currentAPR)) ? "USDY" : "mETH",
+    triggerAsset,
     changePercent: parseFloat((usdy.currentAPY - (previousSnapshot?.usdyCurrentAPY ?? usdy.currentAPY)).toFixed(2)),
     fetchedAt: new Date().toISOString(),
   };

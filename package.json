@@ -1,0 +1,22 @@
+{
+  "name": "rwai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node src/test.js",
+    "start": "node src/agent.js",
+    "dev": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.93.0",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.0.0",
+    "node-cron": "^4.2.1",
+    "telegraf": "^4.16.3"
+  }
+}

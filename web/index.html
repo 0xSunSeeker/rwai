@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RWAI — Autonomous RWA Yield Agent on Mantle</title>
+  <meta name="description" content="RWAI monitors USDY and mETH yield spreads on Mantle, explains changes in plain English, and proposes rebalances via Telegram." />
+  <meta property="og:title" content="RWAI — Autonomous RWA Yield Agent on Mantle" />
+  <meta property="og:description" content="Plain-English yield intelligence for USDY and mETH holders. Powered by Claude. Built on Mantle." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --green: #00d084;
+      --green-dim: rgba(0, 208, 132, 0.12);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.1rem; color: var(--green); letter-spacing: -0.02em; }
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .btn-primary {
+      background: var(--green);
+      color: #000;
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      display: inline-block;
+    }
+    .btn-primary:hover { opacity: 0.85; color: #000; }
+
+    /* ── HERO ── */
+    .hero {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 6rem 2rem 4rem;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--green-dim);
+      border: 1px solid rgba(0, 208, 132, 0.25);
+      color: var(--green);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.3rem 0.85rem;
+      border-radius: 99px;
+      margin-bottom: 1.75rem;
+      letter-spacing: 0.01em;
+    }
+    .hero-badge span { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+    }
+    h1 em { font-style: normal; color: var(--green); }
+
+    .hero-sub {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.65rem 1.4rem;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      text-decoration: none;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    /* ── YIELD TICKER ── */
+    .ticker-section {
+      max-width: 860px;
+      margin: 0 auto 5rem;
+      padding: 0 2rem;
+    }
+    .ticker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    @media (max-width: 600px) { .ticker-grid { grid-template-columns: 1fr; } }
+    .ticker-card {
+      background: var(--surface);
+      padding: 1.75rem 2rem;
+    }
+    .ticker-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 0.6rem;
+    }
+    .ticker-value {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+    .ticker-value.loading { color: var(--muted); font-size: 1.5rem; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+    .ticker-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .ticker-spread .ticker-value { color: #f0b429; }
+
+    /* ── HOW IT WORKS ── */
+    .section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+    }
+    .section-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 2.5rem;
+    }
+
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: grid;
+      grid-template-columns: 2.5rem 1fr;
+      gap: 1.25rem;
+      padding-bottom: 2.5rem;
+      position: relative;
+    }
+    .step:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 1.2rem;
+      top: 2.8rem;
+      bottom: 0;
+      width: 1px;
+      background: var(--border);
+    }
+    .step-num {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background: var(--green-dim);
+      border: 1px solid rgba(0,208,132,0.3);
+      color: var(--green);
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .step-title { font-weight: 600; margin-bottom: 0.3rem; }
+    .step-desc { color: var(--muted); font-size: 0.92rem; line-height: 1.65; }
+
+    /* ── CONTRACT ── */
+    .contract-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .contract-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .contract-key {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+      padding-top: 0.1rem;
+    }
+    .contract-val {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      word-break: break-all;
+      text-align: right;
+    }
+    .contract-val a { color: var(--green); text-decoration: none; }
+    .contract-val a:hover { text-decoration: underline; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">RWAI</span>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#contract">Contract</a>
+    <a href="https://github.com/0xSunSeeker/rwai" target="_blank">GitHub</a>
+    <a href="https://t.me/rwaiapp_bot" class="btn-primary">Open in Telegram</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span></span> Live on Mantle Mainnet
+    </div>
+    <h1>Your autonomous <em>RWA yield agent</em> on Mantle</h1>
+    <p class="hero-sub">
+      RWAI monitors USDY and mETH yield spreads 24/7, explains every change in plain English,
+      and proposes rebalances you approve with one tap.
+    </p>
+    <div class="hero-cta">
+      <a href="https://t.me/rwaiapp_bot" class="btn-primary">Try the bot — it's free</a>
+      <a href="https://github.com/0xSunSeeker/rwai" class="btn-secondary" target="_blank">View source</a>
+    </div>
+  </section>
+
+  <!-- ── LIVE YIELD TICKER ── -->
+  <div class="ticker-section">
+    <div class="ticker-grid">
+      <div class="ticker-card">
+        <div class="ticker-label">USDY — Ondo Finance</div>
+        <div class="ticker-value loading" id="usdy-apy">—</div>
+        <div class="ticker-sub">Tokenized US Treasuries</div>
+      </div>
+      <div class="ticker-card ticker-spread">
+        <div class="ticker-label">Spread (USDY − mETH)</div>
+        <div class="ticker-value loading" id="spread">—</div>
+        <div class="ticker-sub" id="spread-sub">Loading live data…</div>
+      </div>
+      <div class="ticker-card">
+        <div class="ticker-label">mETH — Mantle Staking</div>
+        <div class="ticker-value loading" id="meth-apr">—</div>
+        <div class="ticker-sub">Liquid staked ETH</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="section" id="how">
+    <div class="section-label">How it works</div>
+    <h2>Four layers. One tap to act.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Fetch</div>
+          <div class="step-desc">Every 30 minutes, RWAI pulls live yield data for USDY and mETH from DeFiLlama and compares it to the last snapshot.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Explain</div>
+          <div class="step-desc">When yield shifts more than 0.1% or the spread crosses 1.5%, Claude Sonnet writes a plain-English explanation — what changed, why it happened, and what it means for your position size specifically.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Propose</div>
+          <div class="step-desc">The agent sends a Telegram message with an Approve / Dismiss inline keyboard. Nothing executes until you tap Approve.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Anchor</div>
+          <div class="step-desc">Every approved decision is logged on Mantle Mainnet via the ERC-8004 Reputation Registry — a verifiable, auditable AI track record that accumulates from Day 1.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CONTRACT ── -->
+  <section class="section" id="contract">
+    <div class="section-label">On-chain</div>
+    <h2>Verifiable from Day 1</h2>
+    <div class="contract-box">
+      <div class="contract-row">
+        <span class="contract-key">Registry</span>
+        <span class="contract-val">ERC-8004 Reputation Registry — Mantle Mainnet</span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Address</span>
+        <span class="contract-val">
+          <a href="https://explorer.mantle.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank">
+            0x8004BAa17C55a88189AE136b182e5fdA19dE9b63
+          </a>
+        </span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Latest tx</span>
+        <span class="contract-val">
+          <a href="https://explorer.mantle.xyz/tx/0xb24c9762becc831a9855a2a73b657f841f42a59f8858f2822ea9e7aee50080ec" target="_blank">
+            0xb24c976…0080ec
+          </a>
+        </span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Hackathon</span>
+        <span class="contract-val">
+          <a href="https://dorahacks.io/hackathon/mantleturingtesthackathon2026" target="_blank">
+            Mantle Turing Test Hackathon 2026 — AI × RWA track
+          </a>
+        </span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Built by <a href="https://x.com/0xSunSeeker">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 &nbsp;·&nbsp;
+  <a href="https://t.me/rwaiapp_bot">Telegram</a> &nbsp;·&nbsp;
+  <a href="https://github.com/0xSunSeeker/rwai">GitHub</a>
+</footer>
+
+<script>
+  async function loadYields() {
+    try {
+      const res = await fetch('https://yields.llama.fi/pools');
+      const { data } = await res.json();
+
+      const usdyPool =
+        data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle') ??
+        data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY');
+
+      const methPool = data.find(p => p.project === 'meth-protocol');
+
+      const usdy = parseFloat(usdyPool?.apy ?? 3.55);
+      const meth = parseFloat(methPool?.apy ?? 1.0);
+      const spread = (usdy - meth).toFixed(2);
+
+      const usdyEl = document.getElementById('usdy-apy');
+      const methEl = document.getElementById('meth-apr');
+      const spreadEl = document.getElementById('spread');
+      const spreadSub = document.getElementById('spread-sub');
+
+      usdyEl.textContent = usdy.toFixed(2) + '%';
+      usdyEl.classList.remove('loading');
+
+      methEl.textContent = meth.toFixed(2) + '%';
+      methEl.classList.remove('loading');
+
+      spreadEl.textContent = spread + '%';
+      spreadEl.classList.remove('loading');
+
+      const wide = parseFloat(spread) >= 1.5;
+      spreadSub.textContent = wide
+        ? 'Wide — rebalance may be worth considering'
+        : 'Within normal range';
+      spreadSub.style.color = wide ? '#f0b429' : '';
+    } catch {
+      ['usdy-apy', 'meth-apr', 'spread'].forEach(id => {
+        const el = document.getElementById(id);
+        el.textContent = '—';
+        el.classList.remove('loading');
+      });
+      document.getElementById('spread-sub').textContent = 'Could not load live data';
+    }
+  }
+
+  loadYields();
+</script>
+
+</body>
+</html>

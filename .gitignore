@@ -1,0 +1,15 @@
+# Secrets
+.env
+
+# Dependencies
+node_modules/
+
+# Runtime state — regenerated on every run
+data/lastYield.json
+data/pendingAlert.json
+data/userProfile.json
+
+# Editor / local tooling
+*.code-workspace
+.DS_Store
+.claude/

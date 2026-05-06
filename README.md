@@ -4,7 +4,8 @@
 
 **Track:** AI × RWA — [Mantle Turing Test Hackathon 2026](https://dorahacks.io/hackathon/mantleturingtesthackathon2026)  
 **Live demo:** [rwai.fyi](https://rwai.fyi)  
-**Telegram bot:** [@rwaiapp_bot](https://t.me/rwaiapp_bot)
+**Telegram bot:** [@rwaiapp_bot](https://t.me/rwaiapp_bot)  
+**GitHub:** [github.com/0xSunSeeker/rwai](https://github.com/0xSunSeeker/rwai)
 
 ---
 

@@ -222,24 +222,48 @@ bot.command('explain', async (ctx) => {
 bot.command('history', async (ctx) => {
   try {
     if (!existsSync('./data/predictions.jsonl')) {
-      await ctx.reply('No prediction history yet. The agent will start logging predictions from this cycle onward.');
+      await ctx.reply('No prediction history yet. The agent logs a prediction every 30 minutes.');
       return;
     }
 
-    const lines = readFileSync('./data/predictions.jsonl', 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .slice(-5); // Last 5 predictions
+    const all = readFileSync('./data/predictions.jsonl', 'utf8')
+      .trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
 
-    const predictions = lines.map(l => JSON.parse(l));
+    // Accuracy: count resolved predictions only
+    const resolved = all.filter(p => p.resolved);
+    const totalCalls  = resolved.length * 2; // USDY + mETH per prediction
+    const correctCalls = resolved.reduce((n, p) =>
+      n + (p.usdyPrediction.correct ? 1 : 0) + (p.methPrediction.correct ? 1 : 0), 0);
+    const accuracy = totalCalls > 0
+      ? Math.round((correctCalls / totalCalls) * 100)
+      : null;
 
-    let msg = `📅 *Last ${predictions.length} RWAI Predictions*\n\n`;
-    predictions.forEach((p, i) => {
+    // Show last 5 predictions (newest first)
+    const recent = [...all].reverse().slice(0, 5);
+
+    let msg = `📊 *RWAI Prediction Track Record*\n\n`;
+
+    if (accuracy !== null) {
+      msg += `*Agent accuracy: ${accuracy}% over ${resolved.length} resolved prediction${resolved.length === 1 ? '' : 's'}*\n`;
+      msg += `_(${correctCalls}/${totalCalls} correct calls — USDY + mETH combined)_\n\n`;
+    } else {
+      msg += `_Accuracy score builds after 24h — ${all.length} prediction${all.length === 1 ? '' : 's'} logged so far_\n\n`;
+    }
+
+    msg += `*Last ${recent.length} predictions:*\n\n`;
+
+    recent.forEach(p => {
       const date = new Date(p.loggedAt).toLocaleDateString('en-GB');
-      msg += `*${date}*\n`;
-      msg += `USDY: ${p.usdyPrediction.direction} (${p.usdyPrediction.confidence}% confidence)\n`;
-      msg += `mETH: ${p.methPrediction.direction} (${p.methPrediction.confidence}% confidence)\n\n`;
+      const time = new Date(p.loggedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const usdyMark = p.resolved ? (p.usdyPrediction.correct ? '✅' : '❌') : '⏳';
+      const methMark = p.resolved ? (p.methPrediction.correct ? '✅' : '❌') : '⏳';
+      msg += `*${date} ${time}*\n`;
+      msg += `${usdyMark} USDY: ${p.usdyPrediction.direction} (${p.usdyPrediction.confidence}%)`;
+      if (p.resolved) msg += ` → actual: ${p.usdyPrediction.actualDirection}`;
+      msg += `\n`;
+      msg += `${methMark} mETH: ${p.methPrediction.direction} (${p.methPrediction.confidence}%)`;
+      if (p.resolved) msg += ` → actual: ${p.methPrediction.actualDirection}`;
+      msg += `\n\n`;
     });
 
     await ctx.reply(msg, { parse_mode: 'Markdown' });

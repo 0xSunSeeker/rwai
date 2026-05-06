@@ -74,9 +74,85 @@ function writePendingAlert(explanation, prediction, yieldData) {
   console.log("Pending alert written to disk.");
 }
 
-function appendPrediction(prediction) {
-  const entry = { ...prediction, loggedAt: new Date().toISOString() };
+function appendPrediction(prediction, yieldData) {
+  const entry = {
+    ...prediction,
+    loggedAt: new Date().toISOString(),
+    // Store yield snapshot so we can resolve accuracy after 24h
+    yieldAtPrediction: {
+      usdyAPY: yieldData.usdyCurrentAPY,
+      methAPR: yieldData.methCurrentAPR,
+    },
+    resolved: false,
+  };
   appendFileSync(PREDICTIONS_PATH, JSON.stringify(entry) + "\n");
+}
+
+// Direction: returns "up", "down", or "stable" given a before/after pair
+function toDirection(before, after, threshold = 0.05) {
+  const delta = after - before;
+  if (delta > threshold) return "up";
+  if (delta < -threshold) return "down";
+  return "stable";
+}
+
+// Reads predictions.jsonl, resolves any that are 24h+ old, rewrites the file
+function resolveOldPredictions(currentYield) {
+  if (!existsSync(PREDICTIONS_PATH)) return;
+  try {
+    const lines = readFileSync(PREDICTIONS_PATH, "utf8").trim().split("\n").filter(Boolean);
+    const now = Date.now();
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    let resolved = 0;
+
+    const updated = lines.map(line => {
+      let p;
+      try { p = JSON.parse(line); } catch { return line; }
+
+      // Skip already resolved or missing yield snapshot
+      if (p.resolved || !p.yieldAtPrediction) return line;
+
+      const age = now - new Date(p.loggedAt).getTime();
+      if (age < TWENTY_FOUR_HOURS) return line;
+
+      // Determine actual direction for each asset
+      const actualUsdy = toDirection(p.yieldAtPrediction.usdyAPY, currentYield.usdyCurrentAPY);
+      const actualMeth = toDirection(p.yieldAtPrediction.methAPR, currentYield.methCurrentAPR);
+
+      const usdyCorrect = p.usdyPrediction.direction === actualUsdy;
+      const methCorrect = p.methPrediction.direction === actualMeth;
+
+      resolved++;
+      return JSON.stringify({
+        ...p,
+        resolved: true,
+        resolvedAt: new Date().toISOString(),
+        usdyPrediction: { ...p.usdyPrediction, correct: usdyCorrect, actualDirection: actualUsdy },
+        methPrediction: { ...p.methPrediction, correct: methCorrect, actualDirection: actualMeth },
+      });
+    });
+
+    if (resolved > 0) {
+      writeFileSync(PREDICTIONS_PATH, updated.join("\n") + "\n");
+      console.log(`Resolved ${resolved} prediction(s) against current yield.`);
+
+      // Update agentAccuracy in userProfile so promptEngine uses the real number
+      const allParsed = updated.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const done = allParsed.filter(p => p.resolved);
+      const total = done.length * 2;
+      const correct = done.reduce((n, p) =>
+        n + (p.usdyPrediction.correct ? 1 : 0) + (p.methPrediction.correct ? 1 : 0), 0);
+      if (total > 0 && existsSync(PROFILE_PATH)) {
+        try {
+          const profile = JSON.parse(readFileSync(PROFILE_PATH, "utf8"));
+          profile.agentAccuracy = `${Math.round((correct / total) * 100)}% accurate over ${done.length} predictions`;
+          writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2));
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn("resolveOldPredictions error:", err.message);
+  }
 }
 
 // ─── CORE LOOP FUNCTION ───────────────────────────────────────────────────────
@@ -88,12 +164,15 @@ async function runAgentLoop() {
     const yieldData = await fetchAllYieldData(previousSnapshot);
     console.log(`USDY: ${yieldData.usdyCurrentAPY}% | mETH: ${yieldData.methCurrentAPR}% | T-bill: ${yieldData.tbillRate}%`);
 
-    // Step 2 — Always generate and log a prediction (builds track record)
+    // Step 2 — Resolve any predictions that are now 24h old
+    resolveOldPredictions(yieldData);
+
+    // Step 3a — Always generate and log a new prediction (builds track record)
     const prediction = await generatePrediction(yieldData);
-    appendPrediction(prediction);
+    appendPrediction(prediction, yieldData);
     console.log("Prediction logged:", JSON.stringify(prediction, null, 2));
 
-    // Step 3 — Check if yield moved enough to alert the user
+    // Step 3b — Check if yield moved enough to alert the user
     const user = loadUser();
     const usdyChange = Math.abs(yieldData.usdyCurrentAPY - yieldData.usdyPreviousAPY);
     const methChange = Math.abs(yieldData.methCurrentAPR - yieldData.methPreviousAPR);

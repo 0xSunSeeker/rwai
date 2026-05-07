@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RWAi — Your RWA Yield Agent</title>
+  <meta name="description" content="RWAi monitors USDY and mETH yield spreads on Mantle, explains changes in plain English, and proposes rebalances via Telegram." />
+  <meta property="og:title" content="RWAi — Your RWA Yield Agent" />
+  <meta property="og:description" content="Plain-English yield intelligence for USDY and mETH holders. Powered by Claude. Built on Mantle." />
+  <style>
+    *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: rgb(13,13,13); color: rgb(245,245,245); font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes laserDown { 0%{transform:translateY(-100%)} 100%{transform:translateY(400%)} }
+    @keyframes fadeInLog { 0%{opacity:0;transform:translateY(5px)} 100%{opacity:1;transform:translateY(0)} }
+    @keyframes blink { 0%,100%{opacity:0.8} 50%{opacity:0} }
+    @keyframes spotlight { 0%{opacity:0;transform:translate(-72%,-62%) skewX(-30deg)} 100%{opacity:1;transform:translate(-50%,-40%) skewX(-30deg)} }
+    @keyframes modalIn { from{opacity:0;transform:scale(0.96) translateY(8px)} to{opacity:1;transform:none} }
+
+    /* NAV */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(13,13,13,0.85); backdrop-filter: blur(8px); }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; flex-shrink: 0; }
+    .accent { color: rgb(34,197,94); }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link { display: none; font-size: 0.875rem; color: rgba(255,255,255,0.5); padding: 4px 8px; transition: color 0.2s; }
+    .nav-link:hover { color: rgb(255,255,255); }
+    #btn-connect { display: none; font-size: 0.875rem; font-weight: 600; padding: 8px 16px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.2); color: rgb(255,255,255); background: transparent; transition: background 0.2s, border-color 0.2s, color 0.2s; cursor: pointer; white-space: nowrap; }
+    #btn-connect:hover { background: rgba(255,255,255,0.05); }
+    #btn-connect.connected { border-color: rgb(34,197,94); color: rgb(34,197,94); background: rgba(34,197,94,0.08); }
+    #btn-connect.connected:hover { border-color: rgba(239,68,68,0.5); color: #ef4444; background: rgba(239,68,68,0.06); }
+    #btn-connect.wrong-network { border-color: rgb(245,158,11); color: rgb(245,158,11); }
+    .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 12px; border-radius: 9999px; background: rgb(34,197,94); color: rgb(13,13,13); border: none; transition: background 0.2s; white-space: nowrap; cursor: pointer; }
+    .btn-nav-green:hover { background: rgb(22,163,74); color: rgb(13,13,13); }
+
+    /* HERO */
+    .hero { display: flex; flex-direction: column; padding-top: 64px; position: relative; overflow: hidden; }
+    .hero-spotlight { position: absolute; pointer-events: none; top: -160px; left: 0; width: 600px; height: 600px; background: radial-gradient(rgba(34,197,94,0.13) 0%, transparent 70%); opacity: 0; animation: spotlight 2s ease 0.75s 1 forwards; }
+    .hero-left { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 40px 20px 32px; position: relative; z-index: 10; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 10px; font-weight: 600; color: rgb(34,197,94); text-transform: uppercase; letter-spacing: 0.1em; }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: rgb(34,197,94); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
+    h1 { font-size: 2rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+    h1 .green { color: rgb(34,197,94); white-space: nowrap; }
+    .animated-dots { display: inline-flex; gap: 2px; align-items: flex-end; margin-bottom: 4px; }
+    .animated-dots span { transition: opacity 0.2s; }
+    .hero-sub { margin-top: 20px; font-size: 0.875rem; color: rgba(255,255,255,0.5); max-width: 440px; line-height: 1.7; }
+    .hero-cta { margin-top: 32px; }
+    .cta-label { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+    .cta-buttons { display: flex; flex-direction: column; gap: 12px; }
+    .btn-primary { padding: 12px 24px; border-radius: 9999px; background: rgb(34,197,94); color: rgb(13,13,13); font-weight: 600; font-size: 0.875rem; border: none; transition: background 0.2s; text-align: center; cursor: pointer; display: inline-block; }
+    .btn-primary:hover { background: rgb(22,163,74); color: rgb(13,13,13); }
+    .btn-secondary { padding: 12px 24px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); font-weight: 600; font-size: 0.875rem; background: transparent; transition: border-color 0.2s, color 0.2s; text-align: center; cursor: pointer; display: inline-block; }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.3); color: rgb(255,255,255); }
+    .hero-right { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 20px 48px; }
+    .hero-right > div { width: 100%; }
+
+    /* TERMINAL */
+    .terminal { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; display: flex; flex-direction: column; background: rgb(13,13,18); box-shadow: 0 20px 60px rgba(0,0,0,0.6); height: clamp(260px,45vw,360px); font-family: "SF Mono","Fira Code",Menlo,monospace; }
+    .terminal-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgb(26,26,36); flex-shrink: 0; }
+    .terminal-dots { display: flex; gap: 6px; }
+    .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .terminal-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); }
+    .terminal-body { flex: 1; overflow-y: auto; padding: 20px 16px 16px; color: rgb(160,160,176); font-size: 0.82rem; line-height: 1.6; display: flex; flex-direction: column; gap: 4px; }
+    .terminal-body::-webkit-scrollbar { width: 0; }
+    .terminal-logs { flex: 1; }
+    .log-line { margin-bottom: 6px; animation: fadeInLog 0.3s ease 1 forwards; opacity: 0; }
+    .log-time { color: rgb(107,107,128); margin-right: 10px; }
+    .terminal-cursor-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .terminal-cursor { display: inline-block; width: 8px; height: 14px; background: rgb(0,208,132); opacity: 0.8; animation: blink 1s step-end infinite; vertical-align: middle; }
+
+    /* PAGE SECTIONS */
+    .page-section { padding: 28px 20px 32px; }
+    .section-label { font-size: 0.75rem; font-weight: 600; color: rgb(34,197,94); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+    h2 { font-size: 2rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+    .border-top { border-top: 1px solid rgba(255,255,255,0.05); }
+
+    /* YIELD CARDS */
+    .yield-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 40px; }
+    .yield-card { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); padding: 24px; cursor: default; display: flex; flex-direction: column; transition: background 0.3s, border-color 0.3s; }
+    .yield-card.green:hover { border-color: rgba(34,197,94,0.3); background: rgba(255,255,255,0.05); }
+    .yield-card.amber:hover { border-color: rgba(245,158,11,0.3); background: rgba(255,255,255,0.05); }
+    .yield-asset { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); margin-bottom: 16px; line-height: 1.3; }
+    .yield-pct { font-size: 3rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin-bottom: 12px; }
+    .yield-pct.green { color: rgb(34,197,94); }
+    .yield-pct.amber { color: rgb(245,158,11); }
+    .yield-pct.loading { color: rgba(255,255,255,0.2); animation: pulse 1.5s infinite; font-size: 2rem; }
+    .yield-desc { font-size: 0.875rem; color: rgba(255,255,255,0.35); line-height: 1.5; }
+    .yield-risk-panel { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.35s, opacity 0.3s; }
+    .yield-card:hover .yield-risk-panel { max-height: 120px; opacity: 1; }
+    .yield-risk-inner { padding-top: 16px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 10px; }
+    .risk-dots-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .risk-dots { display: flex; align-items: center; gap: 6px; }
+    .risk-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .risk-dot.filled.green { background: rgb(34,197,94); }
+    .risk-dot.filled.amber { background: rgb(245,158,11); }
+    .risk-dot.empty { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.1); }
+    .risk-label { font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.5); white-space: nowrap; }
+    .risk-label strong { color: rgba(255,255,255,0.9); font-weight: 600; }
+    .hover-note { font-size: 0.75rem; color: rgba(255,255,255,0.45); line-height: 1.5; }
+
+    /* NETWORK PROMPT */
+    .network-prompt { padding: 0 20px; display: none; }
+    .network-prompt.visible { display: block; }
+    .network-prompt-inner { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.25); border-radius: 10px; padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .network-prompt-inner p { font-size: 0.88rem; color: rgb(245,158,11); }
+    .btn-switch { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: rgb(245,158,11); padding: 0.4rem 0.9rem; border-radius: 6px; font-weight: 600; font-size: 0.82rem; cursor: pointer; white-space: nowrap; }
+    .btn-switch:hover { background: rgba(245,158,11,0.25); }
+
+    /* WALLET DASHBOARD */
+    .wallet-section { padding: 0 20px; display: none; margin-bottom: 1rem; }
+    .wallet-section.visible { display: block; }
+    .wallet-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+    .wallet-header { display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .wallet-header-left { font-size: 0.82rem; font-weight: 600; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.07em; }
+    .wallet-network { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 600; padding: 0.22rem 0.6rem; border-radius: 99px; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); color: rgb(34,197,94); }
+    .wallet-network span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .wallet-body { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: rgba(255,255,255,0.06); }
+    .wallet-stat { background: rgb(13,13,13); padding: 1.4rem 1.5rem; }
+    .wallet-stat-label { font-size: 0.73rem; font-weight: 600; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.45rem; }
+    .wallet-stat-value { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.03em; color: rgb(245,245,245); font-variant-numeric: tabular-nums; }
+    .wallet-stat-sub { font-size: 0.75rem; color: rgba(255,255,255,0.3); margin-top: 0.2rem; }
+    .wallet-footer { padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.06); }
+    .wallet-footer p { font-size: 0.83rem; color: rgba(255,255,255,0.4); }
+    .wallet-footer strong { color: rgba(255,255,255,0.8); }
+    .btn-telegram { display: inline-flex; align-items: center; gap: 0.45rem; background: #229ED9; color: #fff; padding: 0.5rem 1.1rem; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; transition: opacity 0.2s; white-space: nowrap; }
+    .btn-telegram:hover { opacity: 0.85; color: #fff; }
+    .btn-telegram svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    /* HOW IT WORKS */
+    .steps-row { display: flex; flex-direction: column; gap: 64px; margin-top: 48px; align-items: flex-start; }
+    .steps-list { flex: 1; min-width: 0; width: 100%; }
+    .step-item { display: flex; gap: 24px; }
+    .step-node { display: flex; flex-direction: column; align-items: center; }
+    .step-circle { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(34,197,94,0.5); background: rgba(34,197,94,0.05); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-num { font-size: 0.75rem; font-weight: 700; color: rgb(34,197,94); }
+    .laser-bar { position: relative; width: 1px; flex: 1; margin: 4px auto; overflow: hidden; background: rgba(255,255,255,0.08); min-height: 40px; }
+    .laser-bar::after { content: ''; position: absolute; left: 0; right: 0; height: 33%; background: linear-gradient(transparent, rgb(34,197,94) 40%, rgb(134,239,172) 60%, rgb(34,197,94) 80%, transparent); animation: laserDown 3.5s linear infinite; }
+    .step-content { flex: 1; padding-bottom: 40px; }
+    .step-content.last { padding-bottom: 0; }
+    .step-title { font-size: 1.25rem; font-weight: 700; color: rgb(255,255,255); line-height: 1.3; margin-bottom: 4px; }
+    .step-desc { font-size: 1rem; color: rgba(255,255,255,0.5); line-height: 1.7; }
+
+    /* PHONE MOCKUP */
+    .phone-wrap { flex: 1; display: flex; justify-content: center; width: 100%; }
+    .phone { width: 280px; background: rgb(17,17,22); border-radius: 2.5rem; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+    .phone-top-bar { display: flex; align-items: center; justify-content: center; padding: 16px 24px 12px; }
+    .phone-notch { width: 80px; height: 6px; border-radius: 9999px; background: rgba(255,255,255,0.1); }
+    .phone-status { display: flex; align-items: center; justify-content: space-between; padding: 0 20px 8px; font-size: 10px; color: rgba(255,255,255,0.25); font-weight: 500; }
+    .tg-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); background: rgb(26,26,36); }
+    .tg-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(34,197,94,0.2); border: 1px solid rgba(34,197,94,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .tg-avatar span { font-size: 10px; font-weight: 700; color: rgb(34,197,94); }
+    .tg-name { font-size: 0.75rem; font-weight: 600; color: rgb(255,255,255); }
+    .tg-status { font-size: 10px; color: rgb(34,197,94); }
+    .tg-chat { padding: 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .tg-bubble { border-radius: 4px 16px 16px; padding: 12px 16px; font-size: 0.75rem; line-height: 1.6; color: rgba(255,255,255,0.8); background: rgb(30,30,42); }
+    .tg-bubble-title { font-weight: 600; color: rgb(255,255,255); margin-bottom: 4px; }
+    .tg-bubble .accent { color: rgb(34,197,94); font-weight: 600; }
+    .tg-bubble .dim { color: rgba(255,255,255,0.5); margin-top: 8px; display: block; }
+    .tg-meta { font-size: 10px; color: rgba(255,255,255,0.2); text-align: right; }
+    .tg-actions { display: flex; gap: 8px; padding-top: 4px; }
+    .tg-approve { flex: 1; padding: 8px; border-radius: 12px; background: rgb(34,197,94); color: rgb(13,13,13); font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; }
+    .tg-dismiss { flex: 1; padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); font-size: 0.75rem; font-weight: 600; background: transparent; cursor: pointer; }
+    .phone-bottom-bar { display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .phone-home-bar { width: 96px; height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.1); }
+
+    /* ON-CHAIN TABLE */
+    .onchain-table { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); overflow: hidden; max-width: 48rem; margin-top: 48px; }
+    .onchain-row { display: flex; flex-direction: column; gap: 8px; padding: 20px 24px; }
+    .onchain-row + .onchain-row { border-top: 1px solid rgba(255,255,255,0.06); }
+    .onchain-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); width: 112px; flex-shrink: 0; }
+    .onchain-value { font-size: 0.875rem; line-height: 1.6; }
+    .onchain-value.mono { font-family: "SF Mono","Fira Code",Menlo,monospace; }
+    .onchain-value.accent { color: rgb(34,197,94); }
+    .onchain-value.muted { color: rgba(255,255,255,0.7); }
+
+    /* CLOSING CTA */
+    .cta-section { text-align: center; padding-top: 80px !important; padding-bottom: 96px !important; }
+    .cta-btns { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 40px; }
+
+    /* WALLET MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 500; display: none; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: rgb(17,17,22); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; width: 100%; max-width: 400px; overflow: hidden; animation: modalIn 0.18s ease; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .modal-head h3 { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .modal-close { background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 1.4rem; line-height: 1; padding: 0.1rem 0.3rem; border-radius: 4px; transition: color 0.15s; }
+    .modal-close:hover { color: rgb(255,255,255); }
+    .modal-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .wallet-option { display: flex; align-items: center; gap: 0.85rem; width: 100%; background: none; border: 1px solid transparent; border-radius: 10px; padding: 0.85rem 1rem; cursor: pointer; text-align: left; color: rgb(245,245,245); font-size: 0.92rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
+    .wallet-option:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+    .wallet-option:disabled { opacity: 0.4; cursor: not-allowed; }
+    .wallet-icon { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; background: #fff; flex-shrink: 0; }
+    .wallet-icon-placeholder { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.06); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .wallet-option-name { flex: 1; }
+    .wallet-option-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 99px; background: rgba(34,197,94,0.1); color: rgb(34,197,94); border: 1px solid rgba(34,197,94,0.2); }
+    .wallet-option-badge.soon { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.08); }
+    .modal-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 0.35rem 0; }
+    .modal-footer { padding: 0.85rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.06); }
+    .modal-footer p { font-size: 0.75rem; color: rgba(255,255,255,0.3); text-align: center; line-height: 1.5; }
+    .no-wallet-msg { padding: 1.25rem; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.88rem; line-height: 1.7; }
+    .no-wallet-msg a { color: rgb(34,197,94); }
+    .no-wallet-msg a:hover { text-decoration: underline; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid rgba(255,255,255,0.05); padding: 40px 20px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+    .footer-logo { font-size: 1.125rem; font-weight: 700; }
+    .footer-copy { font-size: 0.75rem; color: rgba(255,255,255,0.2); }
+    .footer-copy a { color: rgba(255,255,255,0.35); transition: color 0.2s; }
+    .footer-copy a:hover { color: rgba(255,255,255,0.7); }
+
+    /* RESPONSIVE */
+    @media (max-width: 640px) { .wallet-body { grid-template-columns: 1fr; } }
+    @media (min-width: 480px) { .phone { width: 320px; } }
+    @media (min-width: 640px) {
+      .yield-grid { grid-template-columns: repeat(2, 1fr); }
+      .cta-btns { flex-direction: row; justify-content: center; }
+    }
+    @media (min-width: 768px) {
+      nav { padding: 16px 48px; }
+      .nav-links { gap: 12px; }
+      .nav-link { display: block; }
+      #btn-connect { display: block; }
+      .btn-nav-green { font-size: 0.875rem; padding: 8px 16px; }
+      .hero { flex-direction: row; min-height: 100vh; padding-top: 80px; }
+      .hero-spotlight { left: 80px; top: -80px; }
+      .hero-left { padding: 0 40px 0 64px; }
+      .hero-right { padding: 0 48px 0 32px; }
+      h1 { font-size: 3.75rem; }
+      .hero-sub { font-size: 1.125rem; }
+      .cta-label { font-size: 0.875rem; }
+      .cta-buttons { flex-direction: row; align-items: center; }
+      .page-section { padding: 32px 64px; }
+      .network-prompt { padding: 0 64px; }
+      .wallet-section { padding: 0 64px; }
+      h2 { font-size: 3rem; }
+      .onchain-row { flex-direction: row; align-items: center; justify-content: space-between; }
+      .onchain-value { text-align: right; }
+      footer { flex-direction: row; align-items: center; justify-content: space-between; padding: 40px 64px; }
+    }
+    @media (min-width: 1024px) {
+      h1 { font-size: 4.5rem; }
+      .hero-left { padding: 0 40px 0 96px; }
+      .page-section { padding: 32px 96px; }
+      .network-prompt { padding: 0 96px; }
+      .wallet-section { padding: 0 96px; }
+      h2 { font-size: 3.75rem; }
+      .yield-grid { grid-template-columns: repeat(4, 1fr); }
+      .steps-row { flex-direction: row; gap: 96px; }
+      footer { padding: 40px 96px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- WALLET MODAL -->
+<div class="modal-overlay" id="wallet-modal" role="dialog" aria-modal="true" aria-label="Connect wallet">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Connect Wallet</h3>
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body" id="wallet-list">
+      <p class="no-wallet-msg">Scanning for wallets…</p>
+    </div>
+    <div class="modal-footer">
+      <p>By connecting, you confirm you own this wallet.<br>No transaction will be sent without your approval.</p>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <span class="nav-logo">RW<span class="accent">Ai</span></span>
+  <div class="nav-links">
+    <a href="#how-it-works" class="nav-link">How it works</a>
+    <a href="#on-chain" class="nav-link">Contract</a>
+    <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
+    <button id="btn-connect">Connect Wallet</button>
+    <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-spotlight"></div>
+  <div class="hero-left">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      Live on Mantle
+    </div>
+    <h1>
+      Your RWA yield agent,<br>
+      <span class="green">Watching while you sleep<span class="animated-dots" id="dots"><span>.</span><span>.</span><span>.</span></span></span>
+    </h1>
+    <p class="hero-sub">
+      Most holders don't know when and why their RWA token yields shift — or what to do about it.
+      RWAi <strong style="color:rgb(255,255,255);font-weight:700">watches</strong> 24/7, <strong style="color:rgb(255,255,255);font-weight:700">explains</strong> every change, and <strong style="color:rgb(255,255,255);font-weight:700">acts</strong> with your permission.
+    </p>
+    <div class="hero-cta" id="get-started">
+      <p class="cta-label">Ready to stop guessing?</p>
+      <div class="cta-buttons">
+        <button class="btn-primary" id="btn-hero-connect">Connect wallet — see your yield</button>
+        <a href="https://t.me/rwaiapp_bot" class="btn-secondary" target="_blank">Open in Telegram</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="terminal-dots">
+            <div class="terminal-dot" style="background:#ff5f56"></div>
+            <div class="terminal-dot" style="background:#ffbd2e"></div>
+            <div class="terminal-dot" style="background:#27c93f"></div>
+          </div>
+          <span class="terminal-label">rwai-agent-v1 — live_trace</span>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-logs" id="terminal-logs"></div>
+          <div class="terminal-cursor-row">
+            <span class="log-time" id="cursor-time">[--:--:--]</span>
+            <span class="terminal-cursor"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- YIELD CARDS -->
+<section class="page-section">
+  <p class="section-label">Live yield intelligence</p>
+  <h2>What the agent is watching.</h2>
+  <div class="yield-grid">
+    <div class="yield-card green">
+      <p class="yield-asset">USDY — ONDO FINANCE</p>
+      <div class="yield-pct green loading" id="usdy-apy">—</div>
+      <p class="yield-desc">Tokenized US Treasuries</p>
+      <div class="yield-risk-panel">
+        <div class="yield-risk-inner">
+          <div class="risk-dots-row">
+            <div class="risk-dots">
+              <div class="risk-dot filled green"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+            </div>
+            <span class="risk-label">Risk 1/5 — <strong>Very Low</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="yield-card green">
+      <p class="yield-asset">METH — MANTLE STAKING</p>
+      <div class="yield-pct green loading" id="meth-apr">—</div>
+      <p class="yield-desc">Native ETH liquid staking on Mantle</p>
+      <div class="yield-risk-panel">
+        <div class="yield-risk-inner">
+          <div class="risk-dots-row">
+            <div class="risk-dots">
+              <div class="risk-dot filled green"></div>
+              <div class="risk-dot filled green"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+            </div>
+            <span class="risk-label">Risk 2/5 — <strong>Low</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="yield-card green">
+      <p class="yield-asset">CMETH — AUTO-COMPOUND</p>
+      <div class="yield-pct green loading" id="cmeth-apy">—</div>
+      <p class="yield-desc">Auto-compounding mETH vault strategy</p>
+      <div class="yield-risk-panel">
+        <div class="yield-risk-inner">
+          <div class="risk-dots-row">
+            <div class="risk-dots">
+              <div class="risk-dot filled green"></div>
+              <div class="risk-dot filled green"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+            </div>
+            <span class="risk-label">Risk 2/5 — <strong>Low</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="yield-card amber">
+      <p class="yield-asset">SPREAD (USDY – METH)</p>
+      <div class="yield-pct amber loading" id="spread">—</div>
+      <p class="yield-desc" id="spread-sub">Arbitrage spread between USDY and mETH yields</p>
+      <div class="yield-risk-panel">
+        <div class="yield-risk-inner">
+          <div class="risk-dots-row">
+            <div class="risk-dots">
+              <div class="risk-dot filled amber"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+              <div class="risk-dot empty"></div><div class="risk-dot empty"></div>
+            </div>
+            <span class="risk-label">Risk 1/5 — <strong>Very Low</strong></span>
+          </div>
+          <p class="hover-note">Spread &gt; 1.5% triggers a rebalancing alert. RWAi is watching this.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NETWORK PROMPT -->
+<div class="network-prompt" id="network-prompt">
+  <div class="network-prompt-inner">
+    <p>Switch to Mantle Mainnet to see your on-chain USDY balance.</p>
+    <button class="btn-switch" id="btn-switch-network">Switch to Mantle</button>
+  </div>
+</div>
+
+<!-- WALLET DASHBOARD -->
+<div class="wallet-section" id="wallet-section">
+  <div class="wallet-panel">
+    <div class="wallet-header">
+      <span class="wallet-header-left">Your Position</span>
+      <span class="wallet-network"><span></span> Mantle Mainnet</span>
+    </div>
+    <div class="wallet-body">
+      <div class="wallet-stat">
+        <div class="wallet-stat-label">Wallet</div>
+        <div class="wallet-stat-value" id="dash-address" style="font-size:0.92rem;letter-spacing:-0.01em;font-family:'SF Mono','Fira Code',monospace;">—</div>
+        <div class="wallet-stat-sub" id="dash-wallet-name">Connected</div>
+      </div>
+      <div class="wallet-stat">
+        <div class="wallet-stat-label">USDY Balance</div>
+        <div class="wallet-stat-value" id="dash-usdy">—</div>
+        <div class="wallet-stat-sub">on Mantle Mainnet</div>
+      </div>
+      <div class="wallet-stat">
+        <div class="wallet-stat-label">Current USDY Yield</div>
+        <div class="wallet-stat-value" id="dash-yield" style="color:rgb(34,197,94);">—</div>
+        <div class="wallet-stat-sub">via DeFiLlama</div>
+      </div>
+    </div>
+    <div class="wallet-footer">
+      <p>Get <strong>real-time alerts</strong> when yield shifts or a rebalance is worth considering.</p>
+      <a href="https://t.me/rwaiapp_bot" class="btn-telegram" target="_blank">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.17 13.847l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.978.712z"/></svg>
+        Get alerts on Telegram
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="page-section border-top" id="how-it-works">
+  <p class="section-label">How it works</p>
+  <h2>Four steps. One tap to act.</h2>
+  <div class="steps-row">
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-node">
+          <div class="step-circle"><span class="step-num">01</span></div>
+          <div class="laser-bar"></div>
+        </div>
+        <div class="step-content">
+          <div class="step-title">Connect or jump in</div>
+          <div class="step-desc">Link your wallet to see your positions — or go straight to Telegram. No signup required.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-node">
+          <div class="step-circle"><span class="step-num">02</span></div>
+          <div class="laser-bar"></div>
+        </div>
+        <div class="step-content">
+          <div class="step-title">RWAi scans Mantle</div>
+          <div class="step-desc">The agent reads live yield data for USDY, mETH, and cmETH every 30 minutes.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-node">
+          <div class="step-circle"><span class="step-num">03</span></div>
+          <div class="laser-bar"></div>
+        </div>
+        <div class="step-content">
+          <div class="step-title">Get plain-English signals</div>
+          <div class="step-desc">When something worth knowing happens, RWAi explains it clearly and tells you what to consider.</div>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-node">
+          <div class="step-circle"><span class="step-num">04</span></div>
+        </div>
+        <div class="step-content last">
+          <div class="step-title">Act — or let RWAi act for you</div>
+          <div class="step-desc">One-tap approvals via Telegram, or full autonomous execution. Your call.</div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="phone-top-bar"><div class="phone-notch"></div></div>
+        <div class="phone-status"><span>09:41</span><span>●●●</span></div>
+        <div class="tg-header">
+          <div class="tg-avatar"><span>Ri</span></div>
+          <div>
+            <div class="tg-name">RWAi Agent</div>
+            <div class="tg-status">● online</div>
+          </div>
+        </div>
+        <div class="tg-chat">
+          <div class="tg-bubble">
+            <p class="tg-bubble-title">⚡ Yield Alert</p>
+            <p>USDY spread vs mETH just crossed <span class="accent">1.5%</span>. This is above your alert threshold.</p>
+            <span class="dim">Suggested: move <span style="color:rgba(255,255,255,0.8)">15%</span> from mETH → USDY to capture the spread.</span>
+          </div>
+          <div class="tg-meta">RWAi · just now</div>
+          <div class="tg-actions">
+            <button class="tg-approve">✓ Approve</button>
+            <button class="tg-dismiss">Dismiss</button>
+          </div>
+        </div>
+        <div class="phone-bottom-bar"><div class="phone-home-bar"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ON-CHAIN -->
+<section class="page-section border-top" id="on-chain">
+  <p class="section-label">On-chain</p>
+  <h2>Verifiable from Day 1</h2>
+  <div class="onchain-table">
+    <div class="onchain-row">
+      <span class="onchain-label">REGISTRY</span>
+      <span class="onchain-value muted">ERC-8004 Reputation Registry — Mantle Mainnet</span>
+    </div>
+    <div class="onchain-row">
+      <span class="onchain-label">ADDRESS</span>
+      <span class="onchain-value mono accent">
+        <a href="https://explorer.mantle.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" style="color:inherit">0x8004BAa17C55a88189AE136b182e5fdA19dE9b63</a>
+      </span>
+    </div>
+    <div class="onchain-row">
+      <span class="onchain-label">LATEST TX</span>
+      <span class="onchain-value mono accent">
+        <a href="https://explorer.mantle.xyz/tx/0xb24c9762becc831a9855a2a73b657f841f42a59f8858f2822ea9e7aee50080ec" target="_blank" style="color:inherit">0xb24c976…0080ec</a>
+      </span>
+    </div>
+    <div class="onchain-row">
+      <span class="onchain-label">HACKATHON</span>
+      <span class="onchain-value accent">
+        <a href="https://dorahacks.io/hackathon/mantleturingtesthackathon2026" target="_blank" style="color:inherit">Mantle Turing Test Hackathon 2026 — AI × RWA track</a>
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSING CTA -->
+<section class="page-section border-top cta-section">
+  <p class="section-label">Ready to start?</p>
+  <h2>Stop watching yields manually.<br>Let RWAi do it for you.</h2>
+  <div class="cta-btns">
+    <button class="btn-primary" id="btn-cta-connect">Connect wallet — see your yield</button>
+    <a href="https://t.me/rwaiapp_bot" class="btn-secondary" target="_blank">Open in Telegram</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-logo">RW<span class="accent">Ai</span></span>
+  <span class="footer-copy">Built by <a href="https://x.com/0xSunSeeker">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 · <a href="https://t.me/rwaiapp_bot">Telegram</a> · <a href="https://github.com/0xSunSeeker/rwai">GitHub</a></span>
+  <span class="footer-copy">© 2026 RWAi. All rights reserved.</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+<script>
+// ── YIELD TICKER ──────────────────────────────────────────────────────────────
+let liveUSDYApy = 3.55;
+
+async function loadYields() {
+  try {
+    const res = await fetch('https://yields.llama.fi/pools');
+    const { data } = await res.json();
+    const usdyPool = data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle')
+                  ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY');
+    const methPool = data.find(p => p.pool === 'b9f2f00a-ba96-4589-a171-dde979a23d87')
+                  ?? data.find(p => p.project === 'meth-protocol');
+    liveUSDYApy = parseFloat(usdyPool?.apy ?? 3.55);
+    const methApr = parseFloat(methPool?.apy ?? 1.0);
+    const cmethApy = parseFloat(((Math.pow(1 + methApr / 100 / 365, 365) - 1) * 100).toFixed(2));
+    const spread = (liveUSDYApy - methApr).toFixed(2);
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = val;
+      el.classList.remove('loading');
+    };
+    set('usdy-apy', liveUSDYApy.toFixed(2) + '%');
+    set('meth-apr', methApr.toFixed(2) + '%');
+    set('cmeth-apy', cmethApy.toFixed(2) + '%');
+    set('spread', spread + '%');
+    const wide = parseFloat(spread) >= 1.5;
+    const sub = document.getElementById('spread-sub');
+    if (sub) sub.textContent = wide ? 'Spread > 1.5% — rebalance worth considering' : 'Within normal range';
+    const dy = document.getElementById('dash-yield');
+    if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
+  } catch {
+    ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = '—'; el.classList.remove('loading'); }
+    });
+  }
+}
+
+// ── WALLET STATE ──────────────────────────────────────────────────────────────
+const MANTLE_CHAIN_ID = '0x1388';
+const USDY_MANTLE = '0x5be26527e817998a7206475496fde1e68957c5a6';
+const USDY_ABI = ['function balanceOf(address) view returns (uint256)'];
+const MANTLE_CHAIN_PARAMS = {
+  chainId: MANTLE_CHAIN_ID, chainName: 'Mantle',
+  nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
+  rpcUrls: ['https://rpc.mantle.xyz'],
+  blockExplorerUrls: ['https://explorer.mantle.xyz'],
+};
+
+let connectedAddress = null;
+let connectedProvider = null;
+let connectedWalletName = '';
+const announcedWallets = new Map();
+
+window.addEventListener('eip6963:announceProvider', e => {
+  announcedWallets.set(e.detail.info.rdns, e.detail);
+});
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+const modal = document.getElementById('wallet-modal');
+const walletList = document.getElementById('wallet-list');
+const btnConnect = document.getElementById('btn-connect');
+
+function openModal() {
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+  setTimeout(renderWalletList, 80);
+  modal.classList.add('open');
+  document.addEventListener('keydown', onEsc);
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  document.removeEventListener('keydown', onEsc);
+}
+
+function onEsc(e) { if (e.key === 'Escape') closeModal(); }
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+document.getElementById('modal-close').addEventListener('click', closeModal);
+
+btnConnect.addEventListener('click', () => {
+  if (connectedAddress) { disconnect(); return; }
+  openModal();
+});
+document.getElementById('btn-hero-connect').addEventListener('click', () => {
+  if (connectedAddress) { disconnect(); return; }
+  openModal();
+});
+document.getElementById('btn-cta-connect').addEventListener('click', () => {
+  if (connectedAddress) { disconnect(); return; }
+  openModal();
+});
+
+// ── WALLET LIST ───────────────────────────────────────────────────────────────
+function makeWalletBtn({ icon, name, badge, badgeSoon, onClick, disabled }) {
+  const btn = document.createElement('button');
+  btn.className = 'wallet-option';
+  if (disabled) btn.disabled = true;
+  const iconEl = icon
+    ? `<img class="wallet-icon" src="${icon}" alt="${name}" />`
+    : `<div class="wallet-icon-placeholder">🔑</div>`;
+  const badgeEl = badge
+    ? `<span class="wallet-option-badge${badgeSoon ? ' soon' : ''}">${badge}</span>` : '';
+  btn.innerHTML = `${iconEl}<span class="wallet-option-name">${name}</span>${badgeEl}`;
+  if (onClick) btn.addEventListener('click', onClick);
+  return btn;
+}
+
+function renderWalletList() {
+  walletList.innerHTML = '';
+  if (announcedWallets.size > 0) {
+    announcedWallets.forEach(({ info, provider }) => {
+      walletList.appendChild(makeWalletBtn({
+        icon: info.icon, name: info.name, badge: 'Detected',
+        onClick: async () => { closeModal(); await connectWith(provider, info.name); },
+      }));
+    });
+    const div = document.createElement('div');
+    div.className = 'modal-divider';
+    walletList.appendChild(div);
+  } else if (window.ethereum) {
+    const name = window.ethereum.isMetaMask ? 'MetaMask'
+               : window.ethereum.isCoinbaseWallet ? 'Coinbase Wallet'
+               : window.ethereum.isBraveWallet ? 'Brave Wallet' : 'Browser Wallet';
+    walletList.appendChild(makeWalletBtn({
+      icon: null, name, badge: 'Detected',
+      onClick: async () => { closeModal(); await connectWith(window.ethereum, name); },
+    }));
+    const div = document.createElement('div');
+    div.className = 'modal-divider';
+    walletList.appendChild(div);
+  } else {
+    const msg = document.createElement('div');
+    msg.className = 'no-wallet-msg';
+    msg.innerHTML = 'No wallet detected.<br>Install <a href="https://metamask.io/download/" target="_blank">MetaMask</a> or <a href="https://www.coinbase.com/wallet" target="_blank">Coinbase Wallet</a> and refresh.';
+    walletList.appendChild(msg);
+  }
+  walletList.appendChild(makeWalletBtn({
+    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAzNiAzNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHJ4PSI4IiBmaWxsPSIjM0I5OUZDIi8+PHBhdGggZD0iTTkuNiAxNi40Yy4yLS4yLjUtLjIuNyAwbDIuNCAyLjRjLjIuMi41LjIuNyAwbDQuOC00LjhjLjItLjIuNS0uMi43IDBsNC44IDQuOGMuMi4yLjUuMi43IDBsMi40LTIuNGMuMi0uMi41LS4yLjcgMHY3LjJsLTIuNCAxLjJIMTJMMTIgMjMuNiA5LjYgMjIuNHYtNnoiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
+    name: 'WalletConnect', badge: 'Coming soon', badgeSoon: true, disabled: true,
+  }));
+}
+
+// ── CONNECT / DISCONNECT ──────────────────────────────────────────────────────
+async function connectWith(provider, walletName) {
+  try {
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    if (!accounts || accounts.length === 0) return;
+    connectedAddress = accounts[0];
+    connectedProvider = provider;
+    connectedWalletName = walletName;
+    await onConnected(connectedAddress);
+    provider.on?.('accountsChanged', async (accs) => {
+      if (!accs.length) { disconnect(); return; }
+      connectedAddress = accs[0];
+      await onConnected(connectedAddress);
+    });
+    provider.on?.('chainChanged', async () => {
+      if (!connectedAddress) return;
+      await onConnected(connectedAddress);
+    });
+  } catch (err) {
+    if (err.code !== 4001) console.warn('Wallet connect error:', err.message);
+  }
+}
+
+async function onConnected(address) {
+  const short = `${address.slice(0,6)}…${address.slice(-4)}`;
+  btnConnect.textContent = short;
+  btnConnect.classList.remove('wrong-network');
+  btnConnect.classList.add('connected');
+  btnConnect.title = 'Click to disconnect';
+  document.getElementById('dash-address').textContent = short;
+  document.getElementById('dash-wallet-name').textContent = connectedWalletName || 'Connected';
+  document.getElementById('dash-yield').textContent = liveUSDYApy.toFixed(2) + '% APY';
+  document.getElementById('wallet-section').classList.add('visible');
+  const chainId = await connectedProvider.request({ method: 'eth_chainId' });
+  if (chainId !== MANTLE_CHAIN_ID) {
+    btnConnect.classList.remove('connected');
+    btnConnect.classList.add('wrong-network');
+    document.getElementById('network-prompt').classList.add('visible');
+    document.getElementById('dash-usdy').textContent = '—';
+    return;
+  }
+  document.getElementById('network-prompt').classList.remove('visible');
+  await loadUSDYBalance(address);
+}
+
+function disconnect() {
+  connectedAddress = null; connectedProvider = null; connectedWalletName = '';
+  btnConnect.textContent = 'Connect Wallet';
+  btnConnect.classList.remove('connected', 'wrong-network');
+  btnConnect.title = '';
+  document.getElementById('wallet-section').classList.remove('visible');
+  document.getElementById('network-prompt').classList.remove('visible');
+}
+
+async function loadUSDYBalance(address) {
+  const el = document.getElementById('dash-usdy');
+  el.textContent = '…';
+  try {
+    const provider = new ethers.JsonRpcProvider('https://rpc.mantle.xyz');
+    const contract = new ethers.Contract(USDY_MANTLE, USDY_ABI, provider);
+    const raw = await contract.balanceOf(address);
+    const bal = parseFloat(ethers.formatEther(raw));
+    el.textContent = '$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch { el.textContent = '—'; }
+}
+
+document.getElementById('btn-switch-network').addEventListener('click', async () => {
+  if (!connectedProvider) return;
+  try {
+    await connectedProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: MANTLE_CHAIN_ID }] });
+  } catch (err) {
+    if (err.code === 4902) {
+      await connectedProvider.request({ method: 'wallet_addEthereumChain', params: [MANTLE_CHAIN_PARAMS] });
+    }
+  }
+});
+
+async function tryAutoReconnect() {
+  await new Promise(r => setTimeout(r, 200));
+  for (const [, { info, provider }] of announcedWallets) {
+    try {
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) { connectedProvider = provider; connectedWalletName = info.name; await onConnected(accounts[0]); return; }
+    } catch {}
+  }
+  if (window.ethereum) {
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) { connectedProvider = window.ethereum; connectedWalletName = ''; await onConnected(accounts[0]); }
+    } catch {}
+  }
+}
+
+// ── BLOCK NUMBER ──────────────────────────────────────────────────────────────
+async function fetchBlockNumber() {
+  try {
+    const res = await fetch('https://rpc.mantle.xyz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 })
+    });
+    const { result } = await res.json();
+    const el = document.getElementById('block-num');
+    if (el) el.textContent = parseInt(result, 16).toLocaleString();
+  } catch {}
+}
+
+// ── TERMINAL ANIMATION ────────────────────────────────────────────────────────
+const THOUGHTS = [
+  'Your yield changed overnight. Calculating impact...',
+  'Analyzing mETH yield volatility on Mantle LSP...',
+  'Something shifted in the market. Checking your position...',
+  'Cross-referencing USDY yields with 10-Year Treasury rates...',
+  'Calculating optimal allocation for your position size...',
+  'Checking ERC-8004 registry for agent consistency...',
+  "You haven't rebalanced in 3 days. Reviewing options...",
+  'Evaluating cmETH restaking multipliers...',
+  'Verifying on-chain liquidity depth for mETH/USDY pairs...',
+  'Scanning validator performance for Mantle mETH nodes...',
+  'Fetching USDY yield from DeFiLlama API...',
+  'Translating strategy into plain English via Claude...',
+];
+
+const DECISIONS = [
+  { color: '#f0b429', text: 'Spread too wide — sending you a rebalancing proposal.' },
+  { color: '#f0b429', text: 'Decision Engine: Spread > 1.5% detected. Alerting Telegram...' },
+  { color: '#00d084', text: 'All good. Your allocation is still optimal.' },
+  { color: '#00d084', text: 'Decision Engine: Spread within normal parameters.' },
+  { color: '#00d084', text: 'Alert sent to Telegram. Waiting for your approval.' },
+  { color: '#569cd6', text: 'Registry: Logging agent trace to ERC-8004...' },
+  { color: '#00d084', text: 'Portfolio snapshot saved on-chain.' },
+  { color: '#f0b429', text: 'Rebalance proposal queued. Tap to review.' },
+];
+
+const MAX_LINES = 14;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeQueue(arr) {
+  let q = [];
+  return () => {
+    if (!q.length) q = shuffle(arr);
+    return q.shift();
+  };
+}
+
+function fmtTime(d) {
+  return `[${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}]`;
+}
+
+function initTerminal() {
+  const logsEl = document.getElementById('terminal-logs');
+  const cursorTimeEl = document.getElementById('cursor-time');
+  if (!logsEl) return;
+
+  const nextThought = makeQueue(THOUGHTS);
+  const nextDecision = makeQueue(DECISIONS);
+
+  function addLine(text, color) {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.style.animationDelay = '0s';
+    line.innerHTML = `<span class="log-time">${fmtTime(new Date())}</span><span style="color:${color}">${text}</span>`;
+    logsEl.appendChild(line);
+    // trim oldest lines if over cap
+    while (logsEl.children.length > MAX_LINES) logsEl.removeChild(logsEl.firstChild);
+    logsEl.parentElement.scrollTop = logsEl.parentElement.scrollHeight;
+  }
+
+  function updateCursor() {
+    if (cursorTimeEl) cursorTimeEl.textContent = fmtTime(new Date());
+  }
+  updateCursor();
+  setInterval(updateCursor, 1000);
+
+  // Boot sequence
+  addLine('RWAi Agent v1.0.2 initializing...', '#00d084');
+
+  setTimeout(() => {
+    addLine('Connection established: Mantle Mainnet', '#569cd6');
+  }, 1000);
+
+  setTimeout(() => {
+    addLine(nextThought(), '#569cd6');
+    // Start repeating cycle after boot thought lands
+    startCycle();
+  }, 2500);
+
+  let cycleNum = 0;
+  function startCycle() {
+    setInterval(() => {
+      cycleNum++;
+      const thought = cycleNum % 3 === 0
+        ? 'Market State: USDY 3.55% | mETH 1.02%'
+        : nextThought();
+      addLine(thought, '#569cd6');
+
+      setTimeout(() => {
+        const d = nextDecision();
+        addLine(d.text, d.color);
+      }, 3500);
+    }, 6000);
+  }
+}
+
+// ── ANIMATED DOTS ─────────────────────────────────────────────────────────────
+function initAnimatedDots() {
+  const dots = document.querySelectorAll('#dots span');
+  if (!dots.length) return;
+  const states = [
+    [0.12, 0.12, 0.12],
+    [1,    0.12, 0.12],
+    [1,    1,    0.12],
+    [1,    1,    1   ],
+  ];
+  let idx = 0;
+  const apply = () => {
+    const p = states[idx % states.length];
+    dots.forEach((d, i) => { d.style.opacity = p[i]; });
+    idx++;
+  };
+  apply();
+  setInterval(apply, 600);
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+loadYields();
+fetchBlockNumber();
+setInterval(fetchBlockNumber, 12000);
+tryAutoReconnect();
+initTerminal();
+initAnimatedDots();
+</script>
+</body>
+</html>

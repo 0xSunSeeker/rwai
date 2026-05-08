@@ -773,7 +773,8 @@ async function onConnected(address) {
     return;
   }
   document.getElementById('network-prompt').classList.remove('visible');
-  await loadTokenBalances(address);
+  sessionStorage.setItem('rwai_wallet', address);
+  window.location.href = '/dashboard';
 }
 
 function disconnect() {

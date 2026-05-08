@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — RWAi</title>
+  <meta name="description" content="RWAi Privacy Policy" />
+  <style>
+    *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: rgb(13,13,13); color: rgb(245,245,245); font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+
+    /* NAV */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(13,13,13,0.85); backdrop-filter: blur(8px); }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; flex-shrink: 0; }
+    .accent { color: rgb(34,197,94); }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link { display: none; font-size: 0.875rem; color: rgba(255,255,255,0.5); padding: 4px 8px; transition: color 0.2s; }
+    .nav-link:hover { color: rgb(255,255,255); }
+    .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 12px; border-radius: 9999px; background: rgb(34,197,94); color: rgb(13,13,13); border: none; transition: background 0.2s; white-space: nowrap; cursor: pointer; }
+    .btn-nav-green:hover { background: rgb(22,163,74); color: rgb(13,13,13); }
+    @media (min-width: 768px) {
+      nav { padding: 16px 48px; }
+      .nav-links { gap: 12px; }
+      .nav-link { display: block; }
+      .btn-nav-green { font-size: 0.875rem; padding: 8px 16px; }
+    }
+
+    /* CONTENT */
+    .legal-wrap { max-width: 720px; margin: 0 auto; padding: 120px 24px 80px; }
+    .legal-label { font-size: 0.75rem; font-weight: 600; color: rgb(34,197,94); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+    .legal-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 8px; }
+    .legal-date { font-size: 0.8rem; color: rgba(255,255,255,0.3); margin-bottom: 48px; }
+    .legal-section { margin-bottom: 40px; }
+    .legal-section h2 { font-size: 1rem; font-weight: 700; color: rgb(255,255,255); margin-bottom: 12px; letter-spacing: -0.01em; }
+    .legal-section p { font-size: 0.9rem; color: rgba(255,255,255,0.55); line-height: 1.8; }
+    .legal-section a { color: rgb(34,197,94); }
+    .legal-section a:hover { text-decoration: underline; }
+    .divider { height: 1px; background: rgba(255,255,255,0.05); margin-bottom: 40px; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid rgba(255,255,255,0.05); padding: 40px 20px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+    .footer-logo { font-size: 1.125rem; font-weight: 700; }
+    .footer-copy { font-size: 0.75rem; color: rgba(255,255,255,0.2); }
+    .footer-copy a { color: rgba(255,255,255,0.35); transition: color 0.2s; }
+    .footer-copy a:hover { color: rgba(255,255,255,0.7); }
+    @media (min-width: 768px) {
+      footer { flex-direction: row; align-items: center; justify-content: space-between; padding: 40px 64px; }
+    }
+    @media (min-width: 1024px) { footer { padding: 40px 96px; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">RW<span class="accent">Ai</span></a>
+  <div class="nav-links">
+    <a href="/#how-it-works" class="nav-link">How it works</a>
+    <a href="/#on-chain" class="nav-link">Contract</a>
+    <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
+    <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
+  </div>
+</nav>
+
+<div class="legal-wrap">
+  <div class="legal-label">Legal</div>
+  <div class="legal-title">Privacy Policy</div>
+  <div class="legal-date">Last updated: May 2026</div>
+
+  <div class="divider"></div>
+
+  <div class="legal-section">
+    <h2>1. Overview</h2>
+    <p>RWAI is designed with privacy as a default. We collect the minimum data necessary to provide the service and nothing more. We do not sell, share, or monetise any user data.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>2. What We Collect</h2>
+    <p>When you connect your wallet to rwai.fyi, we read your public wallet address and your on-chain token balances for USDY, mETH, and cmETH on Mantle Mainnet. This data is already publicly visible on the blockchain — we are simply reading it to display your positions.</p>
+    <br>
+    <p>We do not collect your name, email address, IP address, or any personally identifiable information.</p>
+    <br>
+    <p>If you use the Telegram bot, your Telegram user ID is stored locally on the server running the RWAI agent to associate your preferences (delegation tier, alert settings) with your session. This data is not shared with any third party.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>3. On-Chain Data</h2>
+    <p>When RWAI logs a decision to the Mantle Mainnet via ERC-8004, the following data is written permanently to the blockchain: a hash of the agent's reasoning, a timestamp, and the agent's wallet address. Your wallet address is only written on-chain when you explicitly approve a transaction.</p>
+    <br>
+    <p>Blockchain data is public and permanent by nature. Once written on-chain, it cannot be deleted.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>4. Cookies and Tracking</h2>
+    <p>rwai.fyi uses no advertising cookies, tracking pixels, or analytics services. We do not use Google Analytics or any third-party tracking tools. The only data stored in your browser is your wallet connection state, which is cleared when you disconnect.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>5. Third-Party Services</h2>
+    <p>RWAI fetches yield data from DeFiLlama (defillama.com) and token prices from CoinGecko (coingecko.com). These requests are made from your browser directly. Please refer to their respective privacy policies for how they handle request data.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>6. Data Retention</h2>
+    <p>Telegram bot preferences are stored locally on the RWAI server and can be deleted upon request. On-chain data cannot be deleted as it is permanent by design. We do not maintain any other databases of user information.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>7. Your Rights</h2>
+    <p>You can disconnect your wallet at any time, which removes your session data from our frontend. You can request deletion of any off-chain data we hold about you by contacting us.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>8. Children</h2>
+    <p>RWAI is not intended for users under 18 years of age.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>9. Changes</h2>
+    <p>This policy may be updated at any time. We will note the date of the last update at the top of this page.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>10. Contact</h2>
+    <p>For privacy questions: <a href="https://x.com/0xSunSeeker" target="_blank">@0xSunSeeker on X</a> or via <a href="https://github.com/0xSunSeeker/rwai" target="_blank">github.com/0xSunSeeker/rwai</a>.</p>
+  </div>
+</div>
+
+<footer>
+  <span class="footer-logo">RW<span class="accent">Ai</span></span>
+  <span class="footer-copy">Built by <a href="https://x.com/0xSunSeeker">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 · <a href="https://t.me/rwaiapp_bot">Telegram</a> · <a href="https://github.com/0xSunSeeker/rwai">GitHub</a> · <a href="/tos.html">Terms</a> · <a href="/privacy.html">Privacy</a></span>
+  <span class="footer-copy">© 2026 RWAi. All rights reserved.</span>
+</footer>
+
+</body>
+</html>

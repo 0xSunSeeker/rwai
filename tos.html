@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — RWAi</title>
+  <meta name="description" content="RWAi Terms of Service" />
+  <style>
+    *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: rgb(13,13,13); color: rgb(245,245,245); font-family: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+
+    /* NAV */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(13,13,13,0.85); backdrop-filter: blur(8px); }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; flex-shrink: 0; }
+    .accent { color: rgb(34,197,94); }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link { display: none; font-size: 0.875rem; color: rgba(255,255,255,0.5); padding: 4px 8px; transition: color 0.2s; }
+    .nav-link:hover { color: rgb(255,255,255); }
+    .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 12px; border-radius: 9999px; background: rgb(34,197,94); color: rgb(13,13,13); border: none; transition: background 0.2s; white-space: nowrap; cursor: pointer; }
+    .btn-nav-green:hover { background: rgb(22,163,74); color: rgb(13,13,13); }
+    @media (min-width: 768px) {
+      nav { padding: 16px 48px; }
+      .nav-links { gap: 12px; }
+      .nav-link { display: block; }
+      .btn-nav-green { font-size: 0.875rem; padding: 8px 16px; }
+    }
+
+    /* CONTENT */
+    .legal-wrap { max-width: 720px; margin: 0 auto; padding: 120px 24px 80px; }
+    .legal-label { font-size: 0.75rem; font-weight: 600; color: rgb(34,197,94); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+    .legal-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 8px; }
+    .legal-date { font-size: 0.8rem; color: rgba(255,255,255,0.3); margin-bottom: 48px; }
+    .legal-section { margin-bottom: 40px; }
+    .legal-section h2 { font-size: 1rem; font-weight: 700; color: rgb(255,255,255); margin-bottom: 12px; letter-spacing: -0.01em; }
+    .legal-section p { font-size: 0.9rem; color: rgba(255,255,255,0.55); line-height: 1.8; }
+    .legal-section a { color: rgb(34,197,94); }
+    .legal-section a:hover { text-decoration: underline; }
+    .divider { height: 1px; background: rgba(255,255,255,0.05); margin-bottom: 40px; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid rgba(255,255,255,0.05); padding: 40px 20px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+    .footer-logo { font-size: 1.125rem; font-weight: 700; }
+    .footer-copy { font-size: 0.75rem; color: rgba(255,255,255,0.2); }
+    .footer-copy a { color: rgba(255,255,255,0.35); transition: color 0.2s; }
+    .footer-copy a:hover { color: rgba(255,255,255,0.7); }
+    @media (min-width: 768px) {
+      footer { flex-direction: row; align-items: center; justify-content: space-between; padding: 40px 64px; }
+    }
+    @media (min-width: 1024px) { footer { padding: 40px 96px; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">RW<span class="accent">Ai</span></a>
+  <div class="nav-links">
+    <a href="/#how-it-works" class="nav-link">How it works</a>
+    <a href="/#on-chain" class="nav-link">Contract</a>
+    <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
+    <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
+  </div>
+</nav>
+
+<div class="legal-wrap">
+  <div class="legal-label">Legal</div>
+  <div class="legal-title">Terms of Service</div>
+  <div class="legal-date">Last updated: May 2026</div>
+
+  <div class="divider"></div>
+
+  <div class="legal-section">
+    <h2>1. What RWAI Is</h2>
+    <p>RWAI is an autonomous yield monitoring agent that tracks USDY, mETH, and cmETH positions on the Mantle Network. RWAI provides yield intelligence, plain-English explanations, and rebalancing proposals. RWAI is not a financial advisor, broker, or regulated investment service. Nothing RWAI says or proposes constitutes financial advice. All decisions are yours.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>2. Not Financial Advice</h2>
+    <p>All yield data, agent insights, rebalancing proposals, and predictions provided by RWAI are for informational purposes only. Past agent accuracy does not guarantee future performance. Always do your own research before making any financial decision. RWAI is experimental software built for the Mantle Turing Test Hackathon 2026.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>3. Geographic Restrictions</h2>
+    <p>USDY is issued by Ondo Finance and is not available to US persons or residents of restricted jurisdictions as defined by Ondo Finance's terms. By using RWAI you confirm that you are not a US person and that your use of RWAI and any monitored assets complies with the laws of your jurisdiction. It is your responsibility to ensure you are eligible to hold and interact with the assets RWAI monitors.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>4. Wallet and Transactions</h2>
+    <p>RWAI never has custody of your funds. When you connect your wallet, RWAI reads your on-chain balances in read-only mode. Any transaction — including approved rebalances — requires your explicit on-chain signature. RWAI cannot move your funds without your approval. For Tier 3 delegated execution, you explicitly authorise the RWAI agent address to execute swaps up to your defined cap. You can revoke this authorisation at any time.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>5. On-Chain Data</h2>
+    <p>RWAI logs agent decisions and reasoning hashes to the Mantle Mainnet via the ERC-8004 Reputation Registry. This data is permanently public and immutable on the blockchain. Do not approve any action you would not want permanently recorded on-chain.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>6. No Warranties</h2>
+    <p>RWAI is provided as-is with no warranties of any kind. Yield data is sourced from DeFiLlama and on-chain sources and may be delayed or inaccurate. RWAI may be unavailable at any time. We are not liable for any losses arising from use of RWAI, including but not limited to missed yield opportunities, failed transactions, or inaccurate agent recommendations.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>7. Limitation of Liability</h2>
+    <p>To the maximum extent permitted by law, RWAI and its contributors shall not be liable for any direct, indirect, incidental, or consequential damages arising from your use of the platform.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>8. Changes</h2>
+    <p>These terms may be updated at any time. Continued use of RWAI after changes constitutes acceptance of the updated terms.</p>
+  </div>
+
+  <div class="legal-section">
+    <h2>9. Contact</h2>
+    <p>For questions: <a href="https://x.com/0xSunSeeker" target="_blank">@0xSunSeeker on X</a> or via the GitHub repository at <a href="https://github.com/0xSunSeeker/rwai" target="_blank">github.com/0xSunSeeker/rwai</a>.</p>
+  </div>
+</div>
+
+<footer>
+  <span class="footer-logo">RW<span class="accent">Ai</span></span>
+  <span class="footer-copy">Built by <a href="https://x.com/0xSunSeeker">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 · <a href="https://t.me/rwaiapp_bot">Telegram</a> · <a href="https://github.com/0xSunSeeker/rwai">GitHub</a> · <a href="/tos.html">Terms</a> · <a href="/privacy.html">Privacy</a></span>
+  <span class="footer-copy">© 2026 RWAi. All rights reserved.</span>
+</footer>
+
+</body>
+</html>

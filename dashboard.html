@@ -1057,6 +1057,7 @@
       document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
       renderChange('usdy-change', coin.usd_24h_change);
       updateTotal();
+      updateInsightCard();
     })
     .catch(function () {
       usdyUSD = 1.013; // fallback: USDY appreciates, not pegged at $1
@@ -1069,6 +1070,7 @@
       document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
       document.getElementById('usdy-change').textContent = '';
       updateTotal();
+      updateInsightCard();
     });
 
   /* ── mETH price + 24h change ── */
@@ -1340,12 +1342,67 @@
     } catch (e) {}
   }
 
+  /* ── Live Insight Card ── */
+  function updateInsightCard() {
+    if (usdyUSD === null || methUSD === null) return;
+    var usdyVal = USDY_BALANCE * usdyUSD;
+    var methVal = METH_BALANCE * methUSD;
+    var spread  = USDY_APY - METH_APR; // positive = USDY yields more
+    var absPct  = (Math.abs(spread) * 100).toFixed(2) + '%';
+    var body = document.querySelector('.insight-body');
+    var approveBtn     = document.getElementById('btn-approve');
+    var approveContent = document.getElementById('approve-content');
+    if (!body) return;
+
+    if (spread >= 0) {
+      // USDY leads — good if user is in USDY, recommend moving TO USDY if in mETH
+      if (USDY_BALANCE > 0) {
+        var extraY = usdyVal * spread;
+        body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
+          'On your ' + fmt(usdyVal) + ' USDY position, staying put earns an extra ' +
+          fmt(extraY) + ' per year vs moving to mETH. <strong>Hold current position.</strong>';
+        if (approveContent) approveContent.textContent = 'No action needed';
+        if (approveBtn) { approveBtn.disabled = true; approveBtn.className = 'btn-approve no-action'; }
+      } else if (METH_BALANCE > 0) {
+        var gain = methVal * spread;
+        body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than your mETH. ' +
+          'Moving ' + fmt(methVal) + ' from mETH to USDY could earn an extra ' +
+          fmt(gain) + ' per year. <strong>Consider rebalancing to USDY.</strong>';
+        if (approveContent) approveContent.textContent = 'Approve Rebalance → USDY';
+        if (approveBtn) { approveBtn.disabled = false; approveBtn.className = 'btn-approve'; }
+      } else {
+        body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
+          'No RWA positions detected in this wallet yet.';
+      }
+    } else {
+      // mETH leads — good if user is in mETH, recommend moving TO mETH if in USDY
+      if (METH_BALANCE > 0) {
+        var extraY2 = methVal * Math.abs(spread);
+        body.innerHTML = 'mETH is currently yielding <strong>' + absPct + '</strong> more than USDY. ' +
+          'On your ' + fmt(methVal) + ' mETH position, staying put earns an extra ' +
+          fmt(extraY2) + ' per year vs moving to USDY. <strong>Hold current position.</strong>';
+        if (approveContent) approveContent.textContent = 'No action needed';
+        if (approveBtn) { approveBtn.disabled = true; approveBtn.className = 'btn-approve no-action'; }
+      } else if (USDY_BALANCE > 0) {
+        var gain2 = usdyVal * Math.abs(spread);
+        body.innerHTML = 'mETH is yielding <strong>' + absPct + '</strong> more than your USDY. ' +
+          'Moving ' + fmt(usdyVal) + ' from USDY to mETH could earn an extra ' +
+          fmt(gain2) + ' per year. <strong>Consider rebalancing to mETH.</strong>';
+        if (approveContent) approveContent.textContent = 'Approve Rebalance → mETH';
+        if (approveBtn) { approveBtn.disabled = false; approveBtn.className = 'btn-approve'; }
+      } else {
+        body.innerHTML = 'mETH is currently yielding <strong>' + absPct + '</strong> more than USDY. ' +
+          'No RWA positions detected in this wallet yet.';
+      }
+    }
+  }
+
   /* ── RPC Balance Fetch ── */
   function loadChainBalances() {
     if (!walletAddress || typeof ethers === 'undefined') return;
     var provider = new ethers.JsonRpcProvider('https://rpc.mantle.xyz');
     var ABI = ['function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)'];
-    var USDY_ADDR  = '0x5BE26527E817998173a93d9e59a6A78B0fFbf32c';
+    var USDY_ADDR  = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
     var METH_ADDR  = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
     var CMETH_ADDR = '0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA';
     function fetchBal(addr, onDone) {
@@ -1366,6 +1423,7 @@
         document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
         updateTotal();
       }
+      updateInsightCard();
     });
     fetchBal(METH_ADDR, function (bal) {
       METH_BALANCE = bal;

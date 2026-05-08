@@ -278,6 +278,7 @@
   <span class="nav-logo">RW<span class="accent">Ai</span></span>
   <div class="nav-links">
     <a href="#how-it-works" class="nav-link">How it works</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
     <a href="#on-chain" class="nav-link">Contract</a>
     <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
     <button id="btn-connect">Connect Wallet</button>
@@ -778,12 +779,15 @@ async function onConnected(address) {
 }
 
 function disconnect() {
+  try { if (connectedProvider && connectedProvider.disconnect) connectedProvider.disconnect(); } catch (e) {}
   connectedAddress = null; connectedProvider = null; connectedWalletName = '';
   btnConnect.textContent = 'Connect Wallet';
   btnConnect.classList.remove('connected', 'wrong-network');
   btnConnect.title = '';
   document.getElementById('wallet-section').classList.remove('visible');
   document.getElementById('network-prompt').classList.remove('visible');
+  sessionStorage.clear();
+  sessionStorage.setItem('userDisconnected', 'true');
 }
 
 async function loadTokenBalances(address) {
@@ -819,6 +823,10 @@ document.getElementById('btn-switch-network').addEventListener('click', async ()
 });
 
 async function tryAutoReconnect() {
+  if (sessionStorage.getItem('userDisconnected') === 'true') {
+    sessionStorage.removeItem('userDisconnected');
+    return;
+  }
   await new Promise(r => setTimeout(r, 200));
   for (const [, { info, provider }] of announcedWallets) {
     try {

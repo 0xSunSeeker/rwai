@@ -519,7 +519,28 @@
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; }
     }
-  </style>
+  
+    /* ── Gate page ── */
+    #gate { min-height: calc(100vh - 64px); display: flex; align-items: center; justify-content: center; padding: 80px 20px 60px; }
+    .gate-inner { max-width: 600px; width: 100%; text-align: center; }
+    .gate-eyebrow { font-size: 0.72rem; font-weight: 700; color: #1D9E75; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 28px; }
+    .gate-yield-cards { display: flex; gap: 12px; justify-content: center; margin-bottom: 48px; }
+    .gate-yield-card { background: #111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 20px 24px; flex: 1; max-width: 180px; transition: border-color 0.2s; }
+    .gate-yield-card:hover { border-color: #2a2a2a; }
+    .gate-yield-token { font-size: 0.72rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .gate-yield-rate { font-size: 1.75rem; font-weight: 800; color: #1D9E75; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
+    .gate-yield-label { font-size: 0.7rem; color: #444; }
+    .gate-headline { font-size: 1.75rem; font-weight: 800; color: #f0f0f0; letter-spacing: -0.02em; line-height: 1.25; margin-bottom: 12px; }
+    .gate-sub { font-size: 0.9rem; color: #666; line-height: 1.6; margin-bottom: 32px; max-width: 440px; margin-left: auto; margin-right: auto; }
+    .gate-connect-btn { display: inline-block; background: #1D9E75; color: #fff; font-size: 1rem; font-weight: 700; padding: 14px 40px; border-radius: 9999px; border: none; cursor: pointer; transition: background 0.2s, transform 0.15s; margin-bottom: 16px; }
+    .gate-connect-btn:hover { background: #17836a; }
+    .gate-connect-btn:active { transform: scale(0.98); }
+    .gate-wallets-note { font-size: 0.75rem; color: #444; }
+    .gate-wallet-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .gate-wallet-option { background: #111; border: 1px solid #222; color: #bbb; font-size: 0.875rem; font-weight: 600; padding: 10px 24px; border-radius: 9999px; cursor: pointer; transition: border-color 0.2s, color 0.2s; min-width: 200px; }
+    .gate-wallet-option:hover { border-color: #1D9E75; color: #1D9E75; }
+    @media (max-width: 480px) { .gate-yield-cards { flex-direction: column; align-items: center; } .gate-yield-card { max-width: 100%; width: 100%; } .gate-headline { font-size: 1.4rem; } }
+</style>
 </head>
 <body>
 
@@ -547,7 +568,37 @@
   </div>
 </nav>
 
-<div class="page">
+<!-- ── GATE PAGE (shown when no wallet connected) ── -->
+<div id="gate" style="display:none">
+  <div class="gate-inner">
+    <p class="gate-eyebrow">Live on Mantle Mainnet</p>
+    <div class="gate-yield-cards">
+      <div class="gate-yield-card">
+        <div class="gate-yield-token">USDY</div>
+        <div class="gate-yield-rate">3.55%</div>
+        <div class="gate-yield-label">APY &middot; Ondo Finance</div>
+      </div>
+      <div class="gate-yield-card">
+        <div class="gate-yield-token">mETH</div>
+        <div class="gate-yield-rate">1.90%</div>
+        <div class="gate-yield-label">APR &middot; Mantle Staking</div>
+      </div>
+      <div class="gate-yield-card">
+        <div class="gate-yield-token">cmETH</div>
+        <div class="gate-yield-rate">1.92%</div>
+        <div class="gate-yield-label">APY &middot; Mantle Restaking</div>
+      </div>
+    </div>
+    <h2 class="gate-headline">Connect your wallet to see your positions</h2>
+    <p class="gate-sub">RWAi will show your live balances, yield earnings, and agent recommendations</p>
+    <button class="gate-connect-btn" id="gate-connect-btn">Connect Wallet</button>
+    <p class="gate-wallets-note">Supports MetaMask, Rabby, WalletConnect and all EIP-6963 wallets</p>
+    <div class="gate-wallet-list" id="gate-wallet-list" style="display:none"></div>
+  </div>
+</div>
+
+
+<div class="page" id="dashboard-content" style="display:none">
 
   <!-- ── PAGE HEADER ── -->
   <div class="page-header">
@@ -967,19 +1018,49 @@
 
   /* ── Wallet ── */
   var walletAddress = sessionStorage.getItem('rwai_wallet') || '';
-  if (!walletAddress) { window.location.href = '/'; }
-  (function updateWalletBadge() {
+  function updateWalletBadge() {
     if (!walletAddress) return;
     var short = walletAddress.slice(0,6) + '…' + walletAddress.slice(-4);
     var fullEl = document.querySelector('.wallet-addr-full');
     var shortEl = document.querySelector('.wallet-addr-short');
     if (fullEl) fullEl.textContent = short + ' · Connected';
     if (shortEl) shortEl.textContent = walletAddress.slice(0,4) + '…' + walletAddress.slice(-4);
-  })();
+  }
+
+  function showDashboard() {
+    var dc = document.getElementById('dashboard-content');
+    var df = document.getElementById('dash-footer');
+    var gt = document.getElementById('gate');
+    var wb = document.getElementById('wallet-badge');
+    var db = document.querySelector('.btn-disconnect');
+    if (dc) dc.style.display = '';
+    if (df) df.style.display = '';
+    if (gt) gt.style.display = 'none';
+    if (wb) wb.style.display = '';
+    if (db) db.style.display = '';
+    updateWalletBadge();
+  }
+
+  function showGate() {
+    var dc = document.getElementById('dashboard-content');
+    var df = document.getElementById('dash-footer');
+    var gt = document.getElementById('gate');
+    var wb = document.getElementById('wallet-badge');
+    var db = document.querySelector('.btn-disconnect');
+    if (dc) dc.style.display = 'none';
+    if (df) df.style.display = 'none';
+    if (gt) gt.style.display = '';
+    if (wb) wb.style.display = 'none';
+    if (db) db.style.display = 'none';
+  }
+
+  if (walletAddress) { showDashboard(); } else { showGate(); }
 
   /* ── Disconnect ── */
   document.querySelector('.btn-disconnect').addEventListener('click', function () {
-    sessionStorage.removeItem('rwai_wallet');
+    try { if (window.ethereum && window.ethereum.disconnect) window.ethereum.disconnect(); } catch (e) {}
+    sessionStorage.clear();
+    sessionStorage.setItem('userDisconnected', 'true');
     window.location.href = '/';
   });
 
@@ -1452,12 +1533,86 @@
       }
     });
   }
-  loadChainBalances();
+  if (walletAddress) { loadChainBalances(); }
+
+  /* ── Gate wallet connect ── */
+  var gateWallets = new Map();
+  window.addEventListener('eip6963:announceProvider', function (ev) {
+    gateWallets.set(ev.detail.info.uuid, ev.detail);
+  });
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+  function renderGateWalletList() {
+    var list = document.getElementById('gate-wallet-list');
+    if (!list) return;
+    list.innerHTML = '';
+    var entries = Array.from(gateWallets.values());
+    if (!entries.length && window.ethereum) {
+      entries = [{ info: { name: 'Browser Wallet' }, provider: window.ethereum }];
+    }
+    entries.forEach(function (w) {
+      var btn = document.createElement('button');
+      btn.className = 'gate-wallet-option';
+      btn.textContent = w.info.name;
+      btn.addEventListener('click', function () { connectWithProvider(w.provider); });
+      list.appendChild(btn);
+    });
+  }
+
+  var gateConnectBtn = document.getElementById('gate-connect-btn');
+  if (gateConnectBtn) {
+    gateConnectBtn.addEventListener('click', function () {
+      var entries = Array.from(gateWallets.values());
+      if (entries.length === 1) {
+        connectWithProvider(entries[0].provider);
+      } else if (entries.length > 1) {
+        var list = document.getElementById('gate-wallet-list');
+        if (list) {
+          if (list.style.display === 'none') { renderGateWalletList(); list.style.display = ''; }
+          else { list.style.display = 'none'; }
+        }
+      } else if (window.ethereum) {
+        connectWithProvider(window.ethereum);
+      } else {
+        alert('No Web3 wallet detected. Please install MetaMask or Rabby.');
+      }
+    });
+  }
+
+  async function connectWithProvider(provider) {
+    try {
+      var accounts = await provider.request({ method: 'eth_requestAccounts' });
+      if (!accounts || !accounts.length) return;
+      var address = accounts[0];
+      try {
+        var chainId = await provider.request({ method: 'eth_chainId' });
+        if (chainId !== '0x1388') {
+          try {
+            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x1388' }] });
+          } catch (se) {
+            if (se.code === 4902) {
+              await provider.request({ method: 'wallet_addEthereumChain', params: [{
+                chainId: '0x1388', chainName: 'Mantle',
+                nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
+                rpcUrls: ['https://rpc.mantle.xyz'],
+                blockExplorerUrls: ['https://mantlescan.xyz']
+              }] });
+            }
+          }
+        }
+      } catch (e) {}
+      walletAddress = address;
+      sessionStorage.setItem('rwai_wallet', address);
+      sessionStorage.removeItem('userDisconnected');
+      showDashboard();
+      loadChainBalances();
+    } catch (e) {}
+  }
 
 })();
 </script>
 
-<footer style="border-top:1px solid rgba(255,255,255,0.05);padding:32px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;margin-top:40px;">
+<footer id="dash-footer" style="display:none;border-top:1px solid rgba(255,255,255,0.05);padding:32px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;margin-top:40px;">
   <span style="font-size:1.125rem;font-weight:700;">RW<span style="color:#1D9E75">Ai</span></span>
   <span style="font-size:0.75rem;color:rgba(255,255,255,0.2);">Built by <a href="https://x.com/0xSunSeeker" style="color:rgba(255,255,255,0.35);text-decoration:none">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 &middot; <a href="https://t.me/rwaiapp_bot" style="color:rgba(255,255,255,0.35);text-decoration:none">Telegram</a> &middot; <a href="https://github.com/0xSunSeeker/rwai" style="color:rgba(255,255,255,0.35);text-decoration:none">GitHub</a> &middot; <a href="/tos.html" style="color:rgba(255,255,255,0.35);text-decoration:none">Terms</a> &middot; <a href="/privacy.html" style="color:rgba(255,255,255,0.35);text-decoration:none">Privacy</a></span>
 </footer>

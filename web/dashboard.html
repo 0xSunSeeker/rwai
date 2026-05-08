@@ -833,8 +833,8 @@
     <div class="next-action-card" style="animation-delay:0.38s">
       <div class="next-action-top">
         <div class="next-action-left">
-          <div class="next-action-content">Hold current positions</div>
-          <div class="next-action-sub">Spread of 1.65% is above alert threshold but below your auto-execute threshold of 2.0%</div>
+          <div class="next-action-content" id="next-action-label">Hold current positions</div>
+          <div class="next-action-sub" id="next-action-sub">Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.</div>
         </div>
         <div class="next-action-right">
           <div class="next-action-countdown-label">Next check in</div>
@@ -1426,54 +1426,132 @@
   /* ── Live Insight Card ── */
   function updateInsightCard() {
     if (usdyUSD === null || methUSD === null) return;
-    var usdyVal = USDY_BALANCE * usdyUSD;
-    var methVal = METH_BALANCE * methUSD;
-    var spread  = USDY_APY - METH_APR; // positive = USDY yields more
-    var absPct  = (Math.abs(spread) * 100).toFixed(2) + '%';
-    var body = document.querySelector('.insight-body');
+    var usdyVal  = USDY_BALANCE * usdyUSD;
+    var methVal  = METH_BALANCE * methUSD;
+    var spread   = USDY_APY - METH_APR; // positive = USDY leads
+    var absPct   = (Math.abs(spread) * 100).toFixed(2) + '%';
+    var body     = document.querySelector('.insight-body');
     var approveBtn     = document.getElementById('btn-approve');
     var approveContent = document.getElementById('approve-content');
+    var naLabel  = document.getElementById('next-action-label');
+    var naSub    = document.getElementById('next-action-sub');
     if (!body) return;
 
+    // Thresholds
+    var ALERT_THRESHOLD  = 0.015; // 1.5% — below this, spread too thin
+    var ACTION_THRESHOLD = 0.020; // 2.0% — above this, swap benefit clearly beats fees
+
+    function setApprove(label, enabled) {
+      if (approveContent) approveContent.textContent = label;
+      if (approveBtn) {
+        approveBtn.disabled = !enabled;
+        approveBtn.className = enabled ? 'btn-approve' : 'btn-approve no-action';
+      }
+    }
+
+    function setNextAction(label, sub) {
+      if (naLabel) naLabel.textContent = label;
+      if (naSub)   naSub.textContent   = sub;
+    }
+
     if (spread >= 0) {
-      // USDY leads — good if user is in USDY, recommend moving TO USDY if in mETH
+      // ── USDY leads ────────────────────────────────────────────────────────
       if (USDY_BALANCE > 0) {
+        // Already in the better asset
         var extraY = usdyVal * spread;
         body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
           'On your ' + fmt(usdyVal) + ' USDY position, staying put earns an extra ' +
           fmt(extraY) + ' per year vs moving to mETH. <strong>Hold current position.</strong>';
-        if (approveContent) approveContent.textContent = 'No action needed';
-        if (approveBtn) { approveBtn.disabled = true; approveBtn.className = 'btn-approve no-action'; }
+        setApprove('No action needed', false);
+        setNextAction('Hold current positions',
+          'You\'re in the higher-yield asset. RWAI is watching for any change.');
+
       } else if (METH_BALANCE > 0) {
-        var gain = methVal * spread;
-        body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than your mETH. ' +
-          'Moving ' + fmt(methVal) + ' from mETH to USDY could earn an extra ' +
-          fmt(gain) + ' per year. <strong>Consider rebalancing to USDY.</strong>';
-        if (approveContent) approveContent.textContent = 'Approve Rebalance → USDY';
-        if (approveBtn) { approveBtn.disabled = false; approveBtn.className = 'btn-approve'; }
+        var grossGain = methVal * spread;
+        var netLow    = Math.max(0, grossGain - methVal * 0.005); // 0.5% swap fee
+        var netHigh   = Math.max(0, grossGain - methVal * 0.003); // 0.3% swap fee
+
+        if (spread >= ACTION_THRESHOLD) {
+          // Spread clears the cost-adjusted bar — propose rebalance
+          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
+            'On your ' + fmt(methVal) + ' mETH position, moving to USDY would net approximately ' +
+            fmt(netLow) + '–' + fmt(netHigh) + ' more per year after estimated swap fees. ' +
+            '<strong>RWAI recommends rebalancing to USDY.</strong>';
+          setApprove('Approve Rebalance → USDY', true);
+          setNextAction('Rebalance to USDY recommended',
+            'Spread of ' + absPct + ' clears the 2.0% cost-adjusted threshold. Net gain beats fees.');
+
+        } else if (spread >= ALERT_THRESHOLD) {
+          // Ambiguous zone — spread attractive but fees eat too much
+          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
+            'Your ' + fmt(methVal) + ' mETH position could earn more in USDY — but after estimated ' +
+            'swap fees and gas on Mantle (~0.3–0.5%), the net annual gain would be approximately ' +
+            fmt(netLow) + '–' + fmt(netHigh) + '. Not worth swapping yet. ' +
+            'RWAI will propose action when the spread hits 2.0% and the benefit clearly beats transaction costs.';
+          setApprove('No action needed', false);
+          setNextAction('Hold current positions',
+            'Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.');
+
+        } else {
+          // Spread too thin
+          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
+            'The spread is too thin to justify a swap after fees. ' +
+            '<strong>Hold current position and monitor.</strong>';
+          setApprove('No action needed', false);
+          setNextAction('Hold current positions',
+            'Spread of ' + absPct + ' is below the 1.5% alert threshold. No action needed.');
+        }
+
       } else {
         body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
           'No RWA positions detected in this wallet yet.';
+        setApprove('No action needed', false);
+        setNextAction('No positions detected', 'Connect a wallet with USDY, mETH, or cmETH to see recommendations.');
       }
+
     } else {
-      // mETH leads — good if user is in mETH, recommend moving TO mETH if in USDY
+      // ── mETH leads ────────────────────────────────────────────────────────
+      var absMethLead = Math.abs(spread);
+      var absPctMeth  = (absMethLead * 100).toFixed(2) + '%';
+
       if (METH_BALANCE > 0) {
-        var extraY2 = methVal * Math.abs(spread);
-        body.innerHTML = 'mETH is currently yielding <strong>' + absPct + '</strong> more than USDY. ' +
+        var extraY2 = methVal * absMethLead;
+        body.innerHTML = 'mETH is currently yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
           'On your ' + fmt(methVal) + ' mETH position, staying put earns an extra ' +
           fmt(extraY2) + ' per year vs moving to USDY. <strong>Hold current position.</strong>';
-        if (approveContent) approveContent.textContent = 'No action needed';
-        if (approveBtn) { approveBtn.disabled = true; approveBtn.className = 'btn-approve no-action'; }
+        setApprove('No action needed', false);
+        setNextAction('Hold current positions',
+          'You\'re in the higher-yield asset. RWAI is watching for any change.');
+
       } else if (USDY_BALANCE > 0) {
-        var gain2 = usdyVal * Math.abs(spread);
-        body.innerHTML = 'mETH is yielding <strong>' + absPct + '</strong> more than your USDY. ' +
-          'Moving ' + fmt(usdyVal) + ' from USDY to mETH could earn an extra ' +
-          fmt(gain2) + ' per year. <strong>Consider rebalancing to mETH.</strong>';
-        if (approveContent) approveContent.textContent = 'Approve Rebalance → mETH';
-        if (approveBtn) { approveBtn.disabled = false; approveBtn.className = 'btn-approve'; }
+        var grossGain2 = usdyVal * absMethLead;
+        var netLow2    = Math.max(0, grossGain2 - usdyVal * 0.005);
+        var netHigh2   = Math.max(0, grossGain2 - usdyVal * 0.003);
+
+        if (absMethLead >= ACTION_THRESHOLD) {
+          body.innerHTML = 'mETH is yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
+            'On your ' + fmt(usdyVal) + ' USDY position, moving to mETH would net approximately ' +
+            fmt(netLow2) + '–' + fmt(netHigh2) + ' more per year after estimated swap fees. ' +
+            '<strong>RWAI recommends rebalancing to mETH.</strong>';
+          setApprove('Approve Rebalance → mETH', true);
+          setNextAction('Rebalance to mETH recommended',
+            'Spread of ' + absPctMeth + ' clears the 2.0% cost-adjusted threshold. Net gain beats fees.');
+        } else {
+          body.innerHTML = 'mETH is yielding <strong>' + absPctMeth + '</strong> more than your USDY. ' +
+            'Your ' + fmt(usdyVal) + ' USDY position could earn more in mETH — but after estimated ' +
+            'swap fees and gas on Mantle (~0.3–0.5%), the net annual gain would be approximately ' +
+            fmt(netLow2) + '–' + fmt(netHigh2) + '. Not worth swapping yet. ' +
+            'RWAI will propose action when the spread hits 2.0%.';
+          setApprove('No action needed', false);
+          setNextAction('Hold current positions',
+            'Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.');
+        }
+
       } else {
-        body.innerHTML = 'mETH is currently yielding <strong>' + absPct + '</strong> more than USDY. ' +
+        body.innerHTML = 'mETH is currently yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
           'No RWA positions detected in this wallet yet.';
+        setApprove('No action needed', false);
+        setNextAction('No positions detected', 'Connect a wallet with USDY, mETH, or cmETH to see recommendations.');
       }
     }
   }

@@ -23,7 +23,7 @@ contract RWAIVault is Ownable, ReentrancyGuard, Pausable {
     ///      update this to 500e6 before deploying.
     uint256 public constant DEFAULT_CAP = 500e18;
 
-    address public constant USDY  = 0x5BE26527E817998173a93d9e59a6A78B0fFbf32c;
+    address public constant USDY  = 0x5bE26527e817998A7206475496fdE1E68957c5A6;
     address public constant METH  = 0xcDA86A272531e8640cD7F1a92c01839911B90bb0;
     address public constant CMETH = 0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA;
 

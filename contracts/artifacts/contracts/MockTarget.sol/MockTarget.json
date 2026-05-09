@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockTarget",
+  "sourceName": "contracts/MockTarget.sol",
+  "abi": [],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea264697066735822122065cfb9eee48a19c59c8c222e6005ce1d34a17b92476d888a8e91c5048bf22ea264736f6c63430008140033",
+  "deployedBytecode": "0x6080604052600080fdfea264697066735822122065cfb9eee48a19c59c8c222e6005ce1d34a17b92476d888a8e91c5048bf22ea264736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

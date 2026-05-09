@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RWAI — Autonomous RWA Yield Agent on Mantle</title>
+  <meta name="description" content="RWAI monitors USDY and mETH yield spreads on Mantle, explains changes in plain English, and proposes rebalances via Telegram." />
+  <meta property="og:title" content="RWAI — Autonomous RWA Yield Agent on Mantle" />
+  <meta property="og:description" content="Plain-English yield intelligence for USDY and mETH holders. Powered by Claude. Built on Mantle." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --green: #00d084;
+      --green-dim: rgba(0, 208, 132, 0.12);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --yellow: #f0b429;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.6; min-height: 100vh; }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: rgba(10,10,15,0.92);
+      backdrop-filter: blur(12px); z-index: 100;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.1rem; color: var(--green); letter-spacing: -0.02em; }
+    .nav-links { display: flex; gap: 1rem; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    @media (max-width: 560px) { .nav-links a:not(.btn-primary):not(#btn-connect-wrap) { display: none; } }
+
+    .btn-primary {
+      background: var(--green); color: #000; padding: 0.5rem 1.25rem; border-radius: 6px;
+      font-weight: 600; font-size: 0.875rem; text-decoration: none; transition: opacity 0.2s; display: inline-block;
+    }
+    .btn-primary:hover { opacity: 0.85; color: #000; }
+
+    #btn-connect {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 0.5rem 1.1rem; border-radius: 6px; font-weight: 500; font-size: 0.875rem;
+      cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s; font-family: var(--font); white-space: nowrap;
+    }
+    #btn-connect:hover { border-color: var(--green); color: var(--green); }
+    #btn-connect.connected { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+    #btn-connect.wrong-network { border-color: var(--yellow); color: var(--yellow); }
+
+    /* ── HERO ── */
+    .hero { max-width: 780px; margin: 0 auto; padding: 6rem 2rem 4rem; text-align: center; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem; background: var(--green-dim);
+      border: 1px solid rgba(0,208,132,0.25); color: var(--green); font-size: 0.8rem; font-weight: 600;
+      padding: 0.3rem 0.85rem; border-radius: 99px; margin-bottom: 1.75rem; letter-spacing: 0.01em;
+    }
+    .hero-badge span { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    h1 { font-size: clamp(2rem,5vw,3.25rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.15; margin-bottom: 1.25rem; }
+    h1 em { font-style: normal; color: var(--green); }
+    .hero-sub { color: var(--muted); font-size: 1.1rem; max-width: 520px; margin: 0 auto 2.5rem; line-height: 1.7; }
+    .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-secondary {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 0.65rem 1.4rem; border-radius: 6px; font-weight: 500; font-size: 0.9rem; text-decoration: none; transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    /* ── YIELD TICKER ── */
+    .ticker-section { max-width: 860px; margin: 0 auto 2rem; padding: 0 2rem; }
+    .ticker-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px;
+      background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    @media (max-width: 700px) { .ticker-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 420px) { .ticker-grid { grid-template-columns: 1fr; } }
+    .ticker-card { background: var(--surface); padding: 1.75rem 2rem; }
+    .ticker-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.6rem; }
+    .ticker-value { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; color: var(--green); font-variant-numeric: tabular-nums; }
+    .ticker-value.loading { color: var(--muted); font-size: 1.5rem; animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+    .ticker-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+    .ticker-spread .ticker-value { color: var(--yellow); }
+    .risk-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.5rem;
+      font-size: 0.7rem; font-weight: 600; color: var(--muted);
+    }
+    .risk-dots { letter-spacing: -1px; }
+
+    /* ── NETWORK PROMPT ── */
+    .network-prompt { max-width: 860px; margin: 0 auto 2rem; padding: 0 2rem; display: none; }
+    .network-prompt.visible { display: block; }
+    .network-prompt-inner {
+      background: rgba(240,180,41,0.06); border: 1px solid rgba(240,180,41,0.25); border-radius: 10px;
+      padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    }
+    .network-prompt-inner p { font-size: 0.88rem; color: var(--yellow); }
+    .btn-switch {
+      background: rgba(240,180,41,0.15); border: 1px solid rgba(240,180,41,0.4); color: var(--yellow);
+      padding: 0.4rem 0.9rem; border-radius: 6px; font-weight: 600; font-size: 0.82rem; cursor: pointer; font-family: var(--font); white-space: nowrap;
+    }
+    .btn-switch:hover { background: rgba(240,180,41,0.25); }
+
+    /* ── WALLET DASHBOARD ── */
+    .wallet-section { max-width: 860px; margin: 0 auto 4rem; padding: 0 2rem; display: none; }
+    .wallet-section.visible { display: block; }
+    .wallet-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .wallet-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.1rem 1.75rem; border-bottom: 1px solid var(--border);
+    }
+    .wallet-header-left { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+    .wallet-network {
+      display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 600;
+      padding: 0.22rem 0.6rem; border-radius: 99px;
+    }
+    .wallet-network.mantle { background: var(--green-dim); border: 1px solid rgba(0,208,132,0.25); color: var(--green); }
+    .wallet-network span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .wallet-body { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
+    @media (max-width: 640px) { .wallet-body { grid-template-columns: 1fr; } }
+    .wallet-stat { background: var(--surface); padding: 1.4rem 1.75rem; }
+    .wallet-stat-label { font-size: 0.73rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.45rem; }
+    .wallet-stat-value { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text); font-variant-numeric: tabular-nums; }
+    .wallet-stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+    .wallet-footer {
+      padding: 1.1rem 1.75rem; display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; border-top: 1px solid var(--border);
+    }
+    .wallet-footer p { font-size: 0.83rem; color: var(--muted); }
+    .wallet-footer strong { color: var(--text); }
+    .btn-telegram {
+      display: inline-flex; align-items: center; gap: 0.45rem; background: #229ED9; color: #fff;
+      padding: 0.5rem 1.1rem; border-radius: 6px; font-weight: 600; font-size: 0.85rem; text-decoration: none; transition: opacity 0.2s; white-space: nowrap;
+    }
+    .btn-telegram:hover { opacity: 0.85; color: #fff; }
+    .btn-telegram svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    /* ── WALLET MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      z-index: 500; display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #16161f; border: 1px solid var(--border); border-radius: 16px;
+      width: 100%; max-width: 400px; overflow: hidden; animation: modalIn 0.18s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: none; } }
+    .modal-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+    }
+    .modal-head h3 { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .modal-close {
+      background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.4rem; line-height: 1;
+      padding: 0.1rem 0.3rem; border-radius: 4px; transition: color 0.15s; font-family: var(--font);
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .wallet-option {
+      display: flex; align-items: center; gap: 0.85rem; width: 100%;
+      background: none; border: 1px solid transparent; border-radius: 10px;
+      padding: 0.85rem 1rem; cursor: pointer; text-align: left; font-family: var(--font);
+      color: var(--text); font-size: 0.92rem; font-weight: 500; transition: background 0.15s, border-color 0.15s;
+    }
+    .wallet-option:hover { background: var(--surface); border-color: var(--border); }
+    .wallet-option:disabled { opacity: 0.4; cursor: not-allowed; }
+    .wallet-icon { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; background: #fff; flex-shrink: 0; }
+    .wallet-icon-placeholder {
+      width: 36px; height: 36px; border-radius: 8px; background: var(--border); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+    }
+    .wallet-option-name { flex: 1; }
+    .wallet-option-badge {
+      font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 99px;
+      background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,208,132,0.2);
+    }
+    .wallet-option-badge.soon { background: rgba(107,107,128,0.15); color: var(--muted); border-color: var(--border); }
+    .modal-divider { height: 1px; background: var(--border); margin: 0.35rem 0; }
+    .modal-footer { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); }
+    .modal-footer p { font-size: 0.75rem; color: var(--muted); text-align: center; line-height: 1.5; }
+    .no-wallet-msg { padding: 1.25rem; text-align: center; color: var(--muted); font-size: 0.88rem; line-height: 1.7; }
+    .no-wallet-msg a { color: var(--green); text-decoration: none; }
+    .no-wallet-msg a:hover { text-decoration: underline; }
+
+    /* ── HOW IT WORKS ── */
+    .section { max-width: 860px; margin: 0 auto; padding: 0 2rem 6rem; }
+    .section-label { font-size: 0.78rem; font-weight: 600; color: var(--green); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
+    h2 { font-size: clamp(1.5rem,3vw,2rem); font-weight: 700; letter-spacing: -0.03em; margin-bottom: 2.5rem; }
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step { display: grid; grid-template-columns: 2.5rem 1fr; gap: 1.25rem; padding-bottom: 2.5rem; position: relative; }
+    .step:not(:last-child)::before { content: ''; position: absolute; left: 1.2rem; top: 2.8rem; bottom: 0; width: 1px; background: var(--border); }
+    .step-num {
+      width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--green-dim);
+      border: 1px solid rgba(0,208,132,0.3); color: var(--green); font-weight: 700; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; z-index: 1;
+    }
+    .step-title { font-weight: 600; margin-bottom: 0.3rem; }
+    .step-desc { color: var(--muted); font-size: 0.92rem; line-height: 1.65; }
+
+    /* ── CONTRACT ── */
+    .contract-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem 2rem; display: flex; flex-direction: column; gap: 1rem; }
+    .contract-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+    .contract-key { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; padding-top: 0.1rem; }
+    .contract-val { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.82rem; color: var(--text); word-break: break-all; text-align: right; }
+    .contract-val a { color: var(--green); text-decoration: none; }
+    .contract-val a:hover { text-decoration: underline; }
+
+    footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; color: var(--muted); font-size: 0.82rem; }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">RWAI</span>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#contract">Contract</a>
+    <a href="https://github.com/0xSunSeeker/rwai" target="_blank">GitHub</a>
+    <button id="btn-connect">Connect Wallet</button>
+    <a href="https://t.me/rwaiapp_bot" class="btn-primary">Open in Telegram</a>
+  </div>
+</nav>
+
+<!-- ── WALLET CHOOSER MODAL ── -->
+<div class="modal-overlay" id="wallet-modal" role="dialog" aria-modal="true" aria-label="Connect wallet">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Connect Wallet</h3>
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body" id="wallet-list">
+      <p class="no-wallet-msg">Scanning for wallets…</p>
+    </div>
+    <div class="modal-footer">
+      <p>By connecting, you confirm you own this wallet.<br>No transaction will be sent without your approval.</p>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <section class="hero">
+    <div class="hero-badge"><span></span> Live on Mantle Mainnet</div>
+    <h1>Your autonomous <em>RWA yield agent</em> on Mantle</h1>
+    <p class="hero-sub">Most USDY and mETH holders don't know when their yield changes — or what to do about it. RWAI watches 24/7, explains every shift in plain English, and proposes action when it counts.</p>
+    <div class="hero-cta">
+      <a href="https://t.me/rwaiapp_bot" class="btn-primary">Try the bot — it's free</a>
+      <a href="https://github.com/0xSunSeeker/rwai" class="btn-secondary" target="_blank">View source</a>
+    </div>
+  </section>
+
+  <div class="ticker-section">
+    <div class="ticker-grid">
+      <div class="ticker-card">
+        <div class="ticker-label">USDY — Ondo Finance</div>
+        <div class="ticker-value loading" id="usdy-apy">—</div>
+        <div class="ticker-sub">Tokenized US Treasuries</div>
+        <div class="risk-badge"><span class="risk-dots" id="usdy-risk-dots">●○○○○</span> Risk 1/5 — Very Low</div>
+      </div>
+      <div class="ticker-card">
+        <div class="ticker-label">mETH — Mantle Staking</div>
+        <div class="ticker-value loading" id="meth-apr">—</div>
+        <div class="ticker-sub">Liquid staked ETH</div>
+        <div class="risk-badge"><span class="risk-dots">●●●○○</span> Risk 3/5 — Medium</div>
+      </div>
+      <div class="ticker-card">
+        <div class="ticker-label">cmETH — Auto-compound</div>
+        <div class="ticker-value loading" id="cmeth-apy">—</div>
+        <div class="ticker-sub">Compounding mETH vault</div>
+        <div class="risk-badge"><span class="risk-dots">●●●○○</span> Risk 3/5 — Medium</div>
+      </div>
+      <div class="ticker-card ticker-spread">
+        <div class="ticker-label">Spread (USDY − mETH)</div>
+        <div class="ticker-value loading" id="spread">—</div>
+        <div class="ticker-sub" id="spread-sub">Loading live data…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="network-prompt" id="network-prompt">
+    <div class="network-prompt-inner">
+      <p>Switch to Mantle Mainnet to see your on-chain USDY balance.</p>
+      <button class="btn-switch" id="btn-switch-network">Switch to Mantle</button>
+    </div>
+  </div>
+
+  <div class="wallet-section" id="wallet-section">
+    <div class="wallet-panel">
+      <div class="wallet-header">
+        <span class="wallet-header-left">Your Position</span>
+        <span class="wallet-network mantle"><span></span> Mantle Mainnet</span>
+      </div>
+      <div class="wallet-body">
+        <div class="wallet-stat">
+          <div class="wallet-stat-label">Wallet</div>
+          <div class="wallet-stat-value" id="dash-address" style="font-size:0.92rem;letter-spacing:-0.01em;font-family:'SF Mono','Fira Code',monospace;">—</div>
+          <div class="wallet-stat-sub" id="dash-wallet-name">Connected</div>
+        </div>
+        <div class="wallet-stat">
+          <div class="wallet-stat-label">USDY Balance</div>
+          <div class="wallet-stat-value" id="dash-usdy">—</div>
+          <div class="wallet-stat-sub">on Mantle Mainnet</div>
+        </div>
+        <div class="wallet-stat">
+          <div class="wallet-stat-label">Current USDY Yield</div>
+          <div class="wallet-stat-value" id="dash-yield" style="color:var(--green);">—</div>
+          <div class="wallet-stat-sub">via DeFiLlama</div>
+        </div>
+      </div>
+      <div class="wallet-footer">
+        <p>Get <strong>real-time alerts</strong> when yield shifts or a rebalance is worth considering.</p>
+        <a href="https://t.me/rwaiapp_bot" class="btn-telegram" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.17 13.847l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.978.712z"/></svg>
+          Get alerts on Telegram
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="how">
+    <div class="section-label">How it works</div>
+    <h2>Four layers. One tap to act.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Fetch</div>
+          <div class="step-desc">Every 30 minutes, RWAI pulls live yield data for USDY and mETH from DeFiLlama and compares it to the last snapshot.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Explain</div>
+          <div class="step-desc">When yield shifts more than 0.1% or the spread crosses 1.5%, Claude Sonnet writes a plain-English explanation — what changed, why it happened, and what it means for your position size specifically.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Propose</div>
+          <div class="step-desc">The agent sends a Telegram message with an Approve / Dismiss inline keyboard. Nothing executes until you tap Approve.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Anchor</div>
+          <div class="step-desc">Every approved decision is logged on Mantle Mainnet via the ERC-8004 Reputation Registry — a verifiable, auditable AI track record that accumulates from Day 1.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="contract">
+    <div class="section-label">On-chain</div>
+    <h2>Verifiable from Day 1</h2>
+    <div class="contract-box">
+      <div class="contract-row">
+        <span class="contract-key">Registry</span>
+        <span class="contract-val">ERC-8004 Reputation Registry — Mantle Mainnet</span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Address</span>
+        <span class="contract-val">
+          <a href="https://explorer.mantle.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank">0x8004BAa17C55a88189AE136b182e5fdA19dE9b63</a>
+        </span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Latest tx</span>
+        <span class="contract-val">
+          <a href="https://explorer.mantle.xyz/tx/0xb24c9762becc831a9855a2a73b657f841f42a59f8858f2822ea9e7aee50080ec" target="_blank">0xb24c976…0080ec</a>
+        </span>
+      </div>
+      <div class="contract-row">
+        <span class="contract-key">Hackathon</span>
+        <span class="contract-val">
+          <a href="https://dorahacks.io/hackathon/mantleturingtesthackathon2026" target="_blank">Mantle Turing Test Hackathon 2026 — AI × RWA track</a>
+        </span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Built by <a href="https://x.com/0xSunSeeker">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 &nbsp;·&nbsp;
+  <a href="https://t.me/rwaiapp_bot">Telegram</a> &nbsp;·&nbsp;
+  <a href="https://github.com/0xSunSeeker/rwai">GitHub</a>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+<script>
+// ── YIELD TICKER ─────────────────────────────────────────────────────────────
+let liveUSDYApy = 3.55;
+
+async function loadYields() {
+  try {
+    const res = await fetch('https://yields.llama.fi/pools');
+    const { data } = await res.json();
+    const usdyPool = data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle')
+                  ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY');
+    const methPool = data.find(p => p.pool === 'b9f2f00a-ba96-4589-a171-dde979a23d87')
+                  ?? data.find(p => p.project === 'meth-protocol');
+    liveUSDYApy = parseFloat(usdyPool?.apy ?? 3.55);
+    const methApr  = parseFloat(methPool?.apy ?? 1.0);
+    const cmethApy = parseFloat(((Math.pow(1 + methApr / 100 / 365, 365) - 1) * 100).toFixed(2));
+    const spread = (liveUSDYApy - methApr).toFixed(2);
+    const set = (id, val) => { const el = document.getElementById(id); el.textContent = val; el.classList.remove('loading'); };
+    set('usdy-apy', liveUSDYApy.toFixed(2) + '%');
+    set('meth-apr', methApr.toFixed(2) + '%');
+    set('cmeth-apy', cmethApy.toFixed(2) + '%');
+    set('spread', spread + '%');
+    const wide = parseFloat(spread) >= 1.5;
+    const sub = document.getElementById('spread-sub');
+    sub.textContent = wide ? 'Wide — rebalance may be worth considering' : 'Within normal range';
+    sub.style.color = wide ? 'var(--yellow)' : '';
+    const dy = document.getElementById('dash-yield');
+    if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
+  } catch {
+    ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => { const el=document.getElementById(id); el.textContent='—'; el.classList.remove('loading'); });
+    document.getElementById('spread-sub').textContent = 'Could not load live data';
+  }
+}
+
+// ── WALLET STATE ──────────────────────────────────────────────────────────────
+const MANTLE_CHAIN_ID   = '0x1388'; // 5000
+const USDY_MANTLE       = '0x5be26527e817998a7206475496fde1e68957c5a6';
+const USDY_ABI          = ['function balanceOf(address) view returns (uint256)'];
+const MANTLE_CHAIN_PARAMS = {
+  chainId: MANTLE_CHAIN_ID, chainName: 'Mantle',
+  nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
+  rpcUrls: ['https://rpc.mantle.xyz'],
+  blockExplorerUrls: ['https://explorer.mantle.xyz'],
+};
+
+let connectedAddress = null;
+let connectedProvider = null;  // the raw EIP-1193 provider
+let connectedWalletName = '';
+
+// EIP-6963: collect announced wallets (name → {info, provider})
+const announcedWallets = new Map();
+
+window.addEventListener('eip6963:announceProvider', e => {
+  announcedWallets.set(e.detail.info.rdns, e.detail);
+});
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+const modal       = document.getElementById('wallet-modal');
+const walletList  = document.getElementById('wallet-list');
+const btnConnect  = document.getElementById('btn-connect');
+
+function openModal() {
+  // Re-request so late-announcing wallets are caught
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+  setTimeout(renderWalletList, 80);
+  modal.classList.add('open');
+  document.addEventListener('keydown', onEsc);
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  document.removeEventListener('keydown', onEsc);
+}
+
+function onEsc(e) { if (e.key === 'Escape') closeModal(); }
+
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+document.getElementById('modal-close').addEventListener('click', closeModal);
+btnConnect.addEventListener('click', () => {
+  if (connectedAddress) return; // already connected — no re-open
+  openModal();
+});
+
+// ── WALLET LIST RENDERING ─────────────────────────────────────────────────────
+function makeWalletBtn({ icon, name, badge, badgeSoon, onClick, disabled }) {
+  const btn = document.createElement('button');
+  btn.className = 'wallet-option';
+  if (disabled) btn.disabled = true;
+
+  const iconEl = icon
+    ? `<img class="wallet-icon" src="${icon}" alt="${name}" />`
+    : `<div class="wallet-icon-placeholder">🔑</div>`;
+
+  const badgeEl = badge
+    ? `<span class="wallet-option-badge${badgeSoon ? ' soon' : ''}">${badge}</span>`
+    : '';
+
+  btn.innerHTML = `${iconEl}<span class="wallet-option-name">${name}</span>${badgeEl}`;
+  if (onClick) btn.addEventListener('click', onClick);
+  return btn;
+}
+
+function renderWalletList() {
+  walletList.innerHTML = '';
+
+  // ── EIP-6963 discovered wallets ──────────────────────────────────────────
+  if (announcedWallets.size > 0) {
+    announcedWallets.forEach(({ info, provider }) => {
+      walletList.appendChild(makeWalletBtn({
+        icon: info.icon,
+        name: info.name,
+        badge: 'Detected',
+        onClick: async () => {
+          closeModal();
+          await connectWith(provider, info.name);
+        },
+      }));
+    });
+
+    // divider before extras
+    const div = document.createElement('div');
+    div.className = 'modal-divider';
+    walletList.appendChild(div);
+  } else if (window.ethereum) {
+    // ── Legacy single-provider fallback ─────────────────────────────────────
+    const name = window.ethereum.isMetaMask        ? 'MetaMask'
+               : window.ethereum.isCoinbaseWallet  ? 'Coinbase Wallet'
+               : window.ethereum.isBraveWallet     ? 'Brave Wallet'
+               : 'Browser Wallet';
+    walletList.appendChild(makeWalletBtn({
+      icon: null,
+      name,
+      badge: 'Detected',
+      onClick: async () => {
+        closeModal();
+        await connectWith(window.ethereum, name);
+      },
+    }));
+    const div = document.createElement('div');
+    div.className = 'modal-divider';
+    walletList.appendChild(div);
+  } else {
+    // ── No wallet found ──────────────────────────────────────────────────────
+    const msg = document.createElement('div');
+    msg.className = 'no-wallet-msg';
+    msg.innerHTML = 'No wallet detected in this browser.<br>Install <a href="https://metamask.io/download/" target="_blank">MetaMask</a> or <a href="https://www.coinbase.com/wallet" target="_blank">Coinbase Wallet</a> and refresh.';
+    walletList.appendChild(msg);
+  }
+
+  // ── WalletConnect (coming soon) ───────────────────────────────────────────
+  walletList.appendChild(makeWalletBtn({
+    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAzNiAzNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHJ4PSI4IiBmaWxsPSIjM0I5OUZDIi8+PHBhdGggZD0iTTkuNiAxNi40Yy4yLS4yLjUtLjIuNyAwbDIuNCAyLjRjLjIuMi41LjIuNyAwbDQuOC00LjhjLjItLjIuNS0uMi43IDBsNC44IDQuOGMuMi4yLjUuMi43IDBsMi40LTIuNGMuMi0uMi41LS4yLjcgMHY3LjJsLTIuNCAxLjJIMTJMMTIgMjMuNiA5LjYgMjIuNHYtNnoiIGZpbGw9IndoaXRlIi8+PC9zdmc+',
+    name: 'WalletConnect',
+    badge: 'Coming soon',
+    badgeSoon: true,
+    disabled: true,
+  }));
+}
+
+// ── CONNECT WITH PROVIDER ─────────────────────────────────────────────────────
+async function connectWith(provider, walletName) {
+  try {
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    if (!accounts || accounts.length === 0) return;
+    connectedAddress  = accounts[0];
+    connectedProvider = provider;
+    connectedWalletName = walletName;
+    await onConnected(connectedAddress);
+
+    // Listen for account / chain changes on this provider
+    provider.on?.('accountsChanged', async (accs) => {
+      if (!accs.length) { disconnect(); return; }
+      connectedAddress = accs[0];
+      await onConnected(connectedAddress);
+    });
+    provider.on?.('chainChanged', async () => {
+      if (!connectedAddress) return;
+      await onConnected(connectedAddress);
+    });
+  } catch (err) {
+    if (err.code !== 4001) console.warn('Wallet connect error:', err.message);
+  }
+}
+
+async function onConnected(address) {
+  const short = `${address.slice(0,6)}…${address.slice(-4)}`;
+  btnConnect.textContent = short;
+  btnConnect.classList.remove('wrong-network');
+  btnConnect.classList.add('connected');
+
+  document.getElementById('dash-address').textContent = short;
+  document.getElementById('dash-wallet-name').textContent = connectedWalletName || 'Connected';
+  document.getElementById('dash-yield').textContent = liveUSDYApy.toFixed(2) + '% APY';
+  document.getElementById('wallet-section').classList.add('visible');
+
+  const chainId = await connectedProvider.request({ method: 'eth_chainId' });
+  if (chainId !== MANTLE_CHAIN_ID) {
+    btnConnect.classList.remove('connected');
+    btnConnect.classList.add('wrong-network');
+    document.getElementById('network-prompt').classList.add('visible');
+    document.getElementById('dash-usdy').textContent = '—';
+    return;
+  }
+  document.getElementById('network-prompt').classList.remove('visible');
+  await loadUSDYBalance(address);
+}
+
+function disconnect() {
+  connectedAddress = null; connectedProvider = null; connectedWalletName = '';
+  btnConnect.textContent = 'Connect Wallet';
+  btnConnect.classList.remove('connected', 'wrong-network');
+  document.getElementById('wallet-section').classList.remove('visible');
+  document.getElementById('network-prompt').classList.remove('visible');
+}
+
+async function loadUSDYBalance(address) {
+  const el = document.getElementById('dash-usdy');
+  el.textContent = '…';
+  try {
+    const provider = new ethers.JsonRpcProvider('https://rpc.mantle.xyz');
+    const contract = new ethers.Contract(USDY_MANTLE, USDY_ABI, provider);
+    const raw = await contract.balanceOf(address);
+    const bal = parseFloat(ethers.formatEther(raw));
+    el.textContent = '$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch { el.textContent = '—'; }
+}
+
+// Switch to Mantle
+document.getElementById('btn-switch-network').addEventListener('click', async () => {
+  if (!connectedProvider) return;
+  try {
+    await connectedProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: MANTLE_CHAIN_ID }] });
+  } catch (err) {
+    if (err.code === 4902) {
+      await connectedProvider.request({ method: 'wallet_addEthereumChain', params: [MANTLE_CHAIN_PARAMS] });
+    }
+  }
+});
+
+// Auto-reconnect if previously authorised (check all EIP-6963 wallets first, then legacy)
+async function tryAutoReconnect() {
+  // Give EIP-6963 announcements a moment to arrive
+  await new Promise(r => setTimeout(r, 200));
+  for (const [, { info, provider }] of announcedWallets) {
+    try {
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) { connectedProvider = provider; connectedWalletName = info.name; await onConnected(accounts[0]); return; }
+    } catch {}
+  }
+  if (window.ethereum) {
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) { connectedProvider = window.ethereum; connectedWalletName = ''; await onConnected(accounts[0]); }
+    } catch {}
+  }
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+loadYields();
+tryAutoReconnect();
+</script>
+
+</body>
+</html>

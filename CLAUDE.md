@@ -13,23 +13,29 @@ RWAI monitors USDY (Ondo Finance, ~3.55% APY) and mETH (Mantle Staking, ~1.98% A
 
 ---
 
-## Current Build Status (as of May 6, 2026)
+## Current Build Status (as of May 8, 2026)
 
 ### What's Working
-- `src/promptEngine.js` — generateExplanation + generatePrediction via Claude API ✅
-- `src/dataFetcher.js` — DeFiLlama live yield data (USDY + mETH) ✅
-- `src/agent.js` — autonomous polling loop with generateInsight ✅
-- `src/bot.js` — Telegram bot with /start, /status, /compare, /explain, /history, approve/dismiss ✅
+- `src/promptEngine.js` — generateExplanation + generatePrediction + generateInsight via Claude API ✅
+- `src/dataFetcher.js` — DeFiLlama live yield data (USDY + mETH), fetchYieldData + shouldAlert exported ✅
+- `src/agent.js` — autonomous polling loop, writes `pendingAlert.json`, appends to `predictions.jsonl` ✅
+- `src/bot.js` — Telegram bot with /start, /status, /compare, /explain, /history, /setup, approve/dismiss + logDecision() wired ✅
 - `src/reputation.js` — ERC-8004 on-chain anchoring on Mantle Mainnet ✅
-- Latest confirmed Mantle Mainnet tx: `0xa041618da351ae12037d409c5981abd05aa708557337a798ab1a48426948b36c`
+- `index.js` — single entry point starting both agent and bot ✅
+- Three-tier delegation onboarding (`/setup` command, `data/userProfile.json`) ✅
+- Prediction accuracy tracking — running accuracy % in `/history` ✅
+- GitHub repo live (public, README with architecture diagram, contract address, tx hash) ✅
+- `rwai.fyi` live on Vercel ✅
+- Dashboard at `rwai.fyi/dashboard` — wallet connect, live DeFiLlama prices, agent insight, simulate rebalance, agent history, token logos, 24h price changes, yield earned counter ✅
+- ToS and Privacy Policy pages ✅
+- `contracts/RWAIVault.sol` — compiled with Hardhat + OpenZeppelin v5 ✅
+- Latest confirmed Mantle Mainnet tx: `0xa041618da351ae12037d409c5981abd05aa708557337a798ab1a48426948b36a`
 
-### What's Broken (Fix These First — 6 Wires)
-1. `bot.js` imports `generateInsight` from `./agent.js` — function doesn't exist there, should come from `./promptEngine.js`
-2. `bot.js` imports `fetchYieldData` and `shouldAlert` from `./dataFetcher.js` — neither exported
-3. `agent.js` never writes `pendingAlert.json` — the core connection between agent and bot is missing
-4. `agent.js` never appends to `predictions.jsonl` — /history command always empty
-5. `approve` action in bot.js never calls `logDecision()` — on-chain reputation logging skipped
-6. No single entry point — must run two terminals manually
+### In Progress
+- `contracts/RWAIVault.sol` testnet deployment — in progress with dev Tokhi
+- Logo — in progress with designer King Ade
+- Demo video — not yet recorded (script ready, Step 7 below)
+- DoraHacks BUIDL submission — form filled, not yet submitted (pending demo video link)
 
 ---
 
@@ -37,10 +43,10 @@ RWAI monitors USDY (Ondo Finance, ~3.55% APY) and mETH (Mantle Staking, ~1.98% A
 - **Runtime:** Node.js ESM (type: module)
 - **AI:** Claude API via @anthropic-ai/sdk, model: claude-sonnet-4-5
 - **Blockchain:** Ethers.js v6, Mantle Mainnet RPC
-- **Bot:** Telegraf (installed in node_modules, missing from package.json)
+- **Bot:** Telegraf (in package.json ✅)
 - **Data:** DeFiLlama public API (no auth needed)
 - **On-chain:** ERC-8004 Reputation Registry at `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` on Mantle Mainnet
-- **Domain:** rwai.fyi (purchased, not yet live)
+- **Domain:** rwai.fyi (live on Vercel ✅)
 
 ### Environment Variables (already in .env)
 - `ANTHROPIC_API_KEY`
@@ -90,88 +96,44 @@ User taps Approve in Telegram
 
 ---
 
-## Build Sequence — Do These In Order
+## Build Sequence — Status
 
-### STEP 1 — Fix the 6 broken wires (do this now)
-Follow the plan already generated:
-1. Add `fetchYieldData` and `shouldAlert` exports to `dataFetcher.js`
-2. Add `generateInsight` to `promptEngine.js`, fix bot.js import
-3. Wire `agent.js` to write `pendingAlert.json` and append to `predictions.jsonl`
-4. Wire `approve` action in `bot.js` to call `logDecision()` and reply with explorer link
-5. Create `index.js` as single entry point that starts both agent and bot
-6. Add telegraf to package.json dependencies
+### STEP 1 — Fix the 6 broken wires ✅ DONE
+All 6 wires fixed: fetchYieldData + shouldAlert exported, generateInsight in promptEngine.js, pendingAlert.json + predictions.jsonl wired in agent.js, logDecision() wired in bot.js approve action, index.js created, telegraf in package.json.
 
-**Test:** `node index.js` → both agent and bot start → open Telegram → /status returns live yield data with Mantle Explorer link
+### STEP 2 — Three-tier delegation onboarding ✅ DONE
+`/setup` command live in bot.js. Tier stored in `data/userProfile.json`. Agent reads tier before deciding whether to write pendingAlert or auto-execute.
 
-### STEP 2 — Three-tier delegation onboarding
-Add `/setup` command to bot.js that asks user their delegation tier preference:
-- Watch Only (alerts only)
-- Propose and Confirm (one-tap approval)  
-- Delegated (auto-execute up to $X)
+### STEP 3 — Prediction accuracy tracking ✅ DONE
+Running accuracy % surfaced in `/history`. Predictions appended to `data/predictions.jsonl` with correct/incorrect resolution after 24h window.
 
-Store preference in `data/userProfile.json`. Agent reads tier before deciding whether to write pendingAlert or auto-execute.
+### STEP 4 — GitHub repo + README ✅ DONE
+Public repo live. README includes one-line pitch, rwai.fyi link, contract address, latest tx hash, ASCII architecture diagram, setup instructions, track info.
 
-**Test:** send `/setup` in Telegram → choose tier → send `/status` → response reflects chosen tier
+### STEP 5 — Deploy rwai.fyi ✅ DONE
+Landing page live on Vercel. Hero, live yield ticker (DeFiLlama), Telegram link, "How it works", contract + explorer link all present.
+Dashboard live at rwai.fyi/dashboard — wallet connect, live prices, agent insight, simulate rebalance, agent history, token logos, 24h changes, yield earned counter.
 
-### STEP 3 — Prediction accuracy tracking
-After each prediction, when the 24-hour window closes, agent should:
-- Read the prediction from `predictions.jsonl`
-- Compare predicted direction to actual yield movement
-- Append `{ correct: true/false, actualDirection }` to that prediction entry
-- Calculate running accuracy percentage
+### STEP 6 — DoraHacks BUIDL submission 🔄 IN PROGRESS
+Form filled with project description, GitHub link, rwai.fyi, contract address, track. **Blocked on demo video link — submit immediately after Step 7.**
 
-Surface this in bot.js `/history` command as: "Agent accuracy: X% over Y predictions"
-
-**Test:** `/history` in Telegram shows prediction log with accuracy score
-
-### STEP 4 — GitHub repo + README
-Create a public GitHub repository:
-- Repo name: `rwai`
-- README.md must include:
-  - One-line pitch
-  - Live demo URL: rwai.fyi
-  - Deployed contract address on Mantle
-  - Latest transaction hash
-  - Architecture diagram (ASCII is fine)
-  - Setup instructions
-  - Track: AI x RWA — Mantle Turing Test Hackathon 2026
-
-**Test:** README renders correctly on GitHub, all links work
-
-### STEP 5 — Deploy rwai.fyi
-Create a minimal but polished landing page:
-- Hero: "RWAI — Your autonomous RWA yield agent on Mantle"
-- Live yield ticker: USDY vs mETH current APY (fetched from DeFiLlama on load)
-- One-tap Telegram bot link
-- "How it works" — the 4-layer loop in plain English
-- Deployed contract address + Mantle Explorer link
-
-Deploy to Vercel connected to the GitHub repo. Point rwai.fyi DNS to Vercel.
-
-**Test:** rwai.fyi loads, shows live yield data, Telegram link works
-
-### STEP 6 — DoraHacks BUIDL submission
-Update the BUIDL page at dorahacks.io/hackathon/mantleturingtesthackathon2026 with:
-- Project description (use the one-line pitch + 3 bullet points)
-- GitHub repo link
-- Live demo: rwai.fyi
-- Contract address: `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`
-- Track: AI x RWA
-- Demo video link (YouTube)
-
-### STEP 7 — 2-minute demo video
+### STEP 7 — 2-minute demo video ⏳ TODO (next)
 Script:
 1. Open Telegram, show the bot running
 2. Type /status — show live yield data + Mantle Explorer link
 3. Type /compare — show USDY vs mETH spread
 4. Trigger an alert manually (temporarily lower the threshold) — show the approve/dismiss buttons
 5. Tap Approve — show the Mantle Explorer transaction confirming
-6. Close with: "RWAI — autonomous, verifiable, plain English. Built on Mantle."
+6. Show rwai.fyi/dashboard — wallet connect, live prices, agent insight
+7. Close with: "RWAI — autonomous, verifiable, plain English. Built on Mantle."
 
-Record with Loom or QuickTime. Upload to YouTube (unlisted is fine).
+Record with Loom or QuickTime. Upload to YouTube (unlisted is fine). Then immediately submit DoraHacks.
+
+### STEP 7b — RWAIVault testnet deployment 🔄 IN PROGRESS (with Tokhi)
+`contracts/RWAIVault.sol` compiled. Tokhi handling testnet deploy. Once live: add deployed address to README + DoraHacks submission.
 
 ### STEP 8 — X (Twitter) campaign for Community Voting
-Community Voting is worth $8,500 and decided by votes on DoraHacks. Start this in parallel with Step 5.
+Community Voting is worth $8,500 and decided by votes on DoraHacks. Start this in parallel with Step 7.
 
 Post cadence:
 - Post 1: "Day 1 — built the Claude explanation engine. This is what RWAI sends your Telegram when USDY yield drops." [screenshot]
@@ -212,7 +174,7 @@ Tag: @0xMantle @ondofinance in every post
 ---
 
 ## What NOT to Do
-- Don't add features before Step 1 is done — the broken wires kill the demo
+- Don't add features before the demo video and DoraHacks submission are done — that's the current blocker
 - Don't build Tier 3 auto-execution for the hackathon — too risky, Tier 2 is enough
 - Don't scope-creep into xStocks or other RWA assets before submission — USDY + mETH is the MVP
 - Don't use `sudo npm install` — it causes permission errors
@@ -220,4 +182,4 @@ Tag: @0xMantle @ondofinance in every post
 
 ---
 
-*Last updated: May 6, 2026 | Built by Ayman (@0xSunSeeker) | rwai.fyi*
+*Last updated: May 8, 2026 | Built by Ayman (@0xSunSeeker) | rwai.fyi*

@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/aymanzahran/Desktop/rwai/contracts/contracts/RWAIVault.sol": {
-      "lastModificationDate": 1778224668853,
-      "contentHash": "8c00fbe4571988544f696ababc0f5f39",
+      "lastModificationDate": 1778300313890,
+      "contentHash": "ad3891c23723e110e89ecf1c57aee23d",
       "sourceName": "contracts/RWAIVault.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -523,6 +523,42 @@
       ],
       "artifacts": [
         "IERC165"
+      ]
+    },
+    "/Users/aymanzahran/Desktop/rwai/contracts/contracts/MockTarget.sol": {
+      "lastModificationDate": 1778300545674,
+      "contentHash": "37977974174a9438e0a1235c3d83ad52",
+      "sourceName": "contracts/MockTarget.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "MockTarget"
       ]
     }
   }

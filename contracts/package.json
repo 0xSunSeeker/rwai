@@ -1,0 +1,20 @@
+{
+  "name": "rwai-contracts",
+  "version": "1.0.0",
+  "description": "RWAI Vault smart contracts — Mantle Mainnet execution layer",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.js --network mantleSepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mantle"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

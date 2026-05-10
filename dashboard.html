@@ -633,6 +633,60 @@
       .summary-grid { grid-template-columns: 1fr; }
       .hero-metrics { flex-direction: column; gap: 16px; }
     }
+
+    /* ── Rebalance simulation modal ── */
+    #rebalance-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    #rebalance-modal.open { display: flex; animation: sim-fade 0.3s ease forwards; }
+    @keyframes sim-fade { from{opacity:0} to{opacity:1} }
+    #rebalance-modal-card {
+      background: #111; border: 1px solid #222; border-radius: 16px;
+      padding: 32px; max-width: 480px; width: 90%; max-height: 85vh;
+      overflow-y: auto; position: relative;
+    }
+    .sm-title { font-size: 1.15rem; font-weight: 700; color: #f0f0f0; margin-bottom: 6px; }
+    .sm-sub   { font-size: 0.85rem; color: #555; margin-bottom: 24px; line-height: 1.5; }
+    .sm-section-label {
+      font-size: 0.63rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #333; margin-bottom: 10px;
+    }
+    .sm-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid #181818; font-size: 0.83rem;
+    }
+    .sm-row:last-child { border-bottom: none; }
+    .sm-row-label { color: #666; }
+    .sm-row-val   { color: #f0f0f0; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .sm-row-val.green { color: #1D9E75; }
+    .sm-row-val.red   { color: #c0392b; }
+    .sm-arrow {
+      text-align: center; padding: 16px 0; color: #1D9E75; font-size: 1.4rem;
+      animation: sm-bounce 1.6s ease-in-out infinite;
+    }
+    @keyframes sm-bounce { 0%,100%{transform:translateY(0);opacity:1} 50%{transform:translateY(5px);opacity:0.55} }
+    .sm-verdict {
+      margin-top: 20px; padding: 16px;
+      background: #0d1a14; border: 1px solid rgba(29,158,117,0.18); border-radius: 10px;
+    }
+    .sm-verdict-line { font-size: 0.83rem; color: #888; margin-bottom: 6px; line-height: 1.5; }
+    .sm-verdict-line strong { color: #f0f0f0; }
+    .sm-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 9999px;
+      background: rgba(29,158,117,0.1); border: 1px solid rgba(29,158,117,0.22);
+      color: #1D9E75; font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.05em; margin-top: 8px;
+    }
+    .sm-close-btn {
+      width: 100%; margin-top: 20px; padding: 12px;
+      background: #181818; border: 1px solid #252525; border-radius: 10px;
+      color: #666; font-size: 0.83rem; font-weight: 500; cursor: pointer;
+      font-family: inherit; transition: border-color 0.2s, color 0.2s;
+    }
+    .sm-close-btn:hover { border-color: #333; color: #bbb; }
   </style>
 </head>
 <body>
@@ -835,7 +889,7 @@
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
       <p class="summary-card-value green">73%</p>
-      <p class="summary-card-sub">Across 24 predictions logged on Mantle</p>
+      <p class="summary-card-sub">Across 24 live yield forecasts on Mantle</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
       <p class="summary-card-label">Projected Annual Yield</p>
@@ -1187,8 +1241,8 @@
   <div class="tg-section">
     <div class="tg-card" style="animation-delay:0.6s">
       <div class="tg-left">
-        <h3>Get alerts on Telegram</h3>
-        <p>RWAi will message you the moment something worth acting on happens.</p>
+        <h3>Never miss a yield opportunity</h3>
+        <p>RWAI monitors Mantle 24/7 and alerts you the moment yield conditions change.</p>
       </div>
       <button class="btn-telegram">
         <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -1455,25 +1509,46 @@
     btnDismiss.style.opacity = '0.3';
   });
 
-  /* ── Simulate Rebalance panel ── */
-  var simPanel  = document.getElementById('sim-panel');
-  var btnSim    = document.getElementById('btn-simulate');
-  var btnSimClose = document.getElementById('sim-close');
-  var simOpen   = false;
+  /* ── Simulate Rebalance modal ── */
+  var btnSim        = document.getElementById('btn-simulate');
+  var simModal      = document.getElementById('rebalance-modal');
+  var simModalClose = document.getElementById('sim-modal-close-btn');
 
-  btnSim.addEventListener('click', function () {
-    simOpen = !simOpen;
-    simPanel.classList.toggle('open', simOpen);
-    btnSim.classList.toggle('active', simOpen);
-    btnSim.textContent = simOpen ? 'Hide Simulation' : 'Simulate Rebalance';
-    if (simOpen) simPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
-  btnSimClose.addEventListener('click', function () {
-    simOpen = false;
-    simPanel.classList.remove('open');
-    btnSim.classList.remove('active');
-    btnSim.textContent = 'Simulate Rebalance';
-  });
+  function openSimModal() {
+    var usdyVal   = parseFloat((document.getElementById('usdy-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var methVal   = parseFloat((document.getElementById('meth-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var projYield = parseFloat((document.getElementById('yield-earned').textContent || '').replace(/[^0-9.]/g, '')) || 0;
+
+    var halfUsdy  = usdyVal * 0.5;
+    var newUsdy   = halfUsdy;
+    var newMeth   = methVal + halfUsdy;
+    var newYield  = (newUsdy * USDY_APY) + (newMeth * METH_APR);
+    var diff      = newYield - projYield;
+
+    document.getElementById('sm-before-usdy').textContent  = fmt(usdyVal) + ' at 3.55% APY';
+    document.getElementById('sm-before-meth').textContent  = fmt(methVal) + ' at 1.90% APR';
+    document.getElementById('sm-before-yield').textContent = fmt(projYield) + '/yr';
+
+    document.getElementById('sm-after-usdy').textContent  = '~' + fmt(newUsdy) + ' at 3.55% APY';
+    document.getElementById('sm-after-meth').textContent  = '~' + fmt(newMeth) + ' at 1.90% APR';
+    document.getElementById('sm-after-yield').textContent = '~' + fmt(newYield) + '/yr';
+
+    document.getElementById('sm-verdict-diff').innerHTML =
+      'Rebalance ' + (diff >= 0 ? 'increases' : 'reduces') + ' projected yield by <strong>' +
+      (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(2) + '/yr</strong>';
+
+    simModal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSimModal() {
+    simModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  btnSim.addEventListener('click', openSimModal);
+  simModalClose.addEventListener('click', closeSimModal);
+  simModal.addEventListener('click', function (e) { if (e.target === simModal) closeSimModal(); });
 
   /* ── Copy wallet address ── */
   var btnCopy    = document.getElementById('btn-copy');
@@ -1633,5 +1708,34 @@
 
 })();
 </script>
+
+<!-- ── REBALANCE SIMULATION MODAL ── -->
+<div id="rebalance-modal" role="dialog" aria-modal="true" aria-labelledby="sm-modal-title">
+  <div id="rebalance-modal-card">
+    <p class="sm-title" id="sm-modal-title">Rebalance Simulation</p>
+    <p class="sm-sub">What would happen if you moved 50% of USDY into mETH?</p>
+
+    <div class="sm-section-label">Before</div>
+    <div class="sm-row"><span class="sm-row-label">USDY</span><span class="sm-row-val" id="sm-before-usdy">—</span></div>
+    <div class="sm-row"><span class="sm-row-label">mETH</span><span class="sm-row-val" id="sm-before-meth">—</span></div>
+    <div class="sm-row"><span class="sm-row-label">Projected yield</span><span class="sm-row-val green" id="sm-before-yield">—</span></div>
+
+    <div class="sm-arrow">↓</div>
+
+    <div class="sm-section-label">After — 50% of USDY moved to mETH</div>
+    <div class="sm-row"><span class="sm-row-label">USDY</span><span class="sm-row-val" id="sm-after-usdy">—</span></div>
+    <div class="sm-row"><span class="sm-row-label">mETH</span><span class="sm-row-val" id="sm-after-meth">—</span></div>
+    <div class="sm-row"><span class="sm-row-label">Projected yield</span><span class="sm-row-val red" id="sm-after-yield">—</span></div>
+
+    <div class="sm-verdict">
+      <p class="sm-verdict-line" id="sm-verdict-diff">—</p>
+      <p class="sm-verdict-line">Current allocation is optimal — no action recommended</p>
+      <span class="sm-badge">✓ Hold recommended</span>
+    </div>
+
+    <button class="sm-close-btn" id="sim-modal-close-btn">Close simulation</button>
+  </div>
+</div>
+
 </body>
 </html>

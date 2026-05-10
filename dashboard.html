@@ -1504,52 +1504,54 @@
 
   /* ── Simulate Rebalance modal ── */
   var btnSimulate = document.querySelector('.btn-simulate');
-  var rebalanceModal = document.getElementById('rebalance-modal');
-  var simClose = document.getElementById('sim-close');
 
   function openSimModal() {
+    var modal = document.getElementById('rebalance-modal');
+    if (!modal) return;
+
     var usdyText = document.getElementById('usdy-usd') ? document.getElementById('usdy-usd').textContent : '$33.80';
     var methText = document.getElementById('meth-usd') ? document.getElementById('meth-usd').textContent : '$77.16';
 
     var usdyVal = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 33.80;
     var methVal = parseFloat(methText.replace(/[^0-9.]/g, '')) || 77.16;
 
-    var usdyAfter  = usdyVal / 2;
-    var methAfter  = methVal + usdyAfter;
+    var usdyAfter   = usdyVal / 2;
+    var methAfter   = methVal + usdyAfter;
     var yieldBefore = (usdyVal * 0.0355) + (methVal * 0.0190);
     var yieldAfter  = (usdyAfter * 0.0355) + (methAfter * 0.0190);
-    var diff = yieldBefore - yieldAfter;
+    var diff        = yieldBefore - yieldAfter;
 
-    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)   + ' @ 3.55%';
-    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)   + ' @ 1.90%';
+    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ 3.55%';
+    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ 1.90%';
     document.getElementById('sim-yield-before').textContent = '$' + yieldBefore.toFixed(2) + ' / yr';
-    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)  + ' @ 3.55%';
-    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)  + ' @ 1.90%';
-    document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2) + ' / yr';
+    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ 3.55%';
+    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ 1.90%';
+    document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2)  + ' / yr';
     document.getElementById('sim-verdict').textContent      = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
 
-    rebalanceModal.style.display = 'flex';
+    modal.style.display = 'flex';
+  }
+
+  function closeSimModal() {
+    var modal = document.getElementById('rebalance-modal');
+    if (modal) modal.style.display = 'none';
   }
 
   if (btnSimulate) btnSimulate.addEventListener('click', openSimModal);
 
-  document.querySelectorAll('button').forEach(function (btn) {
-    if (btn.textContent.trim() === 'Simulate Rebalance') btn.addEventListener('click', openSimModal);
-  });
-
-  if (simClose) simClose.addEventListener('click', function () {
-    rebalanceModal.style.display = 'none';
-  });
-
-  if (rebalanceModal) rebalanceModal.addEventListener('click', function (e) {
-    if (e.target === rebalanceModal) rebalanceModal.style.display = 'none';
+  document.addEventListener('click', function (e) {
+    var modal = document.getElementById('rebalance-modal');
+    if (!modal) return;
+    if (e.target === modal) closeSimModal();
+    if (e.target && e.target.id === 'sim-close') closeSimModal();
   });
 
   /* ── Disconnect ── */
   var btnDisconnect = document.querySelector('.btn-disconnect');
   if (btnDisconnect) {
     btnDisconnect.addEventListener('click', function () {
-      sessionStorage.setItem('rwai_disconnected', 'true');
+      sessionStorage.clear();
+      sessionStorage.setItem('userDisconnected', 'true');
       localStorage.clear();
       window.location.href = '/';
     });

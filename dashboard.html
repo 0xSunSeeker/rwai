@@ -1544,10 +1544,16 @@
   simModal.addEventListener('click', function (e) { if (e.target === simModal) closeSimModal(); });
 
   /* ── Disconnect ── */
-  document.getElementById('btn-disconnect').addEventListener('click', function () {
-    sessionStorage.setItem('rwai_disconnected', 'true');
-    window.location.href = '/';
-  });
+  var btnDisconnect = document.querySelector('.btn-disconnect');
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', function () {
+      sessionStorage.setItem('rwai_disconnected', 'true');
+      localStorage.removeItem('wagmi.connected');
+      localStorage.removeItem('wagmi.wallet');
+      localStorage.removeItem('wc@2:client:0.3//session');
+      window.location.href = '/';
+    });
+  }
 
   /* ── Copy wallet address ── */
   var btnCopy    = document.getElementById('btn-copy');

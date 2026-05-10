@@ -8,7 +8,6 @@ dotenv.config();
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// RWAI's personality — injected into every Claude call
 const RWAI_SYSTEM_PROMPT = `You are RWAI, an autonomous yield intelligence agent for retail holders
 of USDY, mETH, and cmETH on the Mantle blockchain.
 
@@ -17,27 +16,31 @@ in plain English to non-technical users who hold real money in these assets.
 
 ASSETS YOU MONITOR:
 - USDY (Ondo Finance): A tokenized note backed by US Treasuries. Yield adjusts
-  weekly based on T-bill rate movements. Current benchmark: ~3.55% APY. Risk: 1/5.
+  weekly based on T-bill rate movements. Risk: 1/5. No ETH price exposure.
 - mETH (Mantle Staking): Mantle's liquid staked ETH. Yield comes from Ethereum
-  validator rewards. Current benchmark: ~1.0% APR. Risk: 3/5.
-- cmETH (Mantle Staking): Auto-compounding version of mETH. Deposits mETH into a
-  vault that reinvests daily rewards, giving a slightly higher effective APY than
-  mETH. Same underlying risk as mETH. Risk: 3/5.
+  validator rewards. Risk: 3/5. Exposed to ETH price movements.
+- cmETH (Mantle Staking): Auto-compounding version of mETH. Reinvests validator
+  rewards daily for a slightly higher effective APY. Same risk as mETH: 3/5.
+
+CRITICAL RULES — NEVER VIOLATE THESE:
+- Only reference data that is explicitly provided to you in the user message.
+- Never invent trends, market conditions, or external context not in the data.
+- Never claim T-bill rates moved unless tbillRate data shows a change.
+- Never claim ETH staking demand changed unless methTrend data shows it.
+- If a data field is missing or null, say you don't have enough data — do not guess.
+- Confidence scores must reflect actual data quality: if trend data is unavailable,
+  cap confidence at 60. If only current rates are available, cap at 55.
+- Never recommend mETH over USDY unless mETH APR is numerically higher than USDY APY.
 
 YOUR VOICE:
 - Speak like a sharp, trustworthy financial advisor — not a chatbot, not a robot.
-- Always explain WHY something happened, not just WHAT happened.
+- Always explain WHY something happened using only the data provided.
 - Always connect the explanation to the user's specific position size.
 - Never use jargon without immediately explaining it.
-- Be concise. Users read this on Telegram. Three short paragraphs maximum.
+- Be concise. Users read this on Telegram. Three short paragraphs maximum.`;
 
-YOUR PREDICTION FORMAT (when asked to predict):
-- Always output valid JSON when asked for a prediction.
-- Never add markdown, backticks, or explanation around the JSON.
-- Confidence must be a number between 0 and 100.`;
 
 // FUNCTION 1: GENERATE EXPLANATION
-// Takes live yield data + user context, returns a plain-English Telegram message
 export async function generateExplanation(yieldData, userContext) {
   const {
     usdyCurrentAPY,
@@ -56,14 +59,18 @@ export async function generateExplanation(yieldData, userContext) {
     agentAccuracy,
   } = userContext;
 
-  const spreadNow = (methCurrentAPR - usdyCurrentAPY).toFixed(2);
+  // USDY leads mETH currently — spread is USDY minus mETH
+  const spreadNow = (usdyCurrentAPY - methCurrentAPR).toFixed(2);
+  const leader = usdyCurrentAPY >= methCurrentAPR ? 'USDY' : 'mETH';
+  const usdyChanged = usdyCurrentAPY !== usdyPreviousAPY;
+  const methChanged = methCurrentAPR !== methPreviousAPR;
 
   const userPrompt = `
 CURRENT YIELD SNAPSHOT:
-- USDY APY: ${usdyCurrentAPY}% (was ${usdyPreviousAPY}%)
-- mETH APR: ${methCurrentAPR}% (was ${methPreviousAPR}%)
-- Current yield spread (mETH over USDY): ${spreadNow}%
-- US T-bill rate context: ${tbillRate}%
+- USDY APY: ${usdyCurrentAPY}% (previously ${usdyPreviousAPY}%) ${usdyChanged ? `— changed by ${(usdyCurrentAPY - usdyPreviousAPY).toFixed(2)}%` : '— unchanged'}
+- mETH APR: ${methCurrentAPR}% (previously ${methPreviousAPR}%) ${methChanged ? `— changed by ${(methCurrentAPR - methPreviousAPR).toFixed(2)}%` : '— unchanged'}
+- Yield spread (USDY minus mETH): ${spreadNow}% — ${leader} is the higher yielding asset
+- US T-bill rate: ${tbillRate}%
 - Asset that triggered this alert: ${triggerAsset}
 - Change magnitude: ${changePercent}%
 
@@ -74,11 +81,13 @@ USER CONTEXT:
 - Agent track record: ${agentAccuracy}
 
 Write a plain-English Telegram message explaining:
-1. What changed and why (connect to T-bill/ETH staking context)
-2. What this means for their $${userPositionUSD.toLocaleString()} position specifically
-3. What the agent is proposing next
+1. What changed (only reference the data above — do not invent context)
+2. What this means for their $${userPositionUSD.toLocaleString()} position
+3. What the agent recommends next based purely on the yield numbers
 
-Maximum 3 short paragraphs. No bullet points. Conversational, confident tone.`;
+Maximum 3 short paragraphs. No bullet points. Conversational, confident tone.
+Do not mention T-bill movements, ETH staking demand, or validator trends
+unless the data above shows an actual change in those figures.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",
@@ -90,59 +99,78 @@ Maximum 3 short paragraphs. No bullet points. Conversational, confident tone.`;
   return response.content[0].text;
 }
 
+
 // FUNCTION 2: GENERATE INSIGHT
-// One-sentence market insight used by /status command in bot.js
 export async function generateInsight(usdyYield, methYield, spread) {
-  const leader = usdyYield > methYield ? 'USDY' : 'mETH';
+  const leader = usdyYield >= methYield ? 'USDY' : 'mETH';
+  const spreadAbs = Math.abs(spread).toFixed(2);
+
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",
     max_tokens: 80,
     system: RWAI_SYSTEM_PROMPT,
     messages: [{
       role: "user",
-      content: `USDY is at ${usdyYield}% APY, mETH at ${methYield}% APR, spread is ${spread}%. ${leader} leads. Write one sentence of market insight for a Telegram status message. No formatting, no bullet points.`,
+      content: `USDY is at ${usdyYield}% APY. mETH is at ${methYield}% APR. ${leader} leads by ${spreadAbs}%. Write one sentence of market insight for a Telegram status message based only on these numbers. No formatting, no bullet points, no invented context.`,
     }],
   });
   return response.content[0].text.trim();
 }
 
+
 // FUNCTION 3: GENERATE PREDICTION
-// Returns structured JSON prediction ready to be logged on-chain via ERC-8004
 export async function generatePrediction(yieldData) {
   const {
-    usdyCurrentAPY, usdyApy7d, usdyApy30d,
-    methCurrentAPR, methApy7d, methApy30d,
+    usdyCurrentAPY, usdyApy7d, usdyApy30d, recentUsdyTrend,
+    methCurrentAPR, methApy7d, methApy30d, recentMethTrend,
     cmethCurrentAPY,
-    tbillRate, recentTbillTrend, recentMethTrend, recentUsdyTrend,
+    tbillRate, recentTbillTrend,
   } = yieldData;
 
+  // Determine data quality to set honest confidence ceiling
+  const hasHistoricalData = usdyApy7d && usdyApy30d && methApy7d && methApy30d;
+  const hasTrendData = recentUsdyTrend && recentMethTrend && recentTbillTrend;
+  const confidenceCeiling = hasHistoricalData && hasTrendData ? 85 : hasTrendData ? 70 : 55;
+
   const userPrompt = `
-CURRENT YIELD DATA FOR PREDICTION:
-- USDY APY: ${usdyCurrentAPY}% (7d avg: ${usdyApy7d ?? usdyCurrentAPY}%, 30d avg: ${usdyApy30d ?? usdyCurrentAPY}%, trend: ${recentUsdyTrend ?? "stable"})
-- mETH APR: ${methCurrentAPR}% (7d avg: ${methApy7d ?? methCurrentAPR}%, 30d avg: ${methApy30d ?? methCurrentAPR}%, trend: ${recentMethTrend})
-- cmETH APY: ${cmethCurrentAPY}% (auto-compounding mETH — moves with mETH)
+CURRENT YIELD DATA:
+- USDY APY: ${usdyCurrentAPY}%
+  7-day avg: ${usdyApy7d ?? 'not available'}%
+  30-day avg: ${usdyApy30d ?? 'not available'}%
+  Recent trend: ${recentUsdyTrend ?? 'not available'}
+- mETH APR: ${methCurrentAPR}%
+  7-day avg: ${methApy7d ?? 'not available'}%
+  30-day avg: ${methApy30d ?? 'not available'}%
+  Recent trend: ${recentMethTrend ?? 'not available'}
+- cmETH APY: ${cmethCurrentAPY}% (tracks mETH with compounding)
 - US T-bill rate: ${tbillRate}%
-- T-bill trend (last 7 days): ${recentTbillTrend}
+  T-bill trend (7 days): ${recentTbillTrend ?? 'not available'}
+
+DATA QUALITY NOTE:
+Maximum confidence you may assign to any prediction: ${confidenceCeiling}
+If trend data is marked "not available", you must use a confidence of 50 or lower.
+Base your reasoning ONLY on the numbers provided. Do not reference news,
+Fed decisions, or market events not present in the data above.
 
 Make a yield direction prediction for each asset over the next 24 hours.
-Return ONLY valid JSON in this exact format, no other text:
+Return ONLY valid JSON, no other text:
 
 {
   "timestamp": "<ISO 8601 UTC string>",
   "usdyPrediction": {
     "direction": "<up|down|stable>",
-    "confidence": <0-100>,
-    "reasoning": "<one sentence>"
+    "confidence": <0-${confidenceCeiling}>,
+    "reasoning": "<one sentence using only the data provided>"
   },
   "methPrediction": {
     "direction": "<up|down|stable>",
-    "confidence": <0-100>,
-    "reasoning": "<one sentence>"
+    "confidence": <0-${confidenceCeiling}>,
+    "reasoning": "<one sentence using only the data provided>"
   },
   "cmethPrediction": {
     "direction": "<up|down|stable>",
-    "confidence": <0-100>,
-    "reasoning": "<one sentence>"
+    "confidence": <0-${confidenceCeiling}>,
+    "reasoning": "<one sentence using only the data provided>"
   }
 }`;
 
@@ -162,8 +190,8 @@ Return ONLY valid JSON in this exact format, no other text:
   }
 }
 
+
 // FUNCTION 4: GENERATE STRATEGY
-// Given current yields and user profile, returns a plain-English strategy recommendation
 export async function generateStrategy(yieldData, user) {
   const {
     usdyCurrentAPY, methCurrentAPR, cmethCurrentAPY, tbillRate,
@@ -172,28 +200,29 @@ export async function generateStrategy(yieldData, user) {
 
   const annual = (pct) => (userPositionUSD * pct / 100).toFixed(0);
   const spread = (usdyCurrentAPY - methCurrentAPR).toFixed(2);
+  const usdyLeads = usdyCurrentAPY >= methCurrentAPR;
 
   const userPrompt = `
 CURRENT YIELD SNAPSHOT:
-- USDY APY: ${usdyCurrentAPY}%  | Risk: 1/5 (US Treasury backed, no price risk)
-- mETH APR: ${methCurrentAPR}%  | Risk: 3/5 (ETH price exposure, validator rewards)
-- cmETH APY: ${cmethCurrentAPY}% | Risk: 3/5 (auto-compounding mETH vault)
-- US T-bill rate: ${tbillRate}% (USDY is pegged to this)
-- USDY vs mETH spread: ${spread}%
+- USDY APY: ${usdyCurrentAPY}% | Annual on full position: $${annual(usdyCurrentAPY)}/yr | Risk: 1/5
+- mETH APR: ${methCurrentAPR}% | Annual on full position: $${annual(methCurrentAPR)}/yr | Risk: 3/5
+- cmETH APY: ${cmethCurrentAPY}% | Annual on full position: $${annual(cmethCurrentAPY)}/yr | Risk: 3/5
+- US T-bill rate: ${tbillRate}% (USDY yield is derived from this)
+- USDY vs mETH spread: ${spread}% — ${usdyLeads ? 'USDY leads' : 'mETH leads'}
 
 USER PROFILE:
 - Position size: $${userPositionUSD.toLocaleString()}
-- If 100% USDY:  $${annual(usdyCurrentAPY)}/year
-- If 100% mETH:  $${annual(methCurrentAPR)}/year
-- If 100% cmETH: $${annual(cmethCurrentAPY)}/year
 - Delegation tier: ${userTier}
 - Agent track record: ${agentAccuracy}
 
-Write a yield strategy recommendation for this user.
-Be specific: tell them which asset (or combination) to hold and exactly why.
-Include the dollar amounts to make it concrete.
-Mention the risk trade-off plainly — don't bury it.
-2-3 short paragraphs. No bullet points. Conversational, confident tone.`;
+STRATEGY RULES (follow these strictly):
+- If USDY APY is higher than mETH APR, recommend holding USDY. Do not suggest moving to mETH.
+- If mETH APR is higher than USDY APY, explain the yield benefit but also explain the added ETH price risk.
+- Always mention the risk difference between USDY (Treasury-backed, no price risk) and mETH (ETH price exposure).
+- Give specific dollar amounts. Make the annual yield difference concrete.
+- Do not recommend any action not supported by the yield numbers above.
+
+Write a 2-3 paragraph strategy recommendation. No bullet points. Conversational, confident tone.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",

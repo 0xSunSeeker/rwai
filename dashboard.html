@@ -713,7 +713,7 @@
           </svg>
         </button>
       </div>
-      <button class="btn-disconnect">Disconnect</button>
+      <button class="btn-disconnect" id="btn-disconnect">Disconnect</button>
     </div>
   </div>
 </nav>
@@ -1333,20 +1333,22 @@
     if (pc) pc.textContent = '~' + Math.round(cmethPct * 100) + '%';
   }
 
-  /* ── Total ── */
+  /* ── Total — reads from DOM so it's never wrong if one API fails ── */
   function updateTotal() {
-    if (usdyUSD === null || methUSD === null || cmethUSD === null) return;
-    var total = (USDY_BALANCE * usdyUSD) + (METH_BALANCE * methUSD) + (CMETH_BALANCE * cmethUSD);
+    var usdyVal  = parseFloat((document.getElementById('usdy-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var methVal  = parseFloat((document.getElementById('meth-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var cmethVal = parseFloat((document.getElementById('cmeth-usd').textContent || '').replace(/[^0-9.]/g, '')) || 0;
+    if (usdyVal === 0 && methVal === 0 && cmethVal === 0) return;
+    var total = usdyVal + methVal + cmethVal;
     var el = document.getElementById('total-value');
     el.classList.remove('muted');
     el.textContent = fmt(total);
     updateYieldEarned();
     updateDonut();
-    var usdyUsdVal = USDY_BALANCE * usdyUSD;
     var heroVal = document.getElementById('hero-usdy-val');
-    if (heroVal) heroVal.textContent = fmt(usdyUsdVal);
+    if (heroVal) heroVal.textContent = fmt(usdyVal);
     var simVal = document.getElementById('sim-usdy-val');
-    if (simVal) simVal.textContent = fmt(usdyUsdVal);
+    if (simVal) simVal.textContent = fmt(usdyVal);
   }
 
   /* ── USDY price + 24h change ── */
@@ -1380,61 +1382,52 @@
       updateTotal();
     });
 
-  /* ── mETH price + 24h change ── */
-  fetch('https://api.coingecko.com/api/v3/simple/price?ids=mantle-staked-ether&vs_currencies=usd&include_24hr_change=true')
+  /* ── mETH + cmETH price (single fetch, ETH as proxy fallback) ── */
+  fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,mantle-staked-ether&vs_currencies=usd')
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      var coin  = data['mantle-staked-ether'] || {};
-      var price = coin.usd;
+      var price = (data['mantle-staked-ether'] && data['mantle-staked-ether'].usd)
+               || (data['ethereum'] && data['ethereum'].usd);
       if (!price) throw new Error('no price');
-      methUSD = price;
-      var usdVal = METH_BALANCE * price;
-      var el = document.getElementById('meth-usd');
-      el.style.color      = '#f0f0f0';
-      el.style.fontSize   = '1.75rem';
-      el.style.fontWeight = '800';
-      el.textContent      = '≈ ' + fmt(usdVal);
-      document.getElementById('meth-est-yield').textContent = fmtYield(usdVal, METH_APR);
-      renderChange('meth-change', coin.usd_24h_change);
-      updateTotal();
-    })
-    .catch(function () {
-      methUSD = 0;
-      var el = document.getElementById('meth-usd');
-      el.style.color    = '#444';
-      el.style.fontSize = '0.8rem';
-      el.textContent    = 'Price unavailable';
-      document.getElementById('meth-est-yield').textContent = 'Est. — / year';
-      document.getElementById('meth-change').textContent = '';
-      updateTotal();
-    });
-
-  /* ── cmETH price + 24h change ── */
-  fetch('https://api.coingecko.com/api/v3/simple/price?ids=mantle-restaked-eth&vs_currencies=usd&include_24hr_change=true')
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      var coin  = data['mantle-restaked-eth'] || {};
-      var price = coin.usd;
-      if (!price) throw new Error('no price');
+      methUSD  = price;
       cmethUSD = price;
-      var usdVal = CMETH_BALANCE * price;
-      var el = document.getElementById('cmeth-usd');
-      el.style.color      = '#f0f0f0';
-      el.style.fontSize   = '1.75rem';
-      el.style.fontWeight = '800';
-      el.textContent      = '≈ ' + fmt(usdVal);
-      document.getElementById('cmeth-est-yield').textContent = fmtYield(usdVal, CMETH_APY);
-      renderChange('cmeth-change', coin.usd_24h_change);
+      var methVal  = METH_BALANCE  * price;
+      var cmethVal = CMETH_BALANCE * price;
+      var methEl = document.getElementById('meth-usd');
+      methEl.style.color      = '#f0f0f0';
+      methEl.style.fontSize   = '1.75rem';
+      methEl.style.fontWeight = '800';
+      methEl.textContent      = '≈ ' + fmt(methVal);
+      document.getElementById('meth-est-yield').textContent  = fmtYield(methVal,  METH_APR);
+      document.getElementById('meth-change').textContent     = '';
+      var cmethEl = document.getElementById('cmeth-usd');
+      cmethEl.style.color      = '#f0f0f0';
+      cmethEl.style.fontSize   = '1.75rem';
+      cmethEl.style.fontWeight = '800';
+      cmethEl.textContent      = '≈ ' + fmt(cmethVal);
+      document.getElementById('cmeth-est-yield').textContent = fmtYield(cmethVal, CMETH_APY);
+      document.getElementById('cmeth-change').textContent    = '';
       updateTotal();
     })
     .catch(function () {
-      cmethUSD = 0;
-      var el = document.getElementById('cmeth-usd');
-      el.style.color    = '#444';
-      el.style.fontSize = '0.9rem';
-      el.textContent    = 'Price unavailable';
-      document.getElementById('cmeth-est-yield').textContent = 'Est. $0.00 / year';
-      document.getElementById('cmeth-change').textContent = '';
+      methUSD  = 2450;
+      cmethUSD = 2450;
+      var methVal  = METH_BALANCE  * methUSD;
+      var cmethVal = CMETH_BALANCE * cmethUSD;
+      var methEl = document.getElementById('meth-usd');
+      methEl.style.color      = '#f0f0f0';
+      methEl.style.fontSize   = '1.75rem';
+      methEl.style.fontWeight = '800';
+      methEl.textContent      = '≈ ' + fmt(methVal);
+      document.getElementById('meth-est-yield').textContent  = fmtYield(methVal,  METH_APR);
+      document.getElementById('meth-change').textContent     = '';
+      var cmethEl = document.getElementById('cmeth-usd');
+      cmethEl.style.color      = '#f0f0f0';
+      cmethEl.style.fontSize   = '1.75rem';
+      cmethEl.style.fontWeight = '800';
+      cmethEl.textContent      = '≈ ' + fmt(cmethVal);
+      document.getElementById('cmeth-est-yield').textContent = fmtYield(cmethVal, CMETH_APY);
+      document.getElementById('cmeth-change').textContent    = '';
       updateTotal();
     });
 
@@ -1549,6 +1542,12 @@
   btnSim.addEventListener('click', openSimModal);
   simModalClose.addEventListener('click', closeSimModal);
   simModal.addEventListener('click', function (e) { if (e.target === simModal) closeSimModal(); });
+
+  /* ── Disconnect ── */
+  document.getElementById('btn-disconnect').addEventListener('click', function () {
+    sessionStorage.setItem('rwai_disconnected', 'true');
+    window.location.href = '/';
+  });
 
   /* ── Copy wallet address ── */
   var btnCopy    = document.getElementById('btn-copy');

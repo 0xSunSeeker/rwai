@@ -18,62 +18,66 @@
     a { text-decoration: none; color: inherit; }
     button { cursor: pointer; font-family: inherit; }
 
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    @keyframes fade-in {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slide-down {
-      from { opacity: 0; transform: translateY(-8px); max-height: 0; }
-      to   { opacity: 1; transform: translateY(0); max-height: 400px; }
-    }
-    @keyframes tooltip-fade {
-      0%   { opacity: 0; transform: translateY(4px); }
-      20%  { opacity: 1; transform: translateY(0); }
-      80%  { opacity: 1; }
-      100% { opacity: 0; }
-    }
+    @keyframes pulse-dot  { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes pulse-ring { 0%{transform:scale(0.85);opacity:0.6} 100%{transform:scale(2.2);opacity:0} }
+    @keyframes spin       { to{transform:rotate(360deg)} }
+    @keyframes fade-up    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slide-down { from{opacity:0;transform:translateY(-8px);max-height:0} to{opacity:1;transform:translateY(0);max-height:500px} }
+    @keyframes tooltip-fade { 0%{opacity:0;transform:translateY(4px)} 20%{opacity:1;transform:translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+    @keyframes tick-pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
 
-    .page { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .page { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
 
     /* ── Nav ── */
     nav {
       position: sticky; top: 0; z-index: 50;
-      background: #0a0a0a;
-      border-bottom: 1px solid #1a1a1a;
+      background: rgba(10,10,10,0.96);
+      border-bottom: 1px solid #161616;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
     .nav-inner {
       max-width: 1200px; margin: 0 auto;
-      padding: 14px 24px;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
     }
+    .nav-left { display: flex; align-items: center; gap: 14px; }
     .nav-logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; flex-shrink: 0; }
     .nav-logo .accent { color: #1D9E75; }
+    .nav-live-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 11px; border-radius: 9999px;
+      background: rgba(29,158,117,0.08);
+      border: 1px solid rgba(29,158,117,0.18);
+      font-size: 0.63rem; font-weight: 700; color: #1D9E75;
+      text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap;
+    }
+    .nav-live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #1D9E75; flex-shrink: 0;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
     .nav-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
     .wallet-badge {
-      display: flex; align-items: center; gap: 7px;
-      padding: 6px 12px; border-radius: 9999px;
-      background: rgba(29,158,117,0.08);
-      border: 1px solid rgba(29,158,117,0.2);
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 15px; border-radius: 9999px;
+      background: #131313;
+      border: 1px solid #222;
       font-size: 0.8rem; font-weight: 500; color: #ccc;
       position: relative;
+      transition: border-color 0.2s, background 0.2s;
     }
+    .wallet-badge:hover { border-color: #2e2e2e; background: #181818; }
     .wallet-dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: #1D9E75; flex-shrink: 0;
       animation: pulse-dot 2s ease-in-out infinite;
     }
-    .wallet-addr-full  { display: inline; }
-    .wallet-addr-short { display: none; }
+    .wallet-addr-full  { display: inline; font-family: 'SF Mono','Fira Code','Fira Mono','Roboto Mono',monospace; font-size: 0.75rem; letter-spacing: -0.01em; }
+    .wallet-addr-short { display: none; font-family: 'SF Mono','Fira Code','Fira Mono','Roboto Mono',monospace; font-size: 0.75rem; }
     .btn-copy {
       background: none; border: none; padding: 0 0 0 2px;
-      color: #555; cursor: pointer; line-height: 1;
+      color: #444; cursor: pointer; line-height: 1;
       transition: color 0.2s; flex-shrink: 0;
       display: flex; align-items: center;
     }
@@ -89,427 +93,536 @@
       animation: tooltip-fade 2s ease forwards;
     }
     .btn-disconnect {
-      padding: 6px 14px; border-radius: 9999px;
-      border: 1px solid #333; background: transparent;
-      color: #666; font-size: 0.8rem; font-weight: 500;
+      padding: 8px 16px; border-radius: 9999px;
+      border: 1px solid #252525; background: transparent;
+      color: #555; font-size: 0.8rem; font-weight: 500;
       transition: border-color 0.2s, color 0.2s;
     }
-    .btn-disconnect:hover { border-color: #555; color: #999; }
+    .btn-disconnect:hover { border-color: #444; color: #888; }
 
     /* ── Page header ── */
-    .page-header { padding: 36px 0 28px; }
-    .live-badge {
-      display: inline-flex; align-items: center; gap: 7px;
-      font-size: 0.7rem; font-weight: 600; color: #1D9E75;
-      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px;
-    }
-    .live-badge-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: #1D9E75; flex-shrink: 0;
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
+    .page-header { padding: 44px 0 20px; }
     .page-header h1 {
-      font-size: 2rem; font-weight: 800; letter-spacing: -0.03em;
-      line-height: 1.15; margin-bottom: 6px;
+      font-size: 2.25rem; font-weight: 800; letter-spacing: -0.04em;
+      line-height: 1.1; margin-bottom: 10px;
     }
-    .page-header-disclaimer { font-size: 0.775rem; color: #444; margin-bottom: 10px; }
-    .page-header-sub { font-size: 0.875rem; color: #555; }
+    .page-header-disclaimer { font-size: 0.775rem; color: #383838; margin-bottom: 4px; }
 
     /* ── Tier badge ── */
-    .tier-wrap { position: relative; display: inline-block; margin-bottom: 12px; }
+    .tier-wrap { position: relative; display: inline-block; margin-bottom: 16px; }
     .tier-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 9999px;
-      border: 1px solid #2e2e2e; background: transparent;
-      color: #666; font-size: 0.72rem; font-weight: 500;
+      padding: 5px 13px; border-radius: 9999px;
+      border: 1px solid #252525; background: transparent;
+      color: #555; font-size: 0.72rem; font-weight: 600;
       cursor: pointer; transition: border-color 0.2s, color 0.2s;
       font-family: inherit;
     }
-    .tier-badge:hover { border-color: #444; color: #aaa; }
+    .tier-badge:hover { border-color: #383838; color: #999; }
     .tier-badge svg { width: 10px; height: 10px; flex-shrink: 0; transition: transform 0.2s; }
     .tier-badge.open svg { transform: rotate(180deg); }
     .tier-dropdown {
       display: none; position: absolute; top: calc(100% + 6px); left: 0;
-      background: #161616; border: 1px solid #2a2a2a; border-radius: 10px;
-      padding: 6px; min-width: 230px; z-index: 100;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      background: #141414; border: 1px solid #252525; border-radius: 12px;
+      padding: 6px; min-width: 240px; z-index: 100;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
     }
-    .tier-dropdown.open { display: block; }
+    .tier-dropdown.open { display: block; animation: fade-up 0.15s ease; }
     .tier-option {
       display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 12px; border-radius: 7px; cursor: pointer;
+      padding: 11px 13px; border-radius: 8px; cursor: pointer;
       transition: background 0.15s;
     }
-    .tier-option:hover { background: #1f1f1f; }
+    .tier-option:hover { background: #1d1d1d; }
     .tier-option.selected { background: rgba(29,158,117,0.08); }
     .tier-option-dot {
       width: 7px; height: 7px; border-radius: 50%;
-      background: #333; margin-top: 5px; flex-shrink: 0;
+      background: #2e2e2e; margin-top: 5px; flex-shrink: 0;
     }
     .tier-option.selected .tier-option-dot { background: #1D9E75; }
-    .tier-option-text {}
     .tier-option-name { font-size: 0.8rem; font-weight: 600; color: #ccc; }
-    .tier-option-desc { font-size: 0.7rem; color: #555; margin-top: 2px; line-height: 1.4; }
+    .tier-option-desc { font-size: 0.7rem; color: #555; margin-top: 2px; line-height: 1.45; }
 
     /* ── Section label ── */
     .section-label {
-      font-size: 0.7rem; font-weight: 600; color: #444;
-      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px;
+      font-size: 0.68rem; font-weight: 700; color: #383838;
+      text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 16px;
     }
 
-    /* ── Summary cards ── */
-    .summary-grid {
-      display: grid; grid-template-columns: repeat(4, 1fr);
-      gap: 12px; margin-bottom: 36px;
+    /* ── HERO SECTION ── */
+    .hero-section { margin-bottom: 52px; }
+    .hero-card {
+      background: #0c1c14;
+      border: 1px solid rgba(29,158,117,0.16);
+      border-radius: 18px;
+      padding: 40px 44px;
+      display: grid; grid-template-columns: 1fr 272px; gap: 52px;
+      animation: fade-up 0.5s ease both;
+      position: relative; overflow: hidden;
     }
-    .summary-card {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 28px;
-      animation: fade-in 0.4s ease both;
+    .hero-card::before {
+      content: ''; position: absolute;
+      top: -80px; left: -80px; width: 360px; height: 360px;
+      background: radial-gradient(circle, rgba(29,158,117,0.07) 0%, transparent 68%);
+      pointer-events: none;
     }
-    .summary-card.highlight { border-color: rgba(29,158,117,0.4); background: #0d1a15; }
-    .summary-card-label {
-      font-size: 0.65rem; font-weight: 600; color: #444;
+    .hero-left { display: flex; flex-direction: column; }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.63rem; font-weight: 700; color: #1D9E75;
+      text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 18px;
+    }
+    .hero-tag-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #1D9E75; flex-shrink: 0;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .hero-headline {
+      font-size: 1.875rem; font-weight: 800; letter-spacing: -0.035em;
+      line-height: 1.15; margin-bottom: 14px; color: #f0f0f0;
+    }
+    .hero-body {
+      font-size: 0.975rem; color: #777; line-height: 1.8; margin-bottom: 28px;
+    }
+    .hero-metrics {
+      display: flex; gap: 36px; margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .hero-metric { }
+    .hero-metric-label {
+      font-size: 0.62rem; font-weight: 700; color: #3a3a3a;
+      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 5px;
+    }
+    .hero-metric-value {
+      font-size: 1.125rem; font-weight: 700; color: #ccc;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero-metric-value.green { color: #1D9E75; }
+    .hero-reasoning { margin-bottom: 28px; }
+    .hero-reasoning-label {
+      font-size: 0.62rem; font-weight: 700; color: #3a3a3a;
       text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px;
     }
-    .summary-card-value {
-      font-size: 1.875rem; font-weight: 800; letter-spacing: -0.03em;
-      line-height: 1; margin-bottom: 8px;
+    .hero-reasoning ul { list-style: none; }
+    .hero-reasoning li {
+      font-size: 0.85rem; color: #666; padding: 7px 0;
+      display: flex; align-items: flex-start; gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.04); line-height: 1.5;
     }
-    .summary-card-value.white  { color: #f0f0f0; }
-    .summary-card-value.amber  { color: #F0A500; }
-    .summary-card-value.green  { color: #1D9E75; }
-    .summary-card-value.muted  { color: #444; font-size: 1.25rem; }
-    .summary-card-sub { font-size: 0.8rem; color: #555; line-height: 1.4; }
+    .hero-reasoning li:last-child { border-bottom: none; }
+    .hero-reasoning li::before { content: '—'; color: #1D9E75; flex-shrink: 0; margin-top: 1px; font-weight: 700; }
+    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: auto; }
+    .hero-meta-link { font-size: 0.72rem; color: #333; margin-top: 12px; }
+    .hero-meta-link a { color: #1D9E75; border-bottom: 1px solid rgba(29,158,117,0.25); transition: border-color 0.2s; }
+    .hero-meta-link a:hover { border-color: #1D9E75; }
 
-    /* ── Positions ── */
-    .positions-section { margin-bottom: 36px; }
-    .positions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .position-card {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 20px 22px;
-      transition: box-shadow 0.25s;
-      animation: fade-in 0.4s ease both;
+    /* Hero status panel (right) */
+    .hero-status {
+      background: rgba(0,0,0,0.28);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px; padding: 28px 24px;
+      display: flex; flex-direction: column; gap: 0;
+      align-self: start;
     }
-    .position-card:hover { box-shadow: 0 0 20px rgba(29,158,117,0.1); }
-    .pos-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-    .pos-header-left { display: flex; align-items: center; gap: 10px; }
-    /* Token logo with chain badge overlay */
-    .token-logo-wrap {
-      position: relative; flex-shrink: 0;
-      width: 36px; height: 36px;
+    .hero-status-live {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
     }
-    .token-logo {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: #1a1a1a; display: block;
-      object-fit: cover;
+    .hero-pulse-wrap {
+      position: relative; width: 38px; height: 38px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
     }
-    .chain-badge {
-      position: absolute; bottom: -2px; right: -2px;
-      width: 16px; height: 16px; border-radius: 50%;
-      border: 1.5px solid #111;
-      background: #0a0a0a;
-      object-fit: cover;
+    .hero-pulse-ring {
+      position: absolute; width: 38px; height: 38px; border-radius: 50%;
+      background: rgba(29,158,117,0.12);
+      animation: pulse-ring 2.4s ease-out infinite;
     }
-    .pos-name { font-size: 1rem; font-weight: 700; line-height: 1.2; }
-    .pos-protocol { font-size: 0.75rem; color: #555; margin-top: 2px; }
-    .risk-badge {
-      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; padding: 3px 7px; border-radius: 4px;
-      white-space: nowrap; flex-shrink: 0;
+    .hero-pulse-dot {
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #1D9E75; position: relative; z-index: 1;
+      animation: pulse-dot 2s ease-in-out infinite;
     }
-    .risk-badge.low         { background: rgba(29,158,117,0.15); color: #1D9E75; }
-    .risk-badge.amber-badge { background: rgba(240,165,0,0.15);  color: #F0A500; }
-    .pos-balance { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-bottom: 4px; }
-    .pos-usd     { font-size: 0.8rem; color: #1D9E75; font-weight: 500; margin-bottom: 4px; }
-    .pos-usd.loading     { color: #444; }
-    .pos-usd.unavailable { color: #444; }
-    .pos-sub  { font-size: 0.775rem; color: #555; margin-bottom: 16px; }
-    .pos-divider { border: none; border-top: 1px solid #1a1a1a; margin-bottom: 14px; }
-    .pos-footer { display: flex; align-items: flex-end; justify-content: space-between; }
-    .pos-footer-label { font-size: 0.65rem; font-weight: 600; color: #444; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
-    .pos-est-yield { font-size: 0.7rem; color: #444; margin-top: 3px; }
-    .pos-apy-wrap { text-align: right; }
-    .pos-apy { font-size: 1rem; font-weight: 700; color: #1D9E75; display: block; }
-    .pos-change {
-      font-size: 0.65rem; font-weight: 600; margin-top: 2px;
-      display: block; white-space: nowrap;
+    .hero-status-title { font-size: 0.875rem; font-weight: 700; color: #f0f0f0; margin-bottom: 3px; }
+    .hero-status-sub   { font-size: 0.72rem; color: #3a3a3a; }
+    .hero-status-divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0 0 16px; }
+    .hero-status-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .pos-change.up   { color: #1D9E75; }
-    .pos-change.down { color: #e05252; }
-    .pos-change.flat { color: #555; }
-    .pos-token-sub { font-size: 0.8rem; color: #555; font-weight: 500; margin-bottom: 4px; }
+    .hero-status-row:last-of-type { border-bottom: none; }
+    .hero-status-row-label { font-size: 0.75rem; color: #444; }
+    .hero-status-row-val   { font-size: 0.75rem; font-weight: 600; color: #777; font-variant-numeric: tabular-nums; }
+    .hero-status-row-val.green { color: #1D9E75; }
+    .hero-verify-strip {
+      margin-top: 18px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .hero-verify {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 13px;
+      background: rgba(29,158,117,0.06);
+      border: 1px solid rgba(29,158,117,0.12);
+      border-radius: 8px;
+      font-size: 0.7rem; color: #1D9E75; font-weight: 600;
+    }
 
-    /* ── Agent insight ── */
-    .insight-section { margin-bottom: 36px; }
-    .insight-card {
-      background: #0d1f17;
-      border: 1px solid #1a3329;
-      border-left: 3px solid #1D9E75;
-      border-radius: 12px; padding: 22px 24px;
-      animation: fade-in 0.4s ease both;
-    }
-    .insight-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
-    }
-    .insight-header-left { display: flex; align-items: center; gap: 9px; }
-    .insight-icon { font-size: 1.1rem; }
-    .insight-name { font-size: 0.875rem; font-weight: 700; }
-    .insight-meta { font-size: 0.775rem; color: #555; }
-    .insight-meta a {
-      color: #1D9E75; text-decoration: none;
-      border-bottom: 1px solid rgba(29,158,117,0.3);
-      transition: border-color 0.2s;
-    }
-    .insight-meta a:hover { border-color: #1D9E75; }
-    .insight-body { font-size: 0.875rem; color: #888; line-height: 1.7; margin-bottom: 18px; }
-    .insight-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-
-    /* Simulate rebalance panel */
+    /* Sim panel */
     .sim-panel {
-      display: none;
-      margin-top: 16px;
-      background: #0a1a11;
-      border: 1px solid #1a3329;
+      display: none; margin-top: 20px;
+      background: #091510;
+      border: 1px solid rgba(29,158,117,0.18);
       border-left: 3px solid #1D9E75;
-      border-radius: 10px;
-      padding: 18px 20px;
+      border-radius: 12px; padding: 20px 24px;
       animation: slide-down 0.25s ease both;
       position: relative;
     }
     .sim-panel.open { display: block; }
     .sim-panel-title {
-      font-size: 0.75rem; font-weight: 700; color: #1D9E75;
-      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px;
+      font-size: 0.68rem; font-weight: 700; color: #1D9E75;
+      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 16px;
     }
     .sim-row {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
-      gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 12px;
     }
     .sim-row:last-of-type { border-bottom: none; }
-    .sim-row-label { font-size: 0.8rem; color: #666; }
-    .sim-row-val   { font-size: 0.8rem; font-weight: 600; color: #aaa; text-align: right; }
-    .sim-row-val.red    { color: #e05252; }
-    .sim-row-val.green  { color: #1D9E75; }
+    .sim-row-label { font-size: 0.82rem; color: #555; }
+    .sim-row-val   { font-size: 0.82rem; font-weight: 600; color: #888; text-align: right; }
+    .sim-row-val.red   { color: #e05252; }
+    .sim-row-val.green { color: #1D9E75; }
     .sim-verdict {
-      margin-top: 12px; padding: 10px 14px;
-      background: rgba(224,82,82,0.08); border: 1px solid rgba(224,82,82,0.2);
-      border-radius: 8px; font-size: 0.8rem; color: #aaa; line-height: 1.5;
+      margin-top: 14px; padding: 12px 16px;
+      background: rgba(224,82,82,0.07); border: 1px solid rgba(224,82,82,0.14);
+      border-radius: 8px; font-size: 0.82rem; color: #888; line-height: 1.6;
     }
     .sim-verdict strong { color: #e05252; }
     .sim-close {
-      position: absolute; top: 14px; right: 16px;
-      background: none; border: none; color: #555;
-      font-size: 1rem; line-height: 1; padding: 2px;
+      position: absolute; top: 16px; right: 18px;
+      background: none; border: none; color: #444;
+      font-size: 1.1rem; line-height: 1; padding: 2px;
       transition: color 0.2s; cursor: pointer;
     }
-    .sim-close:hover { color: #aaa; }
+    .sim-close:hover { color: #888; }
 
     /* Buttons */
     .btn-approve {
-      padding: 9px 20px; border-radius: 9999px;
+      padding: 10px 22px; border-radius: 9999px;
       background: #1D9E75; color: #fff;
-      font-size: 0.8rem; font-weight: 600; border: none;
-      transition: background 0.2s, opacity 0.2s;
+      font-size: 0.82rem; font-weight: 600; border: none;
+      transition: background 0.2s, transform 0.15s, opacity 0.2s;
       display: flex; align-items: center; gap: 7px;
       min-width: 155px; justify-content: center;
     }
-    .btn-approve:hover:not(:disabled) { background: #178a64; }
-    .btn-approve:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-approve:hover:not(:disabled) { background: #178a64; transform: translateY(-1px); }
+    .btn-approve:active:not(:disabled) { transform: translateY(0); }
+    .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-approve.no-action {
-      background: #1e1e1e; color: #555;
-      border: 1px solid #2a2a2a; cursor: not-allowed; min-width: 155px;
+      background: #161616; color: #444;
+      border: 1px solid #222; cursor: not-allowed;
     }
-    .btn-approve.no-action:hover { background: #1e1e1e; }
+    .btn-approve.no-action:hover { background: #161616; transform: none; }
     .btn-dismiss {
-      padding: 9px 20px; border-radius: 9999px;
-      border: 1px solid #333; background: transparent;
-      color: #666; font-size: 0.8rem; font-weight: 600;
+      padding: 10px 22px; border-radius: 9999px;
+      border: 1px solid #282828; background: transparent;
+      color: #555; font-size: 0.82rem; font-weight: 600;
       transition: border-color 0.2s, color 0.2s, opacity 0.2s;
     }
-    .btn-dismiss:hover:not(:disabled) { border-color: #555; color: #999; }
+    .btn-dismiss:hover:not(:disabled) { border-color: #444; color: #888; }
     .btn-dismiss:disabled { opacity: 0.35; cursor: not-allowed; }
     .btn-simulate {
-      padding: 9px 18px; border-radius: 9999px;
-      border: 1px solid #1a3329; background: transparent;
-      color: #1D9E75; font-size: 0.8rem; font-weight: 600;
+      padding: 10px 20px; border-radius: 9999px;
+      border: 1px solid rgba(29,158,117,0.22); background: transparent;
+      color: #1D9E75; font-size: 0.82rem; font-weight: 600;
       transition: background 0.2s, border-color 0.2s;
     }
-    .btn-simulate:hover { background: rgba(29,158,117,0.08); border-color: #1D9E75; }
+    .btn-simulate:hover { background: rgba(29,158,117,0.08); border-color: rgba(29,158,117,0.5); }
     .btn-simulate.active { background: rgba(29,158,117,0.1); border-color: #1D9E75; }
     .insight-share-row {
-      margin-top: 14px; padding-top: 13px;
+      margin-top: 16px; padding-top: 14px;
       border-top: 1px solid rgba(255,255,255,0.05);
       display: flex; justify-content: flex-end;
     }
     .btn-share-x {
       display: flex; align-items: center; gap: 7px;
       padding: 7px 16px; border-radius: 9999px;
-      border: 1px solid #2a2a2a; background: transparent;
-      color: #666; font-size: 0.78rem; font-weight: 600;
+      border: 1px solid #222; background: transparent;
+      color: #555; font-size: 0.78rem; font-weight: 600;
       transition: border-color 0.2s, color 0.2s;
     }
-    .btn-share-x:hover { border-color: #444; color: #aaa; }
+    .btn-share-x:hover { border-color: #383838; color: #888; }
     .btn-share-x svg { width: 12px; height: 12px; flex-shrink: 0; }
     .spinner {
       width: 13px; height: 13px;
-      border: 2px solid rgba(255,255,255,0.3);
+      border: 2px solid rgba(255,255,255,0.25);
       border-top-color: #fff; border-radius: 50%;
       animation: spin 0.7s linear infinite; flex-shrink: 0;
     }
 
-    /* ── Next Action card ── */
-    .next-action-section { margin-bottom: 36px; }
+    /* ── Summary cards ── */
+    .summary-section { margin-bottom: 52px; }
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    }
+    .summary-card {
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 14px; padding: 32px 28px;
+      animation: fade-up 0.4s ease both;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+      cursor: default;
+    }
+    .summary-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.45);
+      border-color: #242424;
+    }
+    .summary-card.highlight { border-color: rgba(29,158,117,0.28); background: #0d1a14; }
+    .summary-card.highlight:hover { border-color: rgba(29,158,117,0.45); }
+    .summary-card-label {
+      font-size: 0.63rem; font-weight: 700; color: #3a3a3a;
+      text-transform: uppercase; letter-spacing: 0.13em; margin-bottom: 16px;
+    }
+    .summary-card-value {
+      font-size: 2.125rem; font-weight: 800; letter-spacing: -0.035em;
+      line-height: 1; margin-bottom: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-card-value.white  { color: #f0f0f0; }
+    .summary-card-value.amber  { color: #F0A500; }
+    .summary-card-value.green  { color: #1D9E75; }
+    .summary-card-value.muted  { color: #3a3a3a; font-size: 1.5rem; }
+    .summary-card-sub { font-size: 0.8rem; color: #444; line-height: 1.55; }
+
+    /* ── Positions ── */
+    .positions-section { margin-bottom: 56px; }
+    .positions-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 18px; }
+
+    /* Donut layout */
+    .portfolio-layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: start; }
+    .donut-card {
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 14px; padding: 24px 20px;
+      animation: fade-up 0.4s ease both;
+    }
+    .donut-card-label {
+      font-size: 0.63rem; font-weight: 700; color: #3a3a3a;
+      text-transform: uppercase; letter-spacing: 0.13em; margin-bottom: 20px;
+    }
+    .donut-svg-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
+    .donut-legend { display: flex; flex-direction: column; gap: 11px; }
+    .donut-legend-item { display: flex; align-items: center; gap: 10px; }
+    .donut-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .donut-legend-name { font-size: 0.78rem; color: #777; flex: 1; }
+    .donut-legend-pct  { font-size: 0.78rem; font-weight: 700; color: #ccc; font-variant-numeric: tabular-nums; }
+
+    .positions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .position-card {
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 14px; padding: 24px 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+      animation: fade-up 0.4s ease both;
+      cursor: default;
+    }
+    .position-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.45);
+      border-color: #252525;
+    }
+    .position-card.primary { border-color: rgba(29,158,117,0.22); }
+    .position-card.primary:hover { border-color: rgba(29,158,117,0.38); box-shadow: 0 10px 36px rgba(29,158,117,0.07); }
+
+    .pos-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+    .pos-header-left { display: flex; align-items: center; gap: 11px; }
+    .token-logo-wrap { position: relative; flex-shrink: 0; width: 40px; height: 40px; }
+    .token-logo { width: 40px; height: 40px; border-radius: 50%; background: #1a1a1a; display: block; object-fit: cover; }
+    .chain-badge { position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #111; background: #0a0a0a; object-fit: cover; }
+    .pos-name { font-size: 1rem; font-weight: 700; line-height: 1.2; }
+    .pos-protocol { font-size: 0.72rem; color: #444; margin-top: 3px; }
+    .pos-badge-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+    .risk-badge {
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 3px 8px; border-radius: 5px; white-space: nowrap;
+    }
+    .risk-badge.low         { background: rgba(29,158,117,0.12); color: #1D9E75; }
+    .risk-badge.amber-badge { background: rgba(240,165,0,0.12);  color: #F0A500; }
+    .pos-label-pill {
+      font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 2px 7px; border-radius: 4px;
+      background: rgba(29,158,117,0.1); color: #1D9E75;
+    }
+
+    .pos-balance { font-size: 1.875rem; font-weight: 800; letter-spacing: -0.035em; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+    .pos-usd     { font-size: 0.8rem; color: #1D9E75; font-weight: 500; margin-bottom: 4px; }
+    .pos-usd.loading     { color: #333; }
+    .pos-usd.unavailable { color: #333; }
+    .pos-token-sub { font-size: 0.78rem; color: #3a3a3a; font-weight: 500; margin-bottom: 4px; }
+    .pos-sub  { font-size: 0.775rem; color: #3a3a3a; margin-bottom: 20px; }
+    .pos-divider { border: none; border-top: 1px solid #181818; margin-bottom: 16px; }
+    .pos-footer { display: flex; align-items: flex-end; justify-content: space-between; }
+    .pos-footer-label { font-size: 0.6rem; font-weight: 700; color: #3a3a3a; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 3px; }
+    .pos-est-yield { font-size: 0.72rem; color: #3a3a3a; margin-top: 4px; }
+    .pos-apy-wrap { text-align: right; }
+    .pos-apy { font-size: 1.1rem; font-weight: 700; color: #1D9E75; display: block; }
+    .pos-change { font-size: 0.65rem; font-weight: 600; margin-top: 3px; display: block; white-space: nowrap; }
+    .pos-change.up   { color: #1D9E75; }
+    .pos-change.down { color: #e05252; }
+    .pos-change.flat { color: #3a3a3a; }
+
+    /* ── Next Action ── */
+    .next-action-section { margin-bottom: 56px; }
     .next-action-card {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 22px 24px;
-      animation: fade-in 0.4s ease both;
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 14px; padding: 30px 34px;
+      animation: fade-up 0.4s ease both;
+      transition: border-color 0.2s;
     }
-    .next-action-top {
-      display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;
-    }
+    .next-action-card:hover { border-color: #242424; }
+    .next-action-top { display: flex; align-items: flex-start; gap: 36px; flex-wrap: wrap; }
     .next-action-left { flex: 1; min-width: 0; }
-    .next-action-content { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
-    .next-action-sub { font-size: 0.8rem; color: #555; line-height: 1.5; }
+    .next-action-rec-label { font-size: 0.63rem; font-weight: 700; color: #3a3a3a; text-transform: uppercase; letter-spacing: 0.13em; margin-bottom: 10px; }
+    .next-action-content { font-size: 1.3rem; font-weight: 800; margin-bottom: 7px; letter-spacing: -0.025em; }
+    .next-action-sub { font-size: 0.85rem; color: #555; line-height: 1.65; }
     .next-action-right { flex-shrink: 0; text-align: right; }
-    .next-action-countdown-label { font-size: 0.65rem; color: #444; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
+    .next-action-countdown-label { font-size: 0.63rem; color: #3a3a3a; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 8px; }
     .next-action-countdown {
-      font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em;
+      font-size: 2.5rem; font-weight: 800; letter-spacing: -0.04em;
       color: #1D9E75; font-variant-numeric: tabular-nums;
+      animation: tick-pulse 1s ease-in-out infinite;
     }
-    .next-action-footer { margin-top: 14px; border-top: 1px solid #1a1a1a; padding-top: 12px; }
-    .next-action-footer a { font-size: 0.75rem; color: #444; text-decoration: none; transition: color 0.2s; }
-    .next-action-footer a:hover { color: #777; }
+    .next-action-footer { margin-top: 22px; border-top: 1px solid #181818; padding-top: 14px; }
+    .next-action-footer a { font-size: 0.75rem; color: #333; text-decoration: none; transition: color 0.2s; }
+    .next-action-footer a:hover { color: #666; }
 
     /* ── Predictions ── */
-    .predictions-section { margin-bottom: 36px; }
-    .prediction-row {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 14px 18px;
-      display: flex; align-items: center; gap: 14px;
-      margin-bottom: 8px;
-      animation: fade-in 0.4s ease both;
-      transition: background 0.2s;
+    .predictions-section { margin-bottom: 56px; }
+    .predictions-timeline { position: relative; }
+    .predictions-timeline::before {
+      content: ''; position: absolute;
+      left: 22px; top: 28px; bottom: 28px; width: 1px;
+      background: linear-gradient(to bottom, transparent, #1c1c1c 18%, #1c1c1c 82%, transparent);
+      pointer-events: none;
     }
+    .prediction-row {
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 12px; padding: 15px 20px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 8px;
+      animation: fade-up 0.4s ease both;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+      position: relative;
+    }
+    .prediction-row:hover { background: #131313; border-color: #242424; transform: translateX(3px); }
     .prediction-row:last-child { margin-bottom: 0; }
-    .prediction-row:hover { background: #141414; }
-    .pred-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .pred-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .pred-dot.green { background: #1D9E75; }
     .pred-dot.amber { background: #F0A500; }
     .pred-dot.red   { background: #e53e3e; }
     .pred-body { flex: 1; min-width: 0; }
-    .pred-asset { font-size: 0.875rem; font-weight: 600; }
-    .pred-desc  { font-size: 0.775rem; color: #555; margin-top: 1px; }
+    .pred-asset { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; }
+    .pred-desc  { font-size: 0.775rem; color: #555; }
     .pred-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
-    .pred-time  { font-size: 0.7rem; color: #444; white-space: nowrap; }
+    .pred-time  { font-size: 0.7rem; color: #3a3a3a; white-space: nowrap; }
     .pred-badge {
       font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+      letter-spacing: 0.08em; padding: 3px 9px; border-radius: 5px; white-space: nowrap;
     }
-    .pred-badge.correct   { background: rgba(29,158,117,0.15); color: #1D9E75; }
-    .pred-badge.pending   { background: rgba(240,165,0,0.15);  color: #F0A500; }
-    .pred-badge.incorrect { background: rgba(229,62,62,0.15);  color: #e53e3e; }
+    .pred-badge.correct   { background: rgba(29,158,117,0.12); color: #1D9E75; }
+    .pred-badge.pending   { background: rgba(240,165,0,0.12);  color: #F0A500; }
+    .pred-badge.incorrect { background: rgba(229,62,62,0.12);  color: #e53e3e; }
 
     /* ── Agent History ── */
-    .history-section { margin-bottom: 36px; }
+    .history-section { margin-bottom: 56px; }
     .history-card {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 16px 18px;
-      display: flex; gap: 14px;
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 12px; padding: 18px 22px;
+      display: flex; gap: 16px;
       margin-bottom: 8px;
-      animation: fade-in 0.4s ease both;
-      transition: background 0.2s;
+      animation: fade-up 0.4s ease both;
+      transition: background 0.2s, border-color 0.2s;
     }
+    .history-card:hover { background: #131313; border-color: #242424; }
     .history-card:last-of-type { margin-bottom: 0; }
-    .history-card:hover { background: #141414; }
-    .history-icon {
-      font-size: 1.1rem; line-height: 1;
-      flex-shrink: 0; margin-top: 1px;
-    }
+    .history-icon { font-size: 1rem; line-height: 1; flex-shrink: 0; margin-top: 2px; }
     .history-body { flex: 1; min-width: 0; }
-    .history-top {
-      display: flex; align-items: baseline;
-      justify-content: space-between; gap: 10px;
-      margin-bottom: 6px;
-    }
+    .history-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
     .history-type { font-size: 0.875rem; font-weight: 700; }
-    .history-time { font-size: 0.7rem; color: #444; white-space: nowrap; flex-shrink: 0; }
-    .history-desc { font-size: 0.8rem; color: #666; line-height: 1.6; margin-bottom: 10px; }
-    .history-footer {
-      display: flex; align-items: center;
-      justify-content: space-between; gap: 10px; flex-wrap: wrap;
-    }
+    .history-time { font-size: 0.7rem; color: #3a3a3a; white-space: nowrap; flex-shrink: 0; }
+    .history-desc { font-size: 0.8rem; color: #555; line-height: 1.65; margin-bottom: 12px; }
+    .history-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .history-footer-left { display: flex; align-items: center; gap: 8px; }
     .history-badge {
       font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.08em; padding: 3px 8px; border-radius: 4px; white-space: nowrap;
     }
-    .history-badge.correct   { background: rgba(29,158,117,0.15); color: #1D9E75; }
-    .history-badge.pending   { background: rgba(240,165,0,0.15);  color: #F0A500; }
-    .history-badge.incorrect { background: rgba(229,62,62,0.15);  color: #e53e3e; }
-    .history-badge.delivered { background: rgba(59,130,246,0.15); color: #60a5fa; }
-    .history-badge.approved  { background: rgba(29,158,117,0.15); color: #1D9E75; }
-    .history-badge.dismissed { background: rgba(100,100,100,0.15); color: #666; }
-    .history-link {
-      font-size: 0.75rem; color: #1D9E75;
-      text-decoration: none; white-space: nowrap;
-      transition: opacity 0.2s;
+    .history-badge.correct   { background: rgba(29,158,117,0.12); color: #1D9E75; }
+    .history-badge.pending   { background: rgba(240,165,0,0.12);  color: #F0A500; }
+    .history-badge.incorrect { background: rgba(229,62,62,0.12);  color: #e53e3e; }
+    .history-badge.delivered { background: rgba(59,130,246,0.12); color: #60a5fa; }
+    .history-badge.approved  { background: rgba(29,158,117,0.12); color: #1D9E75; }
+    .history-badge.dismissed { background: rgba(100,100,100,0.12); color: #555; }
+    .history-verify {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.58rem; color: rgba(29,158,117,0.55); font-weight: 600;
+      letter-spacing: 0.04em;
     }
-    .history-link:hover { opacity: 0.75; }
-    .history-view-all {
-      margin-top: 14px; text-align: right;
-    }
-    .history-view-all a {
-      font-size: 0.75rem; color: #444;
-      text-decoration: none; transition: color 0.2s;
-    }
-    .history-view-all a:hover { color: #777; }
+    .history-link { font-size: 0.75rem; color: #1D9E75; text-decoration: none; white-space: nowrap; transition: opacity 0.2s; }
+    .history-link:hover { opacity: 0.7; }
+    .history-view-all { margin-top: 16px; text-align: right; }
+    .history-view-all a { font-size: 0.75rem; color: #333; text-decoration: none; transition: color 0.2s; }
+    .history-view-all a:hover { color: #666; }
 
     /* ── Telegram CTA ── */
-    .tg-section { margin-bottom: 48px; }
+    .tg-section { margin-bottom: 56px; }
     .tg-card {
-      background: #111; border: 1px solid #1a1a1a;
-      border-radius: 12px; padding: 28px 32px;
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 14px; padding: 32px 36px;
       display: flex; align-items: center; justify-content: space-between;
       gap: 24px; flex-wrap: wrap;
-      animation: fade-in 0.4s ease both;
+      animation: fade-up 0.4s ease both;
     }
-    .tg-left h3 { font-size: 1.125rem; font-weight: 700; margin-bottom: 6px; }
-    .tg-left p  { font-size: 0.875rem; color: #555; line-height: 1.5; max-width: 420px; }
+    .tg-left h3 { font-size: 1.125rem; font-weight: 700; margin-bottom: 8px; }
+    .tg-left p  { font-size: 0.875rem; color: #555; line-height: 1.6; max-width: 420px; }
     .btn-telegram {
       display: flex; align-items: center; gap: 9px;
-      padding: 11px 22px; border-radius: 9999px;
+      padding: 12px 24px; border-radius: 9999px;
       background: #229ED9; color: #fff;
       font-size: 0.875rem; font-weight: 600; border: none;
-      transition: background 0.2s; white-space: nowrap; flex-shrink: 0;
+      transition: background 0.2s, transform 0.15s; white-space: nowrap; flex-shrink: 0;
     }
-    .btn-telegram:hover { background: #1a8ec4; }
+    .btn-telegram:hover { background: #1a8ec4; transform: translateY(-1px); }
     .tg-icon { width: 18px; height: 18px; flex-shrink: 0; }
 
-    /* ── Hidden canvas for share ── */
+    /* ── Hidden canvas ── */
     #share-canvas { display: none; }
 
     /* ── Responsive ── */
+    @media (max-width: 1060px) {
+      .portfolio-layout { grid-template-columns: 1fr; }
+      .donut-card { display: flex; align-items: center; gap: 36px; }
+      .donut-svg-wrap { margin-bottom: 0; flex-shrink: 0; }
+      .donut-legend { flex-direction: row; flex-wrap: wrap; gap: 16px 24px; }
+    }
     @media (max-width: 900px) {
       .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .hero-card { grid-template-columns: 1fr; gap: 32px; }
+      .hero-status { align-self: stretch; }
     }
     @media (max-width: 768px) {
-      .nav-inner { padding: 12px 16px; }
-      .wallet-badge { font-size: 0.7rem; padding: 5px 9px; }
+      .nav-inner { padding: 14px 20px; }
+      .wallet-badge { font-size: 0.75rem; padding: 7px 12px; }
       .wallet-addr-full  { display: none; }
       .wallet-addr-short { display: inline; }
-      .page { padding: 0 16px; }
-      .page-header { padding: 24px 0 20px; }
-      .page-header h1 { font-size: 1.5rem; }
+      .nav-live-pill { display: none; }
+      .page { padding: 0 20px; }
+      .page-header { padding: 32px 0 16px; }
+      .page-header h1 { font-size: 1.75rem; }
       .summary-grid   { grid-template-columns: repeat(2, 1fr); }
       .positions-grid { grid-template-columns: 1fr; }
-      .insight-actions { flex-direction: column; }
+      .hero-card { padding: 28px 24px; }
+      .hero-headline { font-size: 1.5rem; }
+      .hero-metrics { gap: 20px; }
+      .hero-actions { flex-direction: column; }
       .btn-approve, .btn-dismiss, .btn-simulate { width: 100%; justify-content: center; }
-      .btn-share-x { margin-left: 0; width: 100%; justify-content: center; }
-      .next-action-top { gap: 12px; }
+      .btn-share-x { width: 100%; justify-content: center; }
+      .next-action-top { gap: 20px; }
       .next-action-right { text-align: left; }
-      .next-action-countdown { font-size: 1.25rem; }
+      .next-action-countdown { font-size: 2rem; }
       .tg-card { flex-direction: column; align-items: flex-start; }
       .btn-telegram { width: 100%; justify-content: center; }
       .pred-right { display: none; }
@@ -518,29 +631,9 @@
     }
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; }
+      .hero-metrics { flex-direction: column; gap: 16px; }
     }
-  
-    /* ── Gate page ── */
-    #gate { min-height: calc(100vh - 64px); display: flex; align-items: center; justify-content: center; padding: 80px 20px 60px; }
-    .gate-inner { max-width: 600px; width: 100%; text-align: center; }
-    .gate-eyebrow { font-size: 0.72rem; font-weight: 700; color: #1D9E75; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 28px; }
-    .gate-yield-cards { display: flex; gap: 12px; justify-content: center; margin-bottom: 48px; }
-    .gate-yield-card { background: #111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 20px 24px; flex: 1; max-width: 180px; transition: border-color 0.2s; }
-    .gate-yield-card:hover { border-color: #2a2a2a; }
-    .gate-yield-token { font-size: 0.72rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-    .gate-yield-rate { font-size: 1.75rem; font-weight: 800; color: #1D9E75; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
-    .gate-yield-label { font-size: 0.7rem; color: #444; }
-    .gate-headline { font-size: 1.75rem; font-weight: 800; color: #f0f0f0; letter-spacing: -0.02em; line-height: 1.25; margin-bottom: 12px; }
-    .gate-sub { font-size: 0.9rem; color: #666; line-height: 1.6; margin-bottom: 32px; max-width: 440px; margin-left: auto; margin-right: auto; }
-    .gate-connect-btn { display: inline-block; background: #1D9E75; color: #fff; font-size: 1rem; font-weight: 700; padding: 14px 40px; border-radius: 9999px; border: none; cursor: pointer; transition: background 0.2s, transform 0.15s; margin-bottom: 16px; }
-    .gate-connect-btn:hover { background: #17836a; }
-    .gate-connect-btn:active { transform: scale(0.98); }
-    .gate-wallets-note { font-size: 0.75rem; color: #444; }
-    .gate-wallet-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
-    .gate-wallet-option { background: #111; border: 1px solid #222; color: #bbb; font-size: 0.875rem; font-weight: 600; padding: 10px 24px; border-radius: 9999px; cursor: pointer; transition: border-color 0.2s, color 0.2s; min-width: 200px; }
-    .gate-wallet-option:hover { border-color: #1D9E75; color: #1D9E75; }
-    @media (max-width: 480px) { .gate-yield-cards { flex-direction: column; align-items: center; } .gate-yield-card { max-width: 100%; width: 100%; } .gate-headline { font-size: 1.4rem; } }
-</style>
+  </style>
 </head>
 <body>
 
@@ -550,7 +643,10 @@
 <!-- ── NAV ── -->
 <nav>
   <div class="nav-inner">
-    <span class="nav-logo">RW<span class="accent">Ai</span></span>
+    <div class="nav-left">
+      <span class="nav-logo">RW<span class="accent">Ai</span></span>
+      <span class="nav-live-pill"><span class="nav-live-dot"></span>Monitoring Mantle Mainnet</span>
+    </div>
     <div class="nav-right">
       <div class="wallet-badge" id="wallet-badge">
         <span class="wallet-dot"></span>
@@ -568,44 +664,10 @@
   </div>
 </nav>
 
-<!-- ── GATE PAGE (shown when no wallet connected) ── -->
-<div id="gate" style="display:none">
-  <div class="gate-inner">
-    <p class="gate-eyebrow">Live on Mantle Mainnet</p>
-    <div class="gate-yield-cards">
-      <div class="gate-yield-card">
-        <div class="gate-yield-token">USDY</div>
-        <div class="gate-yield-rate">3.55%</div>
-        <div class="gate-yield-label">APY &middot; Ondo Finance</div>
-      </div>
-      <div class="gate-yield-card">
-        <div class="gate-yield-token">mETH</div>
-        <div class="gate-yield-rate">1.90%</div>
-        <div class="gate-yield-label">APR &middot; Mantle Staking</div>
-      </div>
-      <div class="gate-yield-card">
-        <div class="gate-yield-token">cmETH</div>
-        <div class="gate-yield-rate">1.92%</div>
-        <div class="gate-yield-label">APY &middot; Mantle Restaking</div>
-      </div>
-    </div>
-    <h2 class="gate-headline">Connect your wallet to see your positions</h2>
-    <p class="gate-sub">RWAi will show your live balances, yield earnings, and agent recommendations</p>
-    <button class="gate-connect-btn" id="gate-connect-btn">Connect Wallet</button>
-    <p class="gate-wallets-note">Supports MetaMask, Rabby, WalletConnect and all EIP-6963 wallets</p>
-    <div class="gate-wallet-list" id="gate-wallet-list" style="display:none"></div>
-  </div>
-</div>
-
-
-<div class="page" id="dashboard-content" style="display:none">
+<div class="page">
 
   <!-- ── PAGE HEADER ── -->
   <div class="page-header">
-    <div class="live-badge">
-      <span class="live-badge-dot"></span>
-      Monitoring live on Mantle Mainnet
-    </div>
     <h1>Your Yield Dashboard</h1>
     <div class="tier-wrap" id="tier-wrap">
       <button class="tier-badge" id="tier-badge">
@@ -639,42 +701,205 @@
       </div>
     </div>
     <p class="page-header-disclaimer">Tracking your RWA yield positions on Mantle. Other tokens in your wallet are not shown.</p>
-    <p class="page-header-sub">
-      Last checked <span id="last-checked">4</span> minutes ago &middot; Next check in <span id="next-check">26</span> minutes
-    </p>
+  </div>
+
+  <!-- ── HERO AI INSIGHT ── -->
+  <div class="hero-section">
+    <div class="hero-card">
+
+      <!-- LEFT: insight content + actions -->
+      <div class="hero-left">
+        <div class="hero-tag"><span class="hero-tag-dot"></span>RWAi Agent</div>
+        <h2 class="hero-headline">Opportunity detected</h2>
+        <p class="hero-body">
+          USDY is currently yielding 1.65% more than mETH. On your $29.91 USDY position,
+          staying put earns you an extra $0.49 per year. Hold current position — no rebalance needed at these levels.
+        </p>
+
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <div class="hero-metric-label">Potential Annual Impact</div>
+            <div class="hero-metric-value green">+$0.49 / yr</div>
+          </div>
+          <div class="hero-metric">
+            <div class="hero-metric-label">Confidence Score</div>
+            <div class="hero-metric-value">82%</div>
+          </div>
+          <div class="hero-metric">
+            <div class="hero-metric-label">Logged on Mantle</div>
+            <div class="hero-metric-value">4 mins ago</div>
+          </div>
+        </div>
+
+        <div class="hero-reasoning">
+          <div class="hero-reasoning-label">Reasoning</div>
+          <ul>
+            <li>Treasury yields stable — T-bill rates unchanged overnight</li>
+            <li>Validator APR compressing — ETH staking returns at 12-month low</li>
+            <li>Yield spread widening for 12h — trend favours holding USDY</li>
+          </ul>
+        </div>
+
+        <!-- Simulate panel (JS hooks preserved) -->
+        <div class="sim-panel" id="sim-panel">
+          <button class="sim-close" id="sim-close" aria-label="Close">&times;</button>
+          <div class="sim-panel-title">Rebalance simulation — $29.91 USDY → mETH</div>
+          <div class="sim-row">
+            <span class="sim-row-label">New annual yield (mETH at 1.90%)</span>
+            <span class="sim-row-val">$0.57 / year</span>
+          </div>
+          <div class="sim-row">
+            <span class="sim-row-label">Current annual yield (USDY at 3.55%)</span>
+            <span class="sim-row-val green">$1.06 / year</span>
+          </div>
+          <div class="sim-row">
+            <span class="sim-row-label">Difference</span>
+            <span class="sim-row-val red">−$0.49 / year</span>
+          </div>
+          <div class="sim-verdict">
+            <strong>Not worth it</strong> — USDY still leads by 1.65% at current rates. Rebalancing would cost you $0.49/year on this position size.
+          </div>
+        </div>
+
+        <div class="hero-actions">
+          <button class="btn-approve no-action" id="btn-approve" disabled>
+            <span id="approve-content">No action needed</span>
+          </button>
+          <button class="btn-dismiss" id="btn-dismiss">Dismiss</button>
+          <button class="btn-simulate" id="btn-simulate">Simulate Rebalance</button>
+        </div>
+        <div class="insight-share-row">
+          <button class="btn-share-x" id="btn-share-x">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            Share on X
+          </button>
+        </div>
+        <div class="hero-meta-link">4 mins ago · <a href="https://mantlescan.xyz/tx/0xa041618da351ae12037d409c5981abd05aa708557337a798ab1a48426948b36c" target="_blank" rel="noopener noreferrer">View on Mantle Explorer</a></div>
+      </div>
+
+      <!-- RIGHT: status panel -->
+      <div class="hero-status">
+        <div class="hero-status-live">
+          <div class="hero-pulse-wrap">
+            <div class="hero-pulse-ring"></div>
+            <div class="hero-pulse-dot"></div>
+          </div>
+          <div>
+            <div class="hero-status-title">Monitoring 24/7</div>
+            <div class="hero-status-sub">Active on Mantle Mainnet</div>
+          </div>
+        </div>
+        <hr class="hero-status-divider" />
+        <div class="hero-status-row">
+          <span class="hero-status-row-label">Last scan</span>
+          <span class="hero-status-row-val"><span id="last-checked">4</span> min ago</span>
+        </div>
+        <div class="hero-status-row">
+          <span class="hero-status-row-label">Next scan in</span>
+          <span class="hero-status-row-val"><span id="next-check">26</span> min</span>
+        </div>
+        <div class="hero-status-row">
+          <span class="hero-status-row-label">Positions tracked</span>
+          <span class="hero-status-row-val">3</span>
+        </div>
+        <div class="hero-status-row">
+          <span class="hero-status-row-label">Predictions logged</span>
+          <span class="hero-status-row-val green">24</span>
+        </div>
+        <div class="hero-status-row">
+          <span class="hero-status-row-label">Agent tier</span>
+          <span class="hero-status-row-val">Tier 2</span>
+        </div>
+        <div class="hero-verify-strip">
+          <div class="hero-verify">✓ &nbsp;Mantle logging active</div>
+          <div class="hero-verify">✓ &nbsp;ERC-8004 verified</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <!-- ── SUMMARY CARDS ── -->
+  <div class="summary-section">
   <div class="summary-grid">
     <div class="summary-card" style="animation-delay:0.05s">
-      <p class="summary-card-label">RWA Positions Value</p>
+      <p class="summary-card-label">Portfolio Value</p>
       <p class="summary-card-value white muted" id="total-value">Loading...</p>
-      <p class="summary-card-sub">USDY + mETH + cmETH only — other wallet tokens not included</p>
+      <p class="summary-card-sub">USDY + mETH + cmETH — other wallet tokens excluded</p>
     </div>
     <div class="summary-card highlight" style="animation-delay:0.1s">
-      <p class="summary-card-label">Yield Spread</p>
-      <p class="summary-card-value amber">1.65%</p>
-      <p class="summary-card-sub">USDY leads mETH — rebalance may be worth considering</p>
+      <p class="summary-card-label">Yield Opportunity</p>
+      <p class="summary-card-value amber">+1.65%</p>
+      <p class="summary-card-sub">USDY leads mETH — relative spread favours holding</p>
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
-      <p class="summary-card-label">Agent Accuracy</p>
+      <p class="summary-card-label">Prediction Accuracy</p>
       <p class="summary-card-value green">73%</p>
-      <p class="summary-card-sub">Over 24 predictions logged on Mantle</p>
+      <p class="summary-card-sub">Across 24 predictions logged on Mantle</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
-      <p class="summary-card-label">Yield Earned</p>
+      <p class="summary-card-label">Projected Annual Yield</p>
       <p class="summary-card-value green muted" id="yield-earned">—</p>
-      <p class="summary-card-sub">Est. since you connected</p>
+      <p class="summary-card-sub">Estimated at current rates since connected</p>
     </div>
+  </div>
   </div>
 
   <!-- ── POSITIONS ── -->
   <div class="positions-section">
-    <p class="section-label">Your Positions</p>
-    <div class="positions-grid">
+    <div class="positions-header">
+      <p class="section-label" style="margin-bottom:0">Your Positions</p>
+    </div>
+    <div class="portfolio-layout">
+
+      <!-- DONUT CHART -->
+      <div class="donut-card" style="animation-delay:0.22s">
+        <div class="donut-card-label">Allocation</div>
+        <div class="donut-svg-wrap">
+          <svg width="120" height="120" viewBox="0 0 120 120" class="donut-svg">
+            <!-- USDY: ~99.1% of portfolio -->
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#1D9E75" stroke-width="18"
+              stroke-dasharray="276.2 0.3"
+              stroke-dashoffset="0"
+              transform="rotate(-90 60 60)" opacity="0.9"/>
+            <!-- mETH: ~0.9% -->
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#2a2a2a" stroke-width="18"
+              stroke-dasharray="2.5 273.8"
+              stroke-dashoffset="-276.2"
+              transform="rotate(-90 60 60)"/>
+            <!-- cmETH: ~0% -->
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#1e1e1e" stroke-width="18"
+              stroke-dasharray="0 276.5"
+              stroke-dashoffset="-278.5"
+              transform="rotate(-90 60 60)"/>
+            <text x="60" y="56" text-anchor="middle" fill="#f0f0f0" font-size="13" font-weight="800" font-family="inherit">3</text>
+            <text x="60" y="70" text-anchor="middle" fill="#3a3a3a" font-size="9" font-family="inherit" letter-spacing="0.5">assets</text>
+          </svg>
+        </div>
+        <div class="donut-legend">
+          <div class="donut-legend-item">
+            <div class="donut-legend-dot" style="background:#1D9E75"></div>
+            <span class="donut-legend-name">USDY</span>
+            <span class="donut-legend-pct">~99%</span>
+          </div>
+          <div class="donut-legend-item">
+            <div class="donut-legend-dot" style="background:#2a2a2a"></div>
+            <span class="donut-legend-name">mETH</span>
+            <span class="donut-legend-pct">~1%</span>
+          </div>
+          <div class="donut-legend-item">
+            <div class="donut-legend-dot" style="background:#1e1e1e"></div>
+            <span class="donut-legend-name">cmETH</span>
+            <span class="donut-legend-pct">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- POSITION CARDS -->
+      <div class="positions-grid">
 
       <!-- USDY -->
-      <div class="position-card" style="animation-delay:0.25s">
+      <div class="position-card primary" style="animation-delay:0.25s">
         <div class="pos-header">
           <div class="pos-header-left">
             <div class="token-logo-wrap">
@@ -686,10 +911,13 @@
               <div class="pos-protocol">Ondo Finance</div>
             </div>
           </div>
-          <span class="risk-badge low">Risk 1/5</span>
+          <div class="pos-badge-stack">
+            <span class="risk-badge low">Risk 1/5</span>
+            <span class="pos-label-pill">Largest</span>
+          </div>
         </div>
         <div class="pos-balance" id="usdy-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:4px">Loading...</div>
-        <div class="pos-sub" id="usdy-token-sub">Tokenized US Treasuries · — USDY</div>
+        <div class="pos-sub">Tokenized US Treasuries · 29.91 USDY · Highest yield</div>
         <hr class="pos-divider" />
         <div class="pos-footer">
           <div>
@@ -719,7 +947,7 @@
           <span class="risk-badge amber-badge">Risk 3/5</span>
         </div>
         <div class="pos-balance" id="meth-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:2px">Loading...</div>
-        <div class="pos-token-sub" id="meth-token-sub">— mETH</div>
+        <div class="pos-token-sub">0.0303 mETH</div>
         <div class="pos-sub">Liquid staked ETH</div>
         <hr class="pos-divider" />
         <div class="pos-footer">
@@ -750,7 +978,7 @@
           <span class="risk-badge amber-badge">Risk 3/5</span>
         </div>
         <div class="pos-balance" id="cmeth-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:2px">Loading...</div>
-        <div class="pos-token-sub" id="cmeth-token-sub">— cmETH</div>
+        <div class="pos-token-sub">0.00 cmETH</div>
         <div class="pos-sub">Auto-compounding mETH vault</div>
         <hr class="pos-divider" />
         <div class="pos-footer">
@@ -765,79 +993,23 @@
         </div>
       </div>
 
-    </div>
-  </div>
+    </div><!-- /positions-grid -->
+    </div><!-- /portfolio-layout -->
+  </div><!-- /positions-section -->
 
-  <!-- ── AGENT INSIGHT ── -->
-  <div class="insight-section">
-    <p class="section-label">Latest Agent Insight</p>
-    <div class="insight-card" style="animation-delay:0.35s">
-      <div class="insight-header">
-        <div class="insight-header-left">
-          <span class="insight-icon">🤖</span>
-          <span class="insight-name">RWAi Agent</span>
-        </div>
-        <span class="insight-meta">
-          4 mins ago &middot;
-          <a href="https://mantlescan.xyz/tx/0xa041618da351ae12037d409c5981abd05aa708557337a798ab1a48426948b36c"
-             target="_blank" rel="noopener noreferrer">logged on Mantle</a>
-        </span>
-      </div>
-      <p class="insight-body">
-        USDY is currently yielding 1.65% more than mETH. On your $29.91 USDY position, this means an extra
-        $0.49 per year by staying put. Hold current position — no rebalance needed at these levels.
-      </p>
-
-      <!-- Simulate Rebalance expandable panel -->
-      <div class="sim-panel" id="sim-panel">
-        <button class="sim-close" id="sim-close" aria-label="Close">&times;</button>
-        <div class="sim-panel-title">Rebalance simulation — $29.91 USDY → mETH</div>
-        <div class="sim-row">
-          <span class="sim-row-label">New annual yield (mETH at 1.90%)</span>
-          <span class="sim-row-val">$0.57 / year</span>
-        </div>
-        <div class="sim-row">
-          <span class="sim-row-label">Current annual yield (USDY at 3.55%)</span>
-          <span class="sim-row-val green">$1.06 / year</span>
-        </div>
-        <div class="sim-row">
-          <span class="sim-row-label">Difference</span>
-          <span class="sim-row-val red">−$0.49 / year</span>
-        </div>
-        <div class="sim-verdict">
-          <strong>Not worth it</strong> — USDY still leads by 1.65% at current rates. Rebalancing would cost you $0.49/year on this position size.
-        </div>
-      </div>
-
-      <div class="insight-actions">
-        <button class="btn-approve no-action" id="btn-approve" disabled>
-          <span id="approve-content">No action needed</span>
-        </button>
-        <button class="btn-dismiss" id="btn-dismiss">Dismiss</button>
-        <button class="btn-simulate" id="btn-simulate">Simulate Rebalance</button>
-      </div>
-      <div class="insight-share-row">
-        <button class="btn-share-x" id="btn-share-x">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-          </svg>
-          Share on X
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- ── NEXT ACTION ── -->
   <div class="next-action-section">
-    <p class="section-label">Next Action</p>
+    <p class="section-label">Current Recommendation</p>
     <div class="next-action-card" style="animation-delay:0.38s">
       <div class="next-action-top">
         <div class="next-action-left">
-          <div class="next-action-content" id="next-action-label">Hold current positions</div>
-          <div class="next-action-sub" id="next-action-sub">Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.</div>
+          <div class="next-action-rec-label">Agent decision</div>
+          <div class="next-action-content">Hold current positions</div>
+          <div class="next-action-sub">Spread of 1.65% is above alert threshold but below your auto-execute threshold of 2.0% — no action required</div>
         </div>
         <div class="next-action-right">
-          <div class="next-action-countdown-label">Next check in</div>
+          <div class="next-action-countdown-label">Next scan in</div>
           <div class="next-action-countdown" id="next-action-countdown">23:00</div>
         </div>
       </div>
@@ -850,7 +1022,8 @@
 
   <!-- ── PREDICTIONS ── -->
   <div class="predictions-section">
-    <p class="section-label">Recent Predictions</p>
+    <p class="section-label">Prediction Confidence Timeline</p>
+    <div class="predictions-timeline">
 
     <div class="prediction-row" style="animation-delay:0.4s">
       <div class="pred-dot green"></div>
@@ -902,6 +1075,7 @@
       </div>
     </div>
     -->
+    </div><!-- /predictions-timeline -->
   </div>
 
   <!-- ── AGENT HISTORY ── -->
@@ -918,8 +1092,11 @@
         </div>
         <p class="history-desc">USDY held at 3.55% as expected. T-bill rates stable overnight — no yield movement detected.</p>
         <div class="history-footer">
-          <span class="history-badge correct">Correct</span>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle Explorer →</a>
+          <div class="history-footer-left">
+            <span class="history-badge correct">Correct</span>
+            <span class="history-verify">✓ Mantle verified</span>
+          </div>
+          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -934,8 +1111,11 @@
         </div>
         <p class="history-desc">Spread of 1.65% exceeded alert threshold of 1.5%. Telegram alert sent to user.</p>
         <div class="history-footer">
-          <span class="history-badge delivered">Delivered</span>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle Explorer →</a>
+          <div class="history-footer-left">
+            <span class="history-badge delivered">Delivered</span>
+            <span class="history-verify">✓ Mantle verified</span>
+          </div>
+          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -950,8 +1130,11 @@
         </div>
         <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend.</p>
         <div class="history-footer">
-          <span class="history-badge pending">Pending</span>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle Explorer →</a>
+          <div class="history-footer-left">
+            <span class="history-badge pending">Pending</span>
+            <span class="history-verify">✓ Mantle verified</span>
+          </div>
+          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -966,8 +1149,11 @@
         </div>
         <p class="history-desc">mETH APR held near 1.90% — Ethereum validator set stable, no network events.</p>
         <div class="history-footer">
-          <span class="history-badge correct">Correct</span>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle Explorer →</a>
+          <div class="history-footer-left">
+            <span class="history-badge correct">Correct</span>
+            <span class="history-verify">✓ Mantle verified</span>
+          </div>
+          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -982,8 +1168,11 @@
         </div>
         <p class="history-desc">USDY yield stable at 3.55% — weekly T-bill reset not due for 4 days.</p>
         <div class="history-footer">
-          <span class="history-badge correct">Correct</span>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle Explorer →</a>
+          <div class="history-footer-left">
+            <span class="history-badge correct">Correct</span>
+            <span class="history-verify">✓ Mantle verified</span>
+          </div>
+          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -1011,63 +1200,14 @@
 
 </div><!-- /page -->
 
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
 <script>
 (function () {
   'use strict';
 
-  /* ── Wallet ── */
-  var walletAddress = sessionStorage.getItem('rwai_wallet') || '';
-  function updateWalletBadge() {
-    if (!walletAddress) return;
-    var short = walletAddress.slice(0,6) + '…' + walletAddress.slice(-4);
-    var fullEl = document.querySelector('.wallet-addr-full');
-    var shortEl = document.querySelector('.wallet-addr-short');
-    if (fullEl) fullEl.textContent = short + ' · Connected';
-    if (shortEl) shortEl.textContent = walletAddress.slice(0,4) + '…' + walletAddress.slice(-4);
-  }
-
-  function showDashboard() {
-    var dc = document.getElementById('dashboard-content');
-    var df = document.getElementById('dash-footer');
-    var gt = document.getElementById('gate');
-    var wb = document.getElementById('wallet-badge');
-    var db = document.querySelector('.btn-disconnect');
-    if (dc) dc.style.display = '';
-    if (df) df.style.display = '';
-    if (gt) gt.style.display = 'none';
-    if (wb) wb.style.display = '';
-    if (db) db.style.display = '';
-    updateWalletBadge();
-  }
-
-  function showGate() {
-    var dc = document.getElementById('dashboard-content');
-    var df = document.getElementById('dash-footer');
-    var gt = document.getElementById('gate');
-    var wb = document.getElementById('wallet-badge');
-    var db = document.querySelector('.btn-disconnect');
-    if (dc) dc.style.display = 'none';
-    if (df) df.style.display = 'none';
-    if (gt) gt.style.display = '';
-    if (wb) wb.style.display = 'none';
-    if (db) db.style.display = 'none';
-  }
-
-  if (walletAddress) { showDashboard(); } else { showGate(); }
-
-  /* ── Disconnect ── */
-  document.querySelector('.btn-disconnect').addEventListener('click', function () {
-    try { if (window.ethereum && window.ethereum.disconnect) window.ethereum.disconnect(); } catch (e) {}
-    sessionStorage.clear();
-    sessionStorage.setItem('userDisconnected', 'true');
-    window.location.href = '/';
-  });
-
   /* ── Constants ── */
-  var USDY_BALANCE  = 0;
-  var METH_BALANCE  = 0;
-  var CMETH_BALANCE = 0;
+  var USDY_BALANCE  = 29.91;
+  var METH_BALANCE  = 0.0303;
+  var CMETH_BALANCE = 0.00;
   var USDY_APY      = 0.0355;
   var METH_APR      = 0.0190;
   var CMETH_APY     = 0.0192;
@@ -1138,7 +1278,6 @@
       document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
       renderChange('usdy-change', coin.usd_24h_change);
       updateTotal();
-      updateInsightCard();
     })
     .catch(function () {
       usdyUSD = 1.013; // fallback: USDY appreciates, not pegged at $1
@@ -1151,7 +1290,6 @@
       document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
       document.getElementById('usdy-change').textContent = '';
       updateTotal();
-      updateInsightCard();
     });
 
   /* ── mETH price + 24h change ── */
@@ -1306,7 +1444,7 @@
   /* ── Copy wallet address ── */
   var btnCopy    = document.getElementById('btn-copy');
   var walletBadge = document.getElementById('wallet-badge');
-  var FULL_ADDRESS = walletAddress;
+  var FULL_ADDRESS = '0x92970000000000000000000000000000000056d3'; // placeholder full address
   var copyTooltip = null;
 
   btnCopy.addEventListener('click', function () {
@@ -1423,276 +1561,7 @@
     } catch (e) {}
   }
 
-  /* ── Live Insight Card ── */
-  function updateInsightCard() {
-    if (usdyUSD === null || methUSD === null) return;
-    var usdyVal  = USDY_BALANCE * usdyUSD;
-    var methVal  = METH_BALANCE * methUSD;
-    var spread   = USDY_APY - METH_APR; // positive = USDY leads
-    var absPct   = (Math.abs(spread) * 100).toFixed(2) + '%';
-    var body     = document.querySelector('.insight-body');
-    var approveBtn     = document.getElementById('btn-approve');
-    var approveContent = document.getElementById('approve-content');
-    var naLabel  = document.getElementById('next-action-label');
-    var naSub    = document.getElementById('next-action-sub');
-    if (!body) return;
-
-    // Thresholds
-    var ALERT_THRESHOLD  = 0.015; // 1.5% — below this, spread too thin
-    var ACTION_THRESHOLD = 0.020; // 2.0% — above this, swap benefit clearly beats fees
-
-    function setApprove(label, enabled) {
-      if (approveContent) approveContent.textContent = label;
-      if (approveBtn) {
-        approveBtn.disabled = !enabled;
-        approveBtn.className = enabled ? 'btn-approve' : 'btn-approve no-action';
-      }
-    }
-
-    function setNextAction(label, sub) {
-      if (naLabel) naLabel.textContent = label;
-      if (naSub)   naSub.textContent   = sub;
-    }
-
-    if (spread >= 0) {
-      // ── USDY leads ────────────────────────────────────────────────────────
-      if (USDY_BALANCE > 0) {
-        // Already in the better asset
-        var extraY = usdyVal * spread;
-        body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
-          'On your ' + fmt(usdyVal) + ' USDY position, staying put earns an extra ' +
-          fmt(extraY) + ' per year vs moving to mETH. <strong>Hold current position.</strong>';
-        setApprove('No action needed', false);
-        setNextAction('Hold current positions',
-          'You\'re in the higher-yield asset. RWAI is watching for any change.');
-
-      } else if (METH_BALANCE > 0) {
-        var grossGain = methVal * spread;
-        var netLow    = Math.max(0, grossGain - methVal * 0.005); // 0.5% swap fee
-        var netHigh   = Math.max(0, grossGain - methVal * 0.003); // 0.3% swap fee
-
-        if (spread >= ACTION_THRESHOLD) {
-          // Spread clears the cost-adjusted bar — propose rebalance
-          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
-            'On your ' + fmt(methVal) + ' mETH position, moving to USDY would net approximately ' +
-            fmt(netLow) + '–' + fmt(netHigh) + ' more per year after estimated swap fees. ' +
-            '<strong>RWAI recommends rebalancing to USDY.</strong>';
-          setApprove('Approve Rebalance → USDY', true);
-          setNextAction('Rebalance to USDY recommended',
-            'Spread of ' + absPct + ' clears the 2.0% cost-adjusted threshold. Net gain beats fees.');
-
-        } else if (spread >= ALERT_THRESHOLD) {
-          // Ambiguous zone — spread attractive but fees eat too much
-          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
-            'Your ' + fmt(methVal) + ' mETH position could earn more in USDY — but after estimated ' +
-            'swap fees and gas on Mantle (~0.3–0.5%), the net annual gain would be approximately ' +
-            fmt(netLow) + '–' + fmt(netHigh) + '. Not worth swapping yet. ' +
-            'RWAI will propose action when the spread hits 2.0% and the benefit clearly beats transaction costs.';
-          setApprove('No action needed', false);
-          setNextAction('Hold current positions',
-            'Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.');
-
-        } else {
-          // Spread too thin
-          body.innerHTML = 'USDY is yielding <strong>' + absPct + '</strong> more than mETH. ' +
-            'The spread is too thin to justify a swap after fees. ' +
-            '<strong>Hold current position and monitor.</strong>';
-          setApprove('No action needed', false);
-          setNextAction('Hold current positions',
-            'Spread of ' + absPct + ' is below the 1.5% alert threshold. No action needed.');
-        }
-
-      } else {
-        body.innerHTML = 'USDY is currently yielding <strong>' + absPct + '</strong> more than mETH. ' +
-          'No RWA positions detected in this wallet yet.';
-        setApprove('No action needed', false);
-        setNextAction('No positions detected', 'Connect a wallet with USDY, mETH, or cmETH to see recommendations.');
-      }
-
-    } else {
-      // ── mETH leads ────────────────────────────────────────────────────────
-      var absMethLead = Math.abs(spread);
-      var absPctMeth  = (absMethLead * 100).toFixed(2) + '%';
-
-      if (METH_BALANCE > 0) {
-        var extraY2 = methVal * absMethLead;
-        body.innerHTML = 'mETH is currently yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
-          'On your ' + fmt(methVal) + ' mETH position, staying put earns an extra ' +
-          fmt(extraY2) + ' per year vs moving to USDY. <strong>Hold current position.</strong>';
-        setApprove('No action needed', false);
-        setNextAction('Hold current positions',
-          'You\'re in the higher-yield asset. RWAI is watching for any change.');
-
-      } else if (USDY_BALANCE > 0) {
-        var grossGain2 = usdyVal * absMethLead;
-        var netLow2    = Math.max(0, grossGain2 - usdyVal * 0.005);
-        var netHigh2   = Math.max(0, grossGain2 - usdyVal * 0.003);
-
-        if (absMethLead >= ACTION_THRESHOLD) {
-          body.innerHTML = 'mETH is yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
-            'On your ' + fmt(usdyVal) + ' USDY position, moving to mETH would net approximately ' +
-            fmt(netLow2) + '–' + fmt(netHigh2) + ' more per year after estimated swap fees. ' +
-            '<strong>RWAI recommends rebalancing to mETH.</strong>';
-          setApprove('Approve Rebalance → mETH', true);
-          setNextAction('Rebalance to mETH recommended',
-            'Spread of ' + absPctMeth + ' clears the 2.0% cost-adjusted threshold. Net gain beats fees.');
-        } else {
-          body.innerHTML = 'mETH is yielding <strong>' + absPctMeth + '</strong> more than your USDY. ' +
-            'Your ' + fmt(usdyVal) + ' USDY position could earn more in mETH — but after estimated ' +
-            'swap fees and gas on Mantle (~0.3–0.5%), the net annual gain would be approximately ' +
-            fmt(netLow2) + '–' + fmt(netHigh2) + '. Not worth swapping yet. ' +
-            'RWAI will propose action when the spread hits 2.0%.';
-          setApprove('No action needed', false);
-          setNextAction('Hold current positions',
-            'Spread is attractive but below the cost-adjusted threshold of 2.0%. RWAI only proposes swaps when the benefit clearly beats gas and fees.');
-        }
-
-      } else {
-        body.innerHTML = 'mETH is currently yielding <strong>' + absPctMeth + '</strong> more than USDY. ' +
-          'No RWA positions detected in this wallet yet.';
-        setApprove('No action needed', false);
-        setNextAction('No positions detected', 'Connect a wallet with USDY, mETH, or cmETH to see recommendations.');
-      }
-    }
-  }
-
-  /* ── RPC Balance Fetch ── */
-  function loadChainBalances() {
-    if (!walletAddress || typeof ethers === 'undefined') return;
-    var provider = new ethers.JsonRpcProvider('https://rpc.mantle.xyz');
-    var ABI = ['function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)'];
-    var USDY_ADDR  = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
-    var METH_ADDR  = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
-    var CMETH_ADDR = '0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA';
-    function fetchBal(addr, onDone) {
-      var c = new ethers.Contract(addr, ABI, provider);
-      Promise.all([c.balanceOf(walletAddress), c.decimals()])
-        .then(function (res) { onDone(Number(ethers.formatUnits(res[0], Number(res[1])))); })
-        .catch(function () { onDone(0); });
-    }
-    fetchBal(USDY_ADDR, function (bal) {
-      USDY_BALANCE = bal;
-      var sub = document.getElementById('usdy-token-sub');
-      if (sub) sub.textContent = 'Tokenized US Treasuries · ' + bal.toFixed(2) + ' USDY';
-      if (usdyUSD !== null) {
-        var usdVal = bal * usdyUSD;
-        var el = document.getElementById('usdy-usd');
-        el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
-        el.textContent = fmt(usdVal);
-        document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
-        updateTotal();
-      }
-      updateInsightCard();
-    });
-    fetchBal(METH_ADDR, function (bal) {
-      METH_BALANCE = bal;
-      var sub = document.getElementById('meth-token-sub');
-      if (sub) sub.textContent = bal.toFixed(4) + ' mETH';
-      if (methUSD !== null) {
-        var usdVal = bal * methUSD;
-        var el = document.getElementById('meth-usd');
-        el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
-        el.textContent = '≈ ' + fmt(usdVal);
-        document.getElementById('meth-est-yield').textContent = fmtYield(usdVal, METH_APR);
-        updateTotal();
-      }
-    });
-    fetchBal(CMETH_ADDR, function (bal) {
-      CMETH_BALANCE = bal;
-      var sub = document.getElementById('cmeth-token-sub');
-      if (sub) sub.textContent = bal.toFixed(4) + ' cmETH';
-      if (cmethUSD !== null) {
-        var usdVal = bal * cmethUSD;
-        var el = document.getElementById('cmeth-usd');
-        el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
-        el.textContent = '≈ ' + fmt(usdVal);
-        document.getElementById('cmeth-est-yield').textContent = fmtYield(usdVal, CMETH_APY);
-        updateTotal();
-      }
-    });
-  }
-  if (walletAddress) { loadChainBalances(); }
-
-  /* ── Gate wallet connect ── */
-  var gateWallets = new Map();
-  window.addEventListener('eip6963:announceProvider', function (ev) {
-    gateWallets.set(ev.detail.info.uuid, ev.detail);
-  });
-  window.dispatchEvent(new Event('eip6963:requestProvider'));
-
-  function renderGateWalletList() {
-    var list = document.getElementById('gate-wallet-list');
-    if (!list) return;
-    list.innerHTML = '';
-    var entries = Array.from(gateWallets.values());
-    if (!entries.length && window.ethereum) {
-      entries = [{ info: { name: 'Browser Wallet' }, provider: window.ethereum }];
-    }
-    entries.forEach(function (w) {
-      var btn = document.createElement('button');
-      btn.className = 'gate-wallet-option';
-      btn.textContent = w.info.name;
-      btn.addEventListener('click', function () { connectWithProvider(w.provider); });
-      list.appendChild(btn);
-    });
-  }
-
-  var gateConnectBtn = document.getElementById('gate-connect-btn');
-  if (gateConnectBtn) {
-    gateConnectBtn.addEventListener('click', function () {
-      var entries = Array.from(gateWallets.values());
-      if (entries.length === 1) {
-        connectWithProvider(entries[0].provider);
-      } else if (entries.length > 1) {
-        var list = document.getElementById('gate-wallet-list');
-        if (list) {
-          if (list.style.display === 'none') { renderGateWalletList(); list.style.display = ''; }
-          else { list.style.display = 'none'; }
-        }
-      } else if (window.ethereum) {
-        connectWithProvider(window.ethereum);
-      } else {
-        alert('No Web3 wallet detected. Please install MetaMask or Rabby.');
-      }
-    });
-  }
-
-  async function connectWithProvider(provider) {
-    try {
-      var accounts = await provider.request({ method: 'eth_requestAccounts' });
-      if (!accounts || !accounts.length) return;
-      var address = accounts[0];
-      try {
-        var chainId = await provider.request({ method: 'eth_chainId' });
-        if (chainId !== '0x1388') {
-          try {
-            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x1388' }] });
-          } catch (se) {
-            if (se.code === 4902) {
-              await provider.request({ method: 'wallet_addEthereumChain', params: [{
-                chainId: '0x1388', chainName: 'Mantle',
-                nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
-                rpcUrls: ['https://rpc.mantle.xyz'],
-                blockExplorerUrls: ['https://mantlescan.xyz']
-              }] });
-            }
-          }
-        }
-      } catch (e) {}
-      walletAddress = address;
-      sessionStorage.setItem('rwai_wallet', address);
-      sessionStorage.removeItem('userDisconnected');
-      showDashboard();
-      loadChainBalances();
-    } catch (e) {}
-  }
-
 })();
 </script>
-
-<footer id="dash-footer" style="display:none;border-top:1px solid rgba(255,255,255,0.05);padding:32px 20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;margin-top:40px;">
-  <span style="font-size:1.125rem;font-weight:700;">RW<span style="color:#1D9E75">Ai</span></span>
-  <span style="font-size:0.75rem;color:rgba(255,255,255,0.2);">Built by <a href="https://x.com/0xSunSeeker" style="color:rgba(255,255,255,0.35);text-decoration:none">@0xSunSeeker</a> for the Mantle Turing Test Hackathon 2026 &middot; <a href="https://t.me/rwaiapp_bot" style="color:rgba(255,255,255,0.35);text-decoration:none">Telegram</a> &middot; <a href="https://github.com/0xSunSeeker/rwai" style="color:rgba(255,255,255,0.35);text-decoration:none">GitHub</a> &middot; <a href="/tos.html" style="color:rgba(255,255,255,0.35);text-decoration:none">Terms</a> &middot; <a href="/privacy.html" style="color:rgba(255,255,255,0.35);text-decoration:none">Privacy</a></span>
-</footer>
 </body>
 </html>

@@ -712,7 +712,7 @@
         <div class="hero-tag"><span class="hero-tag-dot"></span>RWAi Agent</div>
         <h2 class="hero-headline">Opportunity detected</h2>
         <p class="hero-body">
-          USDY is currently yielding 1.65% more than mETH. On your $29.91 USDY position,
+          USDY is currently yielding 1.65% more than mETH. On your <span id="hero-usdy-val">$29.91</span> USDY position,
           staying put earns you an extra $0.49 per year. Hold current position — no rebalance needed at these levels.
         </p>
 
@@ -743,7 +743,7 @@
         <!-- Simulate panel (JS hooks preserved) -->
         <div class="sim-panel" id="sim-panel">
           <button class="sim-close" id="sim-close" aria-label="Close">&times;</button>
-          <div class="sim-panel-title">Rebalance simulation — $29.91 USDY → mETH</div>
+          <div class="sim-panel-title">Rebalance simulation — <span id="sim-usdy-val">$29.91</span> USDY → mETH</div>
           <div class="sim-row">
             <span class="sim-row-label">New annual yield (mETH at 1.90%)</span>
             <span class="sim-row-val">$0.57 / year</span>
@@ -858,17 +858,17 @@
         <div class="donut-svg-wrap">
           <svg width="120" height="120" viewBox="0 0 120 120" class="donut-svg">
             <!-- USDY: ~99.1% of portfolio -->
-            <circle cx="60" cy="60" r="44" fill="none" stroke="#1D9E75" stroke-width="18"
+            <circle id="donut-usdy" cx="60" cy="60" r="44" fill="none" stroke="#1D9E75" stroke-width="18"
               stroke-dasharray="276.2 0.3"
               stroke-dashoffset="0"
               transform="rotate(-90 60 60)" opacity="0.9"/>
             <!-- mETH: ~0.9% -->
-            <circle cx="60" cy="60" r="44" fill="none" stroke="#2a2a2a" stroke-width="18"
+            <circle id="donut-meth" cx="60" cy="60" r="44" fill="none" stroke="#2a2a2a" stroke-width="18"
               stroke-dasharray="2.5 273.8"
               stroke-dashoffset="-276.2"
               transform="rotate(-90 60 60)"/>
             <!-- cmETH: ~0% -->
-            <circle cx="60" cy="60" r="44" fill="none" stroke="#1e1e1e" stroke-width="18"
+            <circle id="donut-cmeth" cx="60" cy="60" r="44" fill="none" stroke="#1e1e1e" stroke-width="18"
               stroke-dasharray="0 276.5"
               stroke-dashoffset="-278.5"
               transform="rotate(-90 60 60)"/>
@@ -880,17 +880,17 @@
           <div class="donut-legend-item">
             <div class="donut-legend-dot" style="background:#1D9E75"></div>
             <span class="donut-legend-name">USDY</span>
-            <span class="donut-legend-pct">~99%</span>
+            <span class="donut-legend-pct" id="donut-usdy-pct">~99%</span>
           </div>
           <div class="donut-legend-item">
             <div class="donut-legend-dot" style="background:#2a2a2a"></div>
             <span class="donut-legend-name">mETH</span>
-            <span class="donut-legend-pct">~1%</span>
+            <span class="donut-legend-pct" id="donut-meth-pct">~1%</span>
           </div>
           <div class="donut-legend-item">
             <div class="donut-legend-dot" style="background:#1e1e1e"></div>
             <span class="donut-legend-name">cmETH</span>
-            <span class="donut-legend-pct">—</span>
+            <span class="donut-legend-pct" id="donut-cmeth-pct">—</span>
           </div>
         </div>
       </div>
@@ -1050,14 +1050,15 @@
     </div>
 
     <div class="prediction-row" style="animation-delay:0.5s">
-      <div class="pred-dot amber"></div>
+      <div class="pred-dot green"></div>
       <div class="pred-body">
         <div class="pred-asset">Spread widening</div>
         <div class="pred-desc">Predicted spread would exceed 1.5% within 24h</div>
+        <div class="pred-desc" style="color:#1D9E75;font-size:0.72rem;margin-top:3px">Spread reached 1.65% — threshold exceeded ✓</div>
       </div>
       <div class="pred-right">
         <span class="pred-time">Yesterday 22:05</span>
-        <span class="pred-badge pending">Pending</span>
+        <span class="pred-badge correct">Correct</span>
       </div>
     </div>
 
@@ -1120,7 +1121,7 @@
       </div>
     </div>
 
-    <!-- Entry 3: Prediction — Pending -->
+    <!-- Entry 3: Prediction — Correct -->
     <div class="history-card" style="animation-delay:0.65s">
       <span class="history-icon">🤖</span>
       <div class="history-body">
@@ -1128,10 +1129,10 @@
           <span class="history-type">Yield Prediction</span>
           <span class="history-time">Yesterday 22:05</span>
         </div>
-        <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend.</p>
+        <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend. Spread reached 1.65% — threshold exceeded ✓</p>
         <div class="history-footer">
           <div class="history-footer-left">
-            <span class="history-badge pending">Pending</span>
+            <span class="history-badge correct">Correct</span>
             <span class="history-verify">✓ Mantle verified</span>
           </div>
           <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
@@ -1231,24 +1232,51 @@
     el.title = 'Price movement of the underlying token — not your yield';
   }
 
-  /* ── Yield Earned card ── */
-  var LS_KEY = 'rwai_connected_at';
-  if (!localStorage.getItem(LS_KEY)) {
-    localStorage.setItem(LS_KEY, Date.now().toString());
-  }
+  /* ── Projected Annual Yield card ── */
   function updateYieldEarned() {
     if (usdyUSD === null || methUSD === null || cmethUSD === null) return;
-    var connectedAt = parseInt(localStorage.getItem(LS_KEY), 10);
-    var daysSince = Math.max((Date.now() - connectedAt) / 86400000, 0);
-    // floor at 1 day so new visitors see a non-zero demo value
-    if (daysSince < 1) daysSince = 1;
-    var usdyYield  = USDY_BALANCE  * usdyUSD  * USDY_APY  * daysSince / 365;
-    var methYield  = METH_BALANCE  * methUSD  * METH_APR  * daysSince / 365;
-    var cmethYield = CMETH_BALANCE * cmethUSD * CMETH_APY * daysSince / 365;
-    var total = usdyYield + methYield + cmethYield;
+    var usdyVal  = USDY_BALANCE  * usdyUSD;
+    var methVal  = METH_BALANCE  * methUSD;
+    var cmethVal = CMETH_BALANCE * cmethUSD;
+    var projected = (usdyVal * USDY_APY) + (methVal * METH_APR) + (cmethVal * CMETH_APY);
     var el = document.getElementById('yield-earned');
     el.classList.remove('muted');
-    el.textContent = fmt(total);
+    el.textContent = fmt(projected) + ' / yr';
+  }
+
+  /* ── Donut chart ── */
+  var CIRC = 2 * Math.PI * 44;
+  function updateDonut() {
+    if (usdyUSD === null || methUSD === null || cmethUSD === null) return;
+    var usdyVal  = USDY_BALANCE  * usdyUSD;
+    var methVal  = METH_BALANCE  * methUSD;
+    var cmethVal = CMETH_BALANCE * cmethUSD;
+    var total = usdyVal + methVal + cmethVal;
+    if (total === 0) return;
+    var usdyPct  = usdyVal  / total;
+    var methPct  = methVal  / total;
+    var cmethPct = cmethVal / total;
+    var usdyArc  = CIRC * usdyPct;
+    var methArc  = CIRC * methPct;
+    var cmethArc = CIRC * cmethPct;
+    var cu = document.getElementById('donut-usdy');
+    var cm = document.getElementById('donut-meth');
+    var cc = document.getElementById('donut-cmeth');
+    if (cu) cu.setAttribute('stroke-dasharray', usdyArc.toFixed(1) + ' ' + (CIRC - usdyArc).toFixed(1));
+    if (cm) {
+      cm.setAttribute('stroke-dasharray', methArc.toFixed(1) + ' ' + (CIRC - methArc).toFixed(1));
+      cm.setAttribute('stroke-dashoffset', (-usdyArc).toFixed(1));
+    }
+    if (cc) {
+      cc.setAttribute('stroke-dasharray', cmethArc.toFixed(1) + ' ' + (CIRC - cmethArc).toFixed(1));
+      cc.setAttribute('stroke-dashoffset', (-(usdyArc + methArc)).toFixed(1));
+    }
+    var pu = document.getElementById('donut-usdy-pct');
+    var pm = document.getElementById('donut-meth-pct');
+    var pc = document.getElementById('donut-cmeth-pct');
+    if (pu) pu.textContent = '~' + Math.round(usdyPct * 100) + '%';
+    if (pm) pm.textContent = '~' + Math.round(methPct * 100) + '%';
+    if (pc) pc.textContent = '~' + Math.round(cmethPct * 100) + '%';
   }
 
   /* ── Total ── */
@@ -1259,6 +1287,12 @@
     el.classList.remove('muted');
     el.textContent = fmt(total);
     updateYieldEarned();
+    updateDonut();
+    var usdyUsdVal = USDY_BALANCE * usdyUSD;
+    var heroVal = document.getElementById('hero-usdy-val');
+    if (heroVal) heroVal.textContent = fmt(usdyUsdVal);
+    var simVal = document.getElementById('sim-usdy-val');
+    if (simVal) simVal.textContent = fmt(usdyUsdVal);
   }
 
   /* ── USDY price + 24h change ── */

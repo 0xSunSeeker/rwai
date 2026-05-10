@@ -734,9 +734,9 @@
         <div class="hero-reasoning">
           <div class="hero-reasoning-label">Reasoning</div>
           <ul>
-            <li>Treasury yields stable — T-bill rates unchanged overnight</li>
-            <li>Validator APR compressing — ETH staking returns at 12-month low</li>
-            <li>Yield spread widening for 12h — trend favours holding USDY</li>
+            <li id="reason-1">Treasury yields stable — T-bill rates unchanged overnight</li>
+            <li id="reason-2">Validator APR compressing — ETH staking returns at 12-month low</li>
+            <li id="reason-3">Yield spread widening for 12h — trend favours holding USDY</li>
           </ul>
         </div>
 
@@ -829,7 +829,7 @@
     </div>
     <div class="summary-card highlight" style="animation-delay:0.1s">
       <p class="summary-card-label">Yield Opportunity</p>
-      <p class="summary-card-value amber">+1.65%</p>
+      <p class="summary-card-value amber" id="yield-spread-val">+1.65%</p>
       <p class="summary-card-sub">USDY leads mETH — relative spread favours holding</p>
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
@@ -925,7 +925,7 @@
             <div class="pos-est-yield" id="usdy-est-yield">Est. — / year</div>
           </div>
           <div class="pos-apy-wrap">
-            <span class="pos-apy">3.55%</span>
+            <span class="pos-apy" id="usdy-apy-val">3.55%</span>
             <span class="pos-change" id="usdy-change"></span>
           </div>
         </div>
@@ -956,7 +956,7 @@
             <div class="pos-est-yield" id="meth-est-yield">Est. — / year</div>
           </div>
           <div class="pos-apy-wrap">
-            <span class="pos-apy">1.90%</span>
+            <span class="pos-apy" id="meth-apy-val">1.90%</span>
             <span class="pos-change" id="meth-change"></span>
           </div>
         </div>
@@ -1594,6 +1594,42 @@
       });
     } catch (e) {}
   }
+
+  /* ── Dynamic reasoning bullets ── */
+  function updateReasoningBullets() {
+    var usdyApyEl = document.getElementById('usdy-apy-val');
+    var methApyEl = document.getElementById('meth-apy-val');
+    var spreadEl  = document.getElementById('yield-spread-val');
+    if (!usdyApyEl || !methApyEl || !spreadEl) return;
+
+    var usdyApy = parseFloat(usdyApyEl.textContent.replace('%', ''));
+    var methApr = parseFloat(methApyEl.textContent.replace('%', ''));
+    var spread  = parseFloat(spreadEl.textContent.replace(/[^0-9.]/g, ''));
+
+    var b1 = document.getElementById('reason-1');
+    if (b1) {
+      b1.textContent = usdyApy >= 3.0
+        ? 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — above the 3.0% T-bill baseline'
+        : 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — at or below the T-bill baseline';
+    }
+
+    var b2 = document.getElementById('reason-2');
+    if (b2) {
+      var diff = usdyApy - methApr;
+      b2.textContent = diff >= 0
+        ? 'mETH APR at ' + methApr.toFixed(2) + '% — ' + diff.toFixed(2) + '% below USDY yield'
+        : 'mETH APR at ' + methApr.toFixed(2) + '% — ' + Math.abs(diff).toFixed(2) + '% above USDY yield';
+    }
+
+    var b3 = document.getElementById('reason-3');
+    if (b3) {
+      b3.textContent = spread >= 1.5
+        ? 'Spread of ' + spread.toFixed(2) + '% is above the 1.5% alert threshold — holding USDY is optimal'
+        : 'Spread of ' + spread.toFixed(2) + '% is below the 1.5% alert threshold — rebalance may be worth considering';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', updateReasoningBullets);
 
 })();
 </script>

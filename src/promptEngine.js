@@ -80,6 +80,18 @@ USER CONTEXT:
 - Prior decisions: ${priorDecisions}
 - Agent track record: ${agentAccuracy}
 
+SPREAD ANALYSIS:
+- Current USDY vs mETH spread: ${yieldData.currentSpread != null ? yieldData.currentSpread.toFixed(2) : 'N/A'}%
+- Alert type: ${yieldData.alertType ?? 'yield_change'}
+- Rebalance proposal triggered: ${yieldData.spreadAboveProposal ? 'YES — spread exceeds proposal threshold' : 'NO — spread below proposal threshold'}
+${yieldData.spreadAboveProposal ? `
+IMPORTANT: The spread between USDY and mETH is above the rebalance proposal threshold.
+You MUST include a specific rebalance proposal in your message:
+- Suggest moving a portion of mETH into USDY (not all — propose 25-50% of mETH position)
+- State the exact dollar amount to move based on userPositionUSD
+- Explain why holding more USDY makes sense given the current spread
+- End with: "I am preparing a one-tap approval for this rebalance."
+` : ''}
 Write a plain-English Telegram message explaining:
 1. What changed (only reference the data above — do not invent context)
 2. What this means for their $${userPositionUSD.toLocaleString()} position

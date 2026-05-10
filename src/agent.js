@@ -33,6 +33,10 @@ if (existsSync(LAST_YIELD_PATH)) {
 // How much yield needs to change before the agent triggers an alert (in %).
 const ALERT_THRESHOLD = 0.10;
 
+const SPREAD_ALERT_THRESHOLD    = 1.5;   // Send alert explaining opportunity
+const SPREAD_PROPOSAL_THRESHOLD = 1.65;  // Propose specific rebalance action
+const SPREAD_AUTOEXECUTE_THRESHOLD = 2.0; // Tier 3 auto-execute (future)
+
 // ─── USER PROFILE ─────────────────────────────────────────────────────────────
 const PROFILE_PATH = `${DATA_DIR}/userProfile.json`;
 
@@ -62,11 +66,12 @@ function hasPendingUnsentAlert() {
   }
 }
 
-function writePendingAlert(explanation, prediction, yieldData) {
+function writePendingAlert(explanation, prediction, yieldData, alertType) {
   const alert = {
     explanation,
     prediction,
     yieldData,
+    alertType: alertType ?? "yield_change",
     generatedAt: new Date().toISOString(),
     sent: false,
   };
@@ -189,14 +194,34 @@ async function runAgentLoop() {
     const methChange = Math.abs(yieldData.methCurrentAPR - yieldData.methPreviousAPR);
     const significantChange = usdyChange > ALERT_THRESHOLD || methChange > ALERT_THRESHOLD;
 
-    console.log(`Delegation tier: ${user.userTier}`);
+    const currentSpread  = yieldData.usdyCurrentAPY - yieldData.methCurrentAPR;
+    const previousSpread = yieldData.usdyPreviousAPY - yieldData.methPreviousAPR;
+    const spreadCrossedAlert  = currentSpread >= SPREAD_ALERT_THRESHOLD && previousSpread < SPREAD_ALERT_THRESHOLD;
+    const spreadAboveProposal = currentSpread >= SPREAD_PROPOSAL_THRESHOLD;
+    const spreadAboveAlert    = currentSpread >= SPREAD_ALERT_THRESHOLD;
 
-    if (significantChange) {
-      console.log(`Significant change detected — generating explanation...`);
+    console.log(`Delegation tier: ${user.userTier}`);
+    console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Alert: ${SPREAD_ALERT_THRESHOLD}% | Proposal: ${SPREAD_PROPOSAL_THRESHOLD}%`);
+
+    const shouldAlert = significantChange || spreadCrossedAlert || spreadAboveProposal;
+
+    if (shouldAlert) {
+      // Determine alert type
+      let alertType = "yield_change";
+      if (spreadAboveProposal) alertType = "rebalance_proposal";
+      else if (spreadAboveAlert) alertType = "spread_alert";
+
+      console.log(`Alert triggered — type: ${alertType} | spread: ${currentSpread.toFixed(2)}%`);
+
+      // Add spread context to yieldData so generateExplanation can use it
+      yieldData.currentSpread        = currentSpread;
+      yieldData.alertType            = alertType;
+      yieldData.spreadAboveProposal  = spreadAboveProposal;
 
       // Step 4 — Generate plain-English explanation
       const explanation = await generateExplanation(yieldData, user);
       console.log("\n=== ALERT ===");
+      console.log(`Type: ${alertType}`);
       console.log(explanation);
       console.log("=============\n");
 
@@ -205,12 +230,12 @@ async function runAgentLoop() {
         console.log("Tier 1 active — alert logged, no action proposed.");
       } else if (!hasPendingUnsentAlert()) {
         // Tier 2: write pendingAlert.json for bot to pick up and send
-        writePendingAlert(explanation, prediction, yieldData);
+        writePendingAlert(explanation, prediction, yieldData, alertType);
       } else {
         console.log("Previous alert still unsent — skipping overwrite.");
       }
     } else {
-      console.log(`No significant change (USDY Δ${usdyChange.toFixed(3)}% | mETH Δ${methChange.toFixed(3)}%). Watching...`);
+      console.log(`Watching... USDY Δ${usdyChange.toFixed(3)}% | mETH Δ${methChange.toFixed(3)}% | Spread ${currentSpread.toFixed(2)}%`);
     }
 
     // Step 6 — Persist snapshot for next cycle

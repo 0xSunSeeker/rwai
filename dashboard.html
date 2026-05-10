@@ -796,7 +796,7 @@
 
         <!-- Simulate panel (JS hooks preserved) -->
         <div class="sim-panel" id="sim-panel">
-          <button class="sim-close" id="sim-close" aria-label="Close">&times;</button>
+          <button class="sim-close" id="sim-panel-close" aria-label="Close">&times;</button>
           <div class="sim-panel-title">Rebalance simulation — <span id="sim-usdy-val">$29.91</span> USDY → mETH</div>
           <div class="sim-row">
             <span class="sim-row-label">New annual yield (mETH at 1.90%)</span>
@@ -1503,54 +1503,54 @@
   });
 
   /* ── Simulate Rebalance modal ── */
-  var btnSim        = document.getElementById('btn-simulate');
-  var simModal      = document.getElementById('rebalance-modal');
-  var simModalClose = document.getElementById('sim-modal-close-btn');
+  var btnSimulate = document.querySelector('.btn-simulate');
+  var rebalanceModal = document.getElementById('rebalance-modal');
+  var simClose = document.getElementById('sim-close');
 
   function openSimModal() {
-    var usdyVal   = parseFloat((document.getElementById('usdy-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
-    var methVal   = parseFloat((document.getElementById('meth-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
-    var projYield = parseFloat((document.getElementById('yield-earned').textContent || '').replace(/[^0-9.]/g, '')) || 0;
+    var usdyText = document.getElementById('usdy-usd') ? document.getElementById('usdy-usd').textContent : '$33.80';
+    var methText = document.getElementById('meth-usd') ? document.getElementById('meth-usd').textContent : '$77.16';
 
-    var halfUsdy  = usdyVal * 0.5;
-    var newUsdy   = halfUsdy;
-    var newMeth   = methVal + halfUsdy;
-    var newYield  = (newUsdy * USDY_APY) + (newMeth * METH_APR);
-    var diff      = newYield - projYield;
+    var usdyVal = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 33.80;
+    var methVal = parseFloat(methText.replace(/[^0-9.]/g, '')) || 77.16;
 
-    document.getElementById('sm-before-usdy').textContent  = fmt(usdyVal) + ' at 3.55% APY';
-    document.getElementById('sm-before-meth').textContent  = fmt(methVal) + ' at 1.90% APR';
-    document.getElementById('sm-before-yield').textContent = fmt(projYield) + '/yr';
+    var usdyAfter  = usdyVal / 2;
+    var methAfter  = methVal + usdyAfter;
+    var yieldBefore = (usdyVal * 0.0355) + (methVal * 0.0190);
+    var yieldAfter  = (usdyAfter * 0.0355) + (methAfter * 0.0190);
+    var diff = yieldBefore - yieldAfter;
 
-    document.getElementById('sm-after-usdy').textContent  = '~' + fmt(newUsdy) + ' at 3.55% APY';
-    document.getElementById('sm-after-meth').textContent  = '~' + fmt(newMeth) + ' at 1.90% APR';
-    document.getElementById('sm-after-yield').textContent = '~' + fmt(newYield) + '/yr';
+    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)   + ' @ 3.55%';
+    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)   + ' @ 1.90%';
+    document.getElementById('sim-yield-before').textContent = '$' + yieldBefore.toFixed(2) + ' / yr';
+    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)  + ' @ 3.55%';
+    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)  + ' @ 1.90%';
+    document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2) + ' / yr';
+    document.getElementById('sim-verdict').textContent      = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
 
-    document.getElementById('sm-verdict-diff').innerHTML =
-      'Rebalance ' + (diff >= 0 ? 'increases' : 'reduces') + ' projected yield by <strong>' +
-      (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(2) + '/yr</strong>';
-
-    simModal.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    rebalanceModal.style.display = 'flex';
   }
 
-  function closeSimModal() {
-    simModal.classList.remove('open');
-    document.body.style.overflow = '';
-  }
+  if (btnSimulate) btnSimulate.addEventListener('click', openSimModal);
 
-  btnSim.addEventListener('click', openSimModal);
-  simModalClose.addEventListener('click', closeSimModal);
-  simModal.addEventListener('click', function (e) { if (e.target === simModal) closeSimModal(); });
+  document.querySelectorAll('button').forEach(function (btn) {
+    if (btn.textContent.trim() === 'Simulate Rebalance') btn.addEventListener('click', openSimModal);
+  });
+
+  if (simClose) simClose.addEventListener('click', function () {
+    rebalanceModal.style.display = 'none';
+  });
+
+  if (rebalanceModal) rebalanceModal.addEventListener('click', function (e) {
+    if (e.target === rebalanceModal) rebalanceModal.style.display = 'none';
+  });
 
   /* ── Disconnect ── */
   var btnDisconnect = document.querySelector('.btn-disconnect');
   if (btnDisconnect) {
     btnDisconnect.addEventListener('click', function () {
       sessionStorage.setItem('rwai_disconnected', 'true');
-      localStorage.removeItem('wagmi.connected');
-      localStorage.removeItem('wagmi.wallet');
-      localStorage.removeItem('wc@2:client:0.3//session');
+      localStorage.clear();
       window.location.href = '/';
     });
   }
@@ -1715,32 +1715,57 @@
 </script>
 
 <!-- ── REBALANCE SIMULATION MODAL ── -->
-<div id="rebalance-modal" role="dialog" aria-modal="true" aria-labelledby="sm-modal-title">
-  <div id="rebalance-modal-card">
-    <p class="sm-title" id="sm-modal-title">Rebalance Simulation</p>
-    <p class="sm-sub">What would happen if you moved 50% of USDY into mETH?</p>
+<div id="rebalance-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#111; border:1px solid #222; border-radius:16px; padding:40px; max-width:480px; width:90%; position:relative;">
+    <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:6px; letter-spacing:-0.03em;">Rebalance Simulation</h2>
+    <p style="font-size:0.85rem; color:#555; margin-bottom:28px;">What would happen if you moved 50% of your USDY into mETH?</p>
 
-    <div class="sm-section-label">Before</div>
-    <div class="sm-row"><span class="sm-row-label">USDY</span><span class="sm-row-val" id="sm-before-usdy">—</span></div>
-    <div class="sm-row"><span class="sm-row-label">mETH</span><span class="sm-row-val" id="sm-before-meth">—</span></div>
-    <div class="sm-row"><span class="sm-row-label">Projected yield</span><span class="sm-row-val green" id="sm-before-yield">—</span></div>
-
-    <div class="sm-arrow">↓</div>
-
-    <div class="sm-section-label">After — 50% of USDY moved to mETH</div>
-    <div class="sm-row"><span class="sm-row-label">USDY</span><span class="sm-row-val" id="sm-after-usdy">—</span></div>
-    <div class="sm-row"><span class="sm-row-label">mETH</span><span class="sm-row-val" id="sm-after-meth">—</span></div>
-    <div class="sm-row"><span class="sm-row-label">Projected yield</span><span class="sm-row-val red" id="sm-after-yield">—</span></div>
-
-    <div class="sm-verdict">
-      <p class="sm-verdict-line" id="sm-verdict-diff">—</p>
-      <p class="sm-verdict-line">Current allocation is optimal — no action recommended</p>
-      <span class="sm-badge">✓ Hold recommended</span>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">Before</div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:0.85rem; color:#777;">USDY</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-before">$33.80 @ 3.55%</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:0.85rem; color:#777;">mETH</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$77.16 @ 1.90%</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
+        <span style="font-size:0.85rem; color:#777;">Projected yield</span>
+        <span style="font-size:0.85rem; font-weight:700; color:#1D9E75;" id="sim-yield-before">$2.67 / yr</span>
+      </div>
     </div>
 
-    <button class="sm-close-btn" id="sim-modal-close-btn">Close simulation</button>
+    <div style="text-align:center; font-size:1.4rem; color:#333; margin:16px 0; animation: sim-arrow 1s ease-in-out infinite alternate;">↓</div>
+
+    <div style="margin-bottom:24px;">
+      <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">After (50% shift)</div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:0.85rem; color:#777;">USDY</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-after">$16.90 @ 3.55%</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:0.85rem; color:#777;">mETH</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$93.96 @ 1.90%</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
+        <span style="font-size:0.85rem; color:#777;">Projected yield</span>
+        <span style="font-size:0.85rem; font-weight:700; color:#555;" id="sim-yield-after">$2.39 / yr</span>
+      </div>
+    </div>
+
+    <div style="background:#0d1f18; border:1px solid rgba(29,158,117,0.2); border-radius:10px; padding:16px; margin-bottom:24px;">
+      <div style="font-size:0.85rem; color:#ccc; margin-bottom:6px;" id="sim-verdict">Rebalancing reduces projected yield by $0.28/yr</div>
+      <div style="font-size:0.8rem; color:#1D9E75; font-weight:600;">✓ Hold recommended — current allocation is optimal</div>
+    </div>
+
+    <button id="sim-close" style="width:100%; padding:12px; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:8px; color:#777; font-size:0.875rem; cursor:pointer; transition:all 0.2s;">Close simulation</button>
   </div>
 </div>
+
+<style>
+@keyframes sim-arrow { from { opacity:0.3; transform:translateY(-3px); } to { opacity:1; transform:translateY(3px); } }
+</style>
 
 </body>
 </html>

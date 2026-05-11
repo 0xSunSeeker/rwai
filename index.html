@@ -99,6 +99,8 @@
     #btn-connect.wrong-network { border-color: rgb(245,158,11); color: rgb(245,158,11); }
     .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 12px; border-radius: 9999px; background: rgb(34,197,94); color: rgb(13,13,13); border: none; transition: background 0.2s; white-space: nowrap; cursor: pointer; }
     .btn-nav-green:hover { background: rgb(22,163,74); color: rgb(13,13,13); }
+    .nav-live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; color: rgb(34,197,94); background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); border-radius: 9999px; padding: 4px 10px; white-space: nowrap; }
+    .nav-live-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(34,197,94); flex-shrink: 0; animation: breathe 7s ease-in-out infinite; }
 
     /* HERO */
     .hero { display: flex; flex-direction: column; padding-top: 64px; position: relative; overflow: hidden; }
@@ -313,6 +315,9 @@
     /* RESPONSIVE */
     @media (max-width: 640px) { .wallet-body { grid-template-columns: 1fr 1fr; } }
     @media (min-width: 480px) { .phone { width: 320px; } }
+    @media (max-width: 480px) {
+      .nav-live-text { display: none; }
+    }
     @media (min-width: 640px) {
       .yield-grid { grid-template-columns: repeat(2, 1fr); }
       .cta-btns { flex-direction: row; justify-content: center; }
@@ -374,6 +379,7 @@
 <!-- NAV -->
 <nav>
   <img src="/logo.svg" alt="RWAi" style="height:14px; display:block;" />
+      <span class="nav-live-pill"><span class="nav-live-dot"></span><span class="nav-live-text">Monitoring Mantle Mainnet</span></span>
   <div class="nav-links">
     <a href="#how-it-works" class="nav-link">How it works</a>
     <a href="/dashboard" class="nav-link">Dashboard</a>

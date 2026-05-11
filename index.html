@@ -721,7 +721,7 @@
 const METH_POOL_ID = 'b9f2f00a-ba96-4589-a171-dde979a23d87';
 let liveUSDYApy  = 3.55;
 let liveMethApy  = 1.66;
-let liveCmethApy = 1.98;
+let liveCmethApy = 1.91;
 
 async function loadYields() {
   // Fetch USDY from /pools and mETH from /chart in parallel (mirrors backend dataFetcher.js)
@@ -759,7 +759,7 @@ async function loadYields() {
       const chart = methChartRes.value.data;
       if (Array.isArray(chart) && chart.length > 0) {
         const latest = chart[chart.length - 1];
-        liveMethApy = parseFloat(latest.apy ?? latest.apyBase ?? 1.98);
+        liveMethApy = parseFloat(latest.apyBase7d ?? latest.apyMean30d ?? latest.apy ?? latest.apyBase ?? 1.66);
       }
     }
 

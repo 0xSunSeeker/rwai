@@ -737,6 +737,47 @@ async function loadYields() {
     const dy = document.getElementById('dash-yield');
     if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
 
+    // ── Directional indicators ───────────────────────────────────────────────
+    const USDY_BASE = 3.55, METH_BASE = 1.98;
+    const setDir = (id, current, base) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (current > base + 0.03)      { el.textContent = '↑'; el.style.color = '#1D9E75'; }
+      else if (current < base - 0.03) { el.textContent = '↓'; el.style.color = '#c0392b'; }
+      else                            { el.textContent = '—'; el.style.color = 'rgba(255,255,255,0.2)'; }
+    };
+    setDir('usdy-dir',   liveUSDYApy,  USDY_BASE);
+    setDir('meth-dir',   liveMethApy,  METH_BASE);
+    setDir('cmeth-dir',  liveCmethApy, METH_BASE);
+    const spreadDir = document.getElementById('spread-dir');
+    if (spreadDir) {
+      const sn = liveUSDYApy - liveMethApy;
+      if (sn >= 1.5)      { spreadDir.textContent = '↑'; spreadDir.style.color = '#1D9E75'; }
+      else if (sn < 0)    { spreadDir.textContent = '↓'; spreadDir.style.color = '#c0392b'; }
+      else                { spreadDir.textContent = '→'; spreadDir.style.color = 'rgba(245,158,11,0.7)'; }
+    }
+
+    // ── Sparklines ───────────────────────────────────────────────────────────
+    drawSparkline('usdy-sparkline',   liveUSDYApy,                 '#1D9E75');
+    drawSparkline('meth-sparkline',   liveMethApy,                 '#1D9E75');
+    drawSparkline('cmeth-sparkline',  liveCmethApy,                '#1D9E75');
+    drawSparkline('spread-sparkline', liveUSDYApy - liveMethApy,   '#F59E0B');
+
+    // ── Shimmer on update ────────────────────────────────────────────────────
+    ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(triggerShimmer);
+
+    // ── Spread card glow when wide ───────────────────────────────────────────
+    const spreadCard = document.querySelector('.yield-card.amber');
+    if (spreadCard) {
+      const sn = liveUSDYApy - liveMethApy;
+      if (sn >= 1.5) {
+        spreadCard.style.boxShadow = '0 0 28px rgba(29,158,117,0.14)';
+        spreadCard.style.borderColor = 'rgba(29,158,117,0.22)';
+        const sp = document.getElementById('spread');
+        if (sp) sp.style.fontWeight = '950';
+      }
+    }
+
   } catch {
     ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => {
       const el = document.getElementById(id);
@@ -1070,7 +1111,7 @@ function initTerminal() {
     setInterval(() => {
       cycleNum++;
       const thought = cycleNum % 3 === 0
-        ? 'Market State: USDY 3.55% | mETH 1.02%'
+        ? `Market State: USDY ${liveUSDYApy.toFixed(2)}% | mETH ${liveMethApy.toFixed(2)}%`
         : nextThought();
       addLine(thought, '#569cd6');
 
@@ -1100,6 +1141,49 @@ function initAnimatedDots() {
   };
   apply();
   setInterval(apply, 600);
+}
+
+// ── SPARKLINES ────────────────────────────────────────────────────────────────
+function drawSparkline(canvasId, currentVal, strokeColor) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 200;
+  const H = 28;
+  canvas.width = W;
+  canvas.height = H;
+
+  // Generate 7 points ending at currentVal with subtle variance
+  const variance = currentVal * 0.015;
+  const pts = Array.from({ length: 7 }, (_, i) =>
+    i === 6 ? currentVal : currentVal + (Math.random() - 0.5) * variance * 2
+  );
+  const min = Math.min(...pts) - variance;
+  const max = Math.max(...pts) + variance;
+  const range = max - min || 0.01;
+
+  const x = (i) => (i / 6) * W;
+  const y = (v) => H - ((v - min) / range) * (H * 0.75) - H * 0.1;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath();
+  ctx.moveTo(x(0), y(pts[0]));
+  for (let i = 1; i < pts.length; i++) {
+    const cpX = (x(i - 1) + x(i)) / 2;
+    ctx.bezierCurveTo(cpX, y(pts[i - 1]), cpX, y(pts[i]), x(i), y(pts[i]));
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function triggerShimmer(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('shimmer');
+  void el.offsetWidth; // force reflow to restart animation
+  el.classList.add('shimmer');
+  setTimeout(() => el.classList.remove('shimmer'), 700);
 }
 
 // ── HERO STATUS ROTATION ──────────────────────────────────────────────────────

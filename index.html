@@ -589,70 +589,73 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
 <script>
 // ── YIELD TICKER ──────────────────────────────────────────────────────────────
+const METH_POOL_ID = 'b9f2f00a-ba96-4589-a171-dde979a23d87';
 let liveUSDYApy  = 3.55;
 let liveMethApy  = 1.98;
 let liveCmethApy = 1.98;
 
 async function loadYields() {
+  // Fetch USDY from /pools and mETH from /chart in parallel (mirrors backend dataFetcher.js)
+  const [poolsRes, methChartRes] = await Promise.allSettled([
+    fetch('https://yields.llama.fi/pools').then(r => r.json()),
+    fetch(`https://yields.llama.fi/chart/${METH_POOL_ID}`).then(r => r.json()),
+  ]);
+
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    el.classList.remove('loading');
+  };
+
   try {
-    const res = await fetch('https://yields.llama.fi/pools');
-    const { data } = await res.json();
+    // ── USDY: pools endpoint ──────────────────────────────────────────────────
+    if (poolsRes.status === 'fulfilled') {
+      const data = poolsRes.value.data;
+      const usdyPool = data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle')
+                    ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY')
+                    ?? data.find(p => p.symbol === 'USDY');
+      liveUSDYApy = parseFloat(usdyPool?.apy ?? 3.55);
 
-    const usdyPool = data.find(p => p.symbol === 'USDY' && p.chain === 'Mantle')
-                  ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY')
-                  ?? data.find(p => p.symbol === 'USDY');
+      const usdyProject = usdyPool?.project ?? 'ondo-yield-assets';
+      ['usdy-icon','spread-icon-usdy'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.src = `https://icons.llama.fi/${usdyProject}.png`;
+      });
+    }
 
-    const methPool = data.find(p => p.pool === 'b9f2f00a-ba96-4589-a171-dde979a23d87')
-                  ?? data.find(p => p.symbol === 'METH' && p.chain === 'Mantle')
-                  ?? data.find(p => p.project === 'meth-protocol' && p.chain === 'Mantle')
-                  ?? data.find(p => p.project === 'meth-protocol');
+    // ── mETH: chart endpoint (same as backend) ────────────────────────────────
+    // /chart gives daily data points with apy per point — use the latest
+    if (methChartRes.status === 'fulfilled') {
+      const chart = methChartRes.value.data;
+      if (Array.isArray(chart) && chart.length > 0) {
+        const latest = chart[chart.length - 1];
+        liveMethApy = parseFloat(latest.apy ?? latest.apyBase ?? 1.98);
+      }
+    }
 
-    const cmethPool = data.find(p => p.symbol === 'CMETH' && p.chain === 'Mantle')
-                   ?? data.find(p => p.symbol === 'CMETH');
+    // ── cmETH: derived from mETH APR via daily compounding (same as backend) ──
+    liveCmethApy = parseFloat(((Math.pow(1 + liveMethApy / 100 / 365, 365) - 1) * 100).toFixed(4));
 
-    liveUSDYApy  = parseFloat(usdyPool?.apy  ?? 3.55);
-    liveMethApy  = parseFloat(methPool?.apy  ?? 1.98);
-    liveCmethApy = cmethPool
-      ? parseFloat(cmethPool.apy ?? liveMethApy)
-      : parseFloat(((Math.pow(1 + liveMethApy / 100 / 365, 365) - 1) * 100).toFixed(4));
-
-    const methApr  = liveMethApy;
-    const cmethApy = liveCmethApy;
-    const spreadNum = liveUSDYApy - methApr;
-    const spreadStr = (spreadNum >= 0 ? '+' : '') + spreadNum.toFixed(2) + '%';
-
-    const set = (id, val) => {
+    ['meth-icon','cmeth-icon','spread-icon-meth'].forEach(id => {
       const el = document.getElementById(id);
-      if (!el) return;
-      el.textContent = val;
-      el.classList.remove('loading');
-    };
-    set('usdy-apy',  liveUSDYApy.toFixed(2) + '%');
-    set('meth-apr',  methApr.toFixed(2) + '%');
-    set('cmeth-apy', cmethApy.toFixed(2) + '%');
-    set('spread',    spreadStr);
+      if (el) el.src = 'https://icons.llama.fi/meth-protocol.png';
+    });
 
-    const wide = spreadNum >= 1.5;
+    // ── Render ────────────────────────────────────────────────────────────────
+    const spreadNum = liveUSDYApy - liveMethApy;
+    set('usdy-apy',  liveUSDYApy.toFixed(2) + '%');
+    set('meth-apr',  liveMethApy.toFixed(2) + '%');
+    set('cmeth-apy', liveCmethApy.toFixed(2) + '%');
+    set('spread',    (spreadNum >= 0 ? '+' : '') + spreadNum.toFixed(2) + '%');
+
     const sub = document.getElementById('spread-sub');
-    if (sub) sub.textContent = wide
+    if (sub) sub.textContent = spreadNum >= 1.5
       ? 'Spread > 1.5% — rebalance worth considering'
       : 'Within normal range';
 
     const dy = document.getElementById('dash-yield');
     if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
-
-    // Set token icons from DeFiLlama protocol logos
-    const usdyProject  = usdyPool?.project  ?? 'ondo-yield-assets';
-    const methProject  = methPool?.project  ?? 'meth-protocol';
-    const setIcon = (id, project) => {
-      const el = document.getElementById(id);
-      if (el) el.src = `https://icons.llama.fi/${project}.png`;
-    };
-    setIcon('usdy-icon',        usdyProject);
-    setIcon('meth-icon',        methProject);
-    setIcon('cmeth-icon',       methProject);
-    setIcon('spread-icon-usdy', usdyProject);
-    setIcon('spread-icon-meth', methProject);
 
   } catch {
     ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => {

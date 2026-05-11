@@ -142,7 +142,7 @@ export async function fetchMETHData() {
 
         const ageDays = (Date.now() - oldEntry.timestamp) / (24 * 60 * 60 * 1000);
 
-        if (ageDays >= 1 && oldEntry.price !== latest.pricePerShare) {
+        if (ageDays >= 0.04 && oldEntry.price !== latest.pricePerShare) {
           const apy7d = (Math.pow(latest.pricePerShare / oldEntry.price, 365 / ageDays) - 1) * 100;
           aprFromRate = Math.round(apy7d * 100) / 100;
           console.log(`mETH 7-day APY: ${aprFromRate}% (${ageDays.toFixed(1)}d window)`);

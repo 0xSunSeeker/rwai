@@ -775,12 +775,15 @@ async function onConnected(address) {
     return;
   }
   document.getElementById('network-prompt').classList.remove('visible');
+  sessionStorage.removeItem('userDisconnected');
   sessionStorage.setItem('rwai_wallet', address);
   window.location.href = '/dashboard';
 }
 
 function disconnect() {
   try { if (connectedProvider && connectedProvider.disconnect) connectedProvider.disconnect(); } catch (e) {}
+  // Revoke eth_accounts permission so wallet prompts on next connect
+  try { if (connectedProvider?.request) connectedProvider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }).catch(() => {}); } catch (e) {}
   connectedAddress = null; connectedProvider = null; connectedWalletName = '';
   btnConnect.textContent = 'Connect Wallet';
   btnConnect.classList.remove('connected', 'wrong-network');
@@ -825,8 +828,7 @@ document.getElementById('btn-switch-network').addEventListener('click', async ()
 
 async function tryAutoReconnect() {
   if (sessionStorage.getItem('userDisconnected') === 'true') {
-    sessionStorage.removeItem('userDisconnected');
-    return;
+    return; // flag stays alive until user explicitly connects
   }
   await new Promise(r => setTimeout(r, 200));
   for (const [, { info, provider }] of announcedWallets) {

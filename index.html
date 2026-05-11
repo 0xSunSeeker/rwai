@@ -720,7 +720,7 @@
 // ── YIELD TICKER ──────────────────────────────────────────────────────────────
 const METH_POOL_ID = 'b9f2f00a-ba96-4589-a171-dde979a23d87';
 let liveUSDYApy  = 3.55;
-let liveMethApy  = 1.98;
+let liveMethApy  = 1.66;
 let liveCmethApy = 1.98;
 
 async function loadYields() {
@@ -764,7 +764,7 @@ async function loadYields() {
     }
 
     // ── cmETH: derived from mETH APR via daily compounding (same as backend) ──
-    liveCmethApy = parseFloat(((Math.pow(1 + liveMethApy / 100 / 365, 365) - 1) * 100).toFixed(4));
+    liveCmethApy = Math.round((liveMethApy + 0.25) * 100) / 100;
 
     ['meth-icon','cmeth-icon','spread-icon-meth'].forEach(id => {
       const el = document.getElementById(id);
@@ -787,7 +787,7 @@ async function loadYields() {
     if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
 
     // ── Directional indicators ───────────────────────────────────────────────
-    const USDY_BASE = 3.55, METH_BASE = 1.98;
+    const USDY_BASE = 3.55, METH_BASE = 1.66;
     const setDir = (id, current, base) => {
       const el = document.getElementById(id);
       if (!el) return;

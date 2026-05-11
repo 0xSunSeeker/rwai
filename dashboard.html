@@ -1260,6 +1260,12 @@
 (function () {
   'use strict';
 
+  /* ── Wallet gate — redirect home if no active session ── */
+  if (!sessionStorage.getItem('rwai_wallet')) {
+    window.location.replace('/');
+    return;
+  }
+
   /* ── Constants ── */
   var USDY_BALANCE  = 29.91;
   var METH_BALANCE  = 0.0303;

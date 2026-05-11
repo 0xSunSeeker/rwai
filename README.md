@@ -64,11 +64,18 @@ No other submission arrives at demo day with a prediction history. RWAI does.
 
 ---
 
-## Deployed contract
+## Deployed contracts
 
 | | |
 |---|---|
-| **Registry** | ERC-8004 Reputation Registry |
+| **RWAIVault** | Execution layer — agent-gated swaps between USDY, mETH, cmETH |
+| **Address** | [`0x020D48EE13A2Da9a45Fc4F753a4D0E3a939916d0`](https://mantlescan.xyz/address/0x020D48EE13A2Da9a45Fc4F753a4D0E3a939916d0#code) |
+| **Network** | Mantle Mainnet (chainId 5000) |
+| **Verified** | ✅ Source verified on Mantlescan |
+
+| | |
+|---|---|
+| **ERC-8004 Reputation Registry** | On-chain AI prediction track record |
 | **Address** | [`0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`](https://explorer.mantle.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63) |
 | **Network** | Mantle Mainnet (chainId 5000) |
 | **Latest tx** | [`0xb24c9762becc831a9855a2a73b657f841f42a59f8858f2822ea9e7aee50080ec`](https://explorer.mantle.xyz/tx/0xb24c9762becc831a9855a2a73b657f841f42a59f8858f2822ea9e7aee50080ec) |

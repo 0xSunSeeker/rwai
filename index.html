@@ -326,6 +326,8 @@
       footer { padding: 40px 20px; }
       .footer-links { grid-template-columns: 1fr; }
       .footer-row1 { flex-direction: column; align-items: flex-start; gap: 16px; }
+      #hero-status { display: none; }
+      .macro-pill:nth-child(n+2) { display: none; }
     }
     @media (max-width: 768px) {
       footer { padding: 48px 32px; }
@@ -849,6 +851,13 @@ async function loadYields() {
     drawSparkline('meth-sparkline',   liveMethApy,                 '#1D9E75');
     drawSparkline('cmeth-sparkline',  liveCmethApy,                '#1D9E75');
     drawSparkline('spread-sparkline', liveUSDYApy - liveMethApy,   '#F59E0B');
+    // Redraw sparklines on resize
+    window.addEventListener('resize', () => {
+      drawSparkline('usdy-sparkline',   liveUSDYApy,               '#1D9E75');
+      drawSparkline('meth-sparkline',   liveMethApy,               '#1D9E75');
+      drawSparkline('cmeth-sparkline',  liveCmethApy,              '#1D9E75');
+      drawSparkline('spread-sparkline', liveUSDYApy - liveMethApy, '#F59E0B');
+    }, { passive: true });
 
     // ── Shimmer on update ────────────────────────────────────────────────────
     ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(triggerShimmer);

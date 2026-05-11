@@ -143,29 +143,22 @@ function resolveOldPredictions(currentYield) {
       const age = now - new Date(p.loggedAt).getTime();
       if (age < TWENTY_FOUR_HOURS) return line;
 
-      // Determine actual direction for each asset
-      const actualUsdy  = toDirection(p.yieldAtPrediction.usdyAPY,  currentYield.usdyCurrentAPY);
-      const actualMeth  = toDirection(p.yieldAtPrediction.methAPR,   currentYield.methCurrentAPR);
-      const actualCmeth = p.yieldAtPrediction.cmethAPY != null
-        ? toDirection(p.yieldAtPrediction.cmethAPY, currentYield.cmethCurrentAPY)
-        : null;
+      // Determine actual direction for USDY and mETH.
+      // cmETH is excluded: the APY formula changed mid-stream (compounding → +0.25% flat),
+      // making historical comparisons invalid. Accuracy is tracked on USDY + mETH only.
+      const actualUsdy = toDirection(p.yieldAtPrediction.usdyAPY, currentYield.usdyCurrentAPY);
+      const actualMeth = toDirection(p.yieldAtPrediction.methAPR,  currentYield.methCurrentAPR);
 
-      const usdyCorrect  = p.usdyPrediction.direction  === actualUsdy;
-      const methCorrect  = p.methPrediction.direction  === actualMeth;
-      const cmethCorrect = actualCmeth != null && p.cmethPrediction
-        ? p.cmethPrediction.direction === actualCmeth
-        : null;
+      const usdyCorrect = p.usdyPrediction.direction === actualUsdy;
+      const methCorrect = p.methPrediction.direction === actualMeth;
 
       resolved++;
       return JSON.stringify({
         ...p,
         resolved: true,
         resolvedAt: new Date().toISOString(),
-        usdyPrediction:  { ...p.usdyPrediction,  correct: usdyCorrect,  actualDirection: actualUsdy },
-        methPrediction:  { ...p.methPrediction,  correct: methCorrect,  actualDirection: actualMeth },
-        ...(p.cmethPrediction && actualCmeth != null
-          ? { cmethPrediction: { ...p.cmethPrediction, correct: cmethCorrect, actualDirection: actualCmeth } }
-          : {}),
+        usdyPrediction: { ...p.usdyPrediction, correct: usdyCorrect, actualDirection: actualUsdy },
+        methPrediction: { ...p.methPrediction, correct: methCorrect, actualDirection: actualMeth },
       });
     });
 
@@ -176,11 +169,11 @@ function resolveOldPredictions(currentYield) {
       // Update agentAccuracy in userProfile so promptEngine uses the real number
       const allParsed = updated.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
       const done = allParsed.filter(p => p.resolved);
-      const total = done.reduce((n, p) => n + (p.cmethPrediction ? 3 : 2), 0);
+      // Count USDY + mETH only — cmETH excluded (formula change mid-stream)
+      const total = done.reduce((n, p) => n + 2, 0);
       const correct = done.reduce((n, p) =>
-        n + (p.usdyPrediction.correct ? 1 : 0)
-          + (p.methPrediction.correct ? 1 : 0)
-          + (p.cmethPrediction?.correct ? 1 : 0), 0);
+        n + (p.usdyPrediction?.correct ? 1 : 0)
+          + (p.methPrediction?.correct  ? 1 : 0), 0);
       if (total > 0 && existsSync(PROFILE_PATH)) {
         try {
           const profile = JSON.parse(readFileSync(PROFILE_PATH, "utf8"));

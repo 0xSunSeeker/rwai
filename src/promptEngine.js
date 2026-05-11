@@ -154,7 +154,6 @@ CURRENT YIELD DATA:
   7-day avg: ${methApy7d ?? 'not available'}%
   30-day avg: ${methApy30d ?? 'not available'}%
   Recent trend: ${recentMethTrend ?? 'not available'}
-- cmETH APY: ${cmethCurrentAPY}% (tracks mETH with compounding)
 - US T-bill rate: ${tbillRate}%
   T-bill trend (7 days): ${recentTbillTrend ?? 'not available'}
 
@@ -179,11 +178,6 @@ Return ONLY valid JSON, no other text:
     "confidence": <0-${confidenceCeiling}>,
     "reasoning": "<one sentence using only the data provided>"
   },
-  "cmethPrediction": {
-    "direction": "<up|down|stable>",
-    "confidence": <0-${confidenceCeiling}>,
-    "reasoning": "<one sentence using only the data provided>"
-  }
 }`;
 
   const response = await client.messages.create({

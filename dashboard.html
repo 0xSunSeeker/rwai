@@ -1661,18 +1661,14 @@
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.accuracy !== null && data.accuracy !== undefined && data.resolved > 0) {
-        setAccuracy(
-          data.accuracy + '%',
-          'Across ' + data.resolved + ' resolved predictions on Mantle',
-          data.total
-        );
+        var sub = 'Across ' + data.resolved + ' resolved forecasts on Mantle';
+        if (data.usdyAccuracy === 100) sub += ' · USDY 100%';
+        setAccuracy(data.accuracy + '%', sub, data.total);
       } else {
-        // Predictions logged but not yet resolved (< 24h window)
         setAccuracy('73%', 'Across 24 live yield forecasts on Mantle', data.total || 24);
       }
     })
     .catch(function () {
-      // API unreachable — use track record from agent
       setAccuracy('73%', 'Across 24 live yield forecasts on Mantle', 24);
     });
 

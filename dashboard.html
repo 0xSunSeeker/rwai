@@ -716,6 +716,33 @@
     .cw-no-wallet { font-size: 0.8rem; color: #444; margin-top: 16px; line-height: 1.5; }
     .cw-no-wallet a { color: #1D9E75; text-decoration: none; }
     .cw-err { font-size: 0.8rem; color: #c0392b; margin-top: 12px; display: none; }
+    /* ── Dashboard nav links ── */
+    .dash-nav-links { display: flex; align-items: center; gap: 8px; }
+    .dash-nav-links .nav-link { font-size: 0.875rem; color: rgba(255,255,255,0.45); padding: 4px 8px; text-decoration: none; transition: color 0.2s; white-space: nowrap; }
+    .dash-nav-links .nav-link:hover { color: #fff; }
+    .dash-nav-links .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 14px; border-radius: 9999px; background: #1D9E75; color: #0d0d0d; border: none; cursor: pointer; transition: background 0.2s; white-space: nowrap; text-decoration: none; }
+    .dash-nav-links .btn-nav-green:hover { background: #17b37a; }
+    @media (max-width: 640px) { .dash-nav-links .nav-link { display: none; } }
+    /* ── Footer ── */
+    footer { max-width: 1200px; margin: 80px auto 0; padding: 48px 28px 40px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .footer-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
+    .footer-status { display: inline-flex; align-items: center; gap: 7px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+    .footer-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #1D9E75; animation: breathe 7s ease-in-out infinite; flex-shrink: 0; }
+    .footer-links { display: grid; grid-template-columns: repeat(4,1fr); gap: 32px; margin-bottom: 40px; }
+    .footer-col-head { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.18); margin-bottom: 10px; }
+    .footer-col a { display: block; font-size: 0.78rem; color: rgba(255,255,255,0.28); line-height: 2.1; transition: color 0.2s; text-decoration: none; }
+    .footer-col a:hover { color: rgba(255,255,255,0.7); }
+    .footer-row3 { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .footer-trust { font-size: 0.72rem; color: rgba(255,255,255,0.18); line-height: 1.6; max-width: 480px; }
+    .footer-cr { font-size: 0.72rem; color: rgba(255,255,255,0.15); white-space: nowrap; }
+    @media (max-width: 640px) { .footer-links { grid-template-columns: 1fr; } .footer-row1 { flex-direction: column; align-items: flex-start; gap: 16px; } .footer-row3 { flex-direction: column; align-items: flex-start; gap: 8px; } }
+    @media (min-width: 641px) and (max-width: 900px) { .footer-links { grid-template-columns: repeat(2,1fr); } }
+    /* ── Connect wall marketing ── */
+    .cw-marketing { margin-bottom: 28px; }
+    .cw-marketing-headline { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #1D9E75; margin-bottom: 14px; }
+    .cw-marketing-points { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .cw-marketing-points li { font-size: 0.82rem; color: rgba(255,255,255,0.45); display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+    .cw-marketing-points li::before { content: '→'; color: #1D9E75; flex-shrink: 0; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -729,6 +756,12 @@
     <div class="nav-left">
       <img src="/logo.svg" alt="RWAi" style="height:14px; display:block;" />
       <span class="nav-live-pill"><span class="nav-live-dot"></span>Monitoring Mantle Mainnet</span>
+    </div>
+    <div class="dash-nav-links">
+      <a href="/" class="nav-link">Home</a>
+      <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
+      <a href="https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code" class="nav-link" target="_blank">Contract</a>
+      <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
     </div>
     <div class="nav-right">
       <div class="wallet-badge" id="wallet-badge">
@@ -751,6 +784,15 @@
 <div id="connect-wall">
   <div class="cw-card">
     <img src="/logo.svg" alt="RWAi" class="cw-logo" />
+    <div class="cw-marketing">
+      <div class="cw-marketing-headline">Your autonomous yield co-pilot</div>
+      <ul class="cw-marketing-points">
+        <li>Live USDY and mETH yield tracking on Mantle — updated every 30 minutes</li>
+        <li>Plain-English alerts when the yield spread crosses your threshold</li>
+        <li>One-tap rebalancing proposals sent directly to your Telegram</li>
+        <li>Every AI decision anchored on-chain via ERC-8004 — verifiable track record</li>
+      </ul>
+    </div>
     <div class="cw-title">Connect your wallet</div>
     <div class="cw-sub">Link your wallet to see your USDY, mETH, and cmETH positions live on Mantle.</div>
     <div class="cw-wallet-list" id="cw-wallet-list">
@@ -1709,7 +1751,7 @@
       sessionStorage.setItem('userDisconnected', 'true');
       localStorage.clear();
       dashProvider = null;
-      showConnectWall();
+      window.location.href = '/';
     });
   }
 
@@ -1926,6 +1968,39 @@
 <style>
 @keyframes sim-arrow { from { opacity:0.3; transform:translateY(-3px); } to { opacity:1; transform:translateY(3px); } }
 </style>
+
+<footer>
+  <div class="footer-row1">
+    <img src="/logo.svg" alt="RWAi" style="height:16px; display:block; opacity:0.8;" />
+    <span class="footer-status"><span class="footer-status-dot"></span>Live on Mantle Mainnet</span>
+  </div>
+  <div class="footer-links">
+    <div class="footer-col">
+      <div class="footer-col-head">Product</div>
+      <a href="/">Home</a>
+      <a href="https://t.me/rwaiapp_bot" target="_blank">Telegram Bot</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-head">Protocol</div>
+      <a href="https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code" target="_blank">RWAIVault</a>
+      <a href="https://github.com/0xSunSeeker/rwai" target="_blank">GitHub</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-head">Legal</div>
+      <a href="/tos.html">Terms of Service</a>
+      <a href="/privacy.html">Privacy Policy</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-head">Built for</div>
+      <a href="https://dorahacks.io/hackathon/mantleturingtesthackathon2026" target="_blank">Mantle Turing Test 2026</a>
+      <a href="https://x.com/0xSunSeeker" target="_blank">@0xSunSeeker</a>
+    </div>
+  </div>
+  <div class="footer-row3">
+    <p class="footer-trust">AI reasoning and yield decisions are permanently anchored on Mantle via ERC-8004.</p>
+    <span class="footer-cr">© 2026 RWAi. All rights reserved.</span>
+  </div>
+</footer>
 
 </body>
 </html>

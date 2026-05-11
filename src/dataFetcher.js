@@ -126,7 +126,10 @@ export async function fetchMETHData() {
       const prev   = chart.length >= 2 ? chart[chart.length - 2] : latest;
 
       // Use DeFiLlama's own APY as primary value
-      const currentAPR = parseFloat(latest.apy ?? latest.apyBase ?? 0);
+      // Prefer 7-day average APY — daily apy field is too volatile (validator reward spikes)
+      const currentAPR = parseFloat(
+        latest.apyBase7d ?? latest.apyMean30d ?? latest.apy ?? latest.apyBase ?? 0
+      );
 
       // ── Layer 2: 7-day pricePerShare window APY ──────────────────────────
       // Official mETH methodology: APY = ((price_day7 / price_day0) ^ (365/7)) - 1
@@ -168,7 +171,7 @@ export async function fetchMETHData() {
   // ── Layer 3: hard fallback — flagged as estimated ─────────────────────────
   console.error("mETH fetch: all sources failed — using estimated fallback");
   return {
-    currentAPR: 1.0,
+    currentAPR: 1.66,
     apy7d: 1.0,
     apy30d: 1.0,
     pricePerShare: null,

@@ -844,7 +844,7 @@
           <button class="sim-close" id="sim-panel-close" aria-label="Close">&times;</button>
           <div class="sim-panel-title">Rebalance simulation — <span id="sim-usdy-val">$29.91</span> USDY → mETH</div>
           <div class="sim-row">
-            <span class="sim-row-label">New annual yield (mETH at 1.90%)</span>
+            <span class="sim-row-label" id="sim-meth-rate-label">New annual yield (mETH at 1.66%)</span>
             <span class="sim-row-val">$0.57 / year</span>
           </div>
           <div class="sim-row">
@@ -1055,7 +1055,7 @@
             <div class="pos-est-yield" id="meth-est-yield">Est. — / year</div>
           </div>
           <div class="pos-apy-wrap">
-            <span class="pos-apy" id="meth-apy-val">1.90%</span>
+            <span class="pos-apy" id="meth-apy-val">1.66%</span>
             <span class="pos-change" id="meth-change"></span>
           </div>
         </div>
@@ -1086,7 +1086,7 @@
             <div class="pos-est-yield" id="cmeth-est-yield">Est. $0.00 / year</div>
           </div>
           <div class="pos-apy-wrap">
-            <span class="pos-apy">1.92%</span>
+            <span class="pos-apy" id="cmeth-apy-val">1.91%</span>
             <span class="pos-change" id="cmeth-change"></span>
           </div>
         </div>
@@ -1395,8 +1395,8 @@
   var METH_BALANCE  = 0.0303;
   var CMETH_BALANCE = 0.00;
   var USDY_APY      = 0.0355;
-  var METH_APR      = 0.0190;
-  var CMETH_APY     = 0.0192;
+  var METH_APR      = 0.0166;
+  var CMETH_APY     = 0.0191;
 
   var usdyUSD  = null;
   var methUSD  = null;
@@ -1562,6 +1562,27 @@
       updateTotal();
     });
 
+  /* ── mETH live APR from DeFiLlama (7-day chart, pool b9f2f00a) ── */
+  fetch('https://yields.llama.fi/chart/b9f2f00a-ba96-4589-a171-dde979a23d87')
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      var chart = json.data;
+      if (!Array.isArray(chart) || chart.length < 1) throw new Error('no data');
+      var latest = chart[chart.length - 1];
+      var apr = parseFloat(latest.apy || latest.apyBase || 0);
+      if (apr <= 0) throw new Error('zero APR');
+      METH_APR  = apr / 100;
+      CMETH_APY = (apr + 0.25) / 100;
+      var methApyEl = document.getElementById('meth-apy-val');
+      if (methApyEl) methApyEl.textContent = apr.toFixed(2) + '%';
+      var cmethApyEl = document.getElementById('cmeth-apy-val');
+      if (cmethApyEl) cmethApyEl.textContent = (apr + 0.25).toFixed(2) + '%';
+      var simLabel = document.getElementById('sim-meth-rate-label');
+      if (simLabel) simLabel.textContent = 'New annual yield (mETH at ' + apr.toFixed(2) + '%)';
+      updateReasoningBullets();
+    })
+    .catch(function() { /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
+
   /* ── Header minute timer ── */
   var lastChecked = 4, nextCheck = 26;
   var lastEl = document.getElementById('last-checked');
@@ -1648,15 +1669,16 @@
 
     var usdyAfter   = usdyVal / 2;
     var methAfter   = methVal + usdyAfter;
-    var yieldBefore = (usdyVal * 0.0355) + (methVal * 0.0190);
-    var yieldAfter  = (usdyAfter * 0.0355) + (methAfter * 0.0190);
+    var methAprPct  = (METH_APR * 100).toFixed(2) + '%';
+    var yieldBefore = (usdyVal * 0.0355) + (methVal * METH_APR);
+    var yieldAfter  = (usdyAfter * 0.0355) + (methAfter * METH_APR);
     var diff        = yieldBefore - yieldAfter;
 
     document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ 3.55%';
-    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ 1.90%';
+    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ ' + methAprPct;
     document.getElementById('sim-yield-before').textContent = '$' + yieldBefore.toFixed(2) + ' / yr';
     document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ 3.55%';
-    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ 1.90%';
+    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ ' + methAprPct;
     document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2)  + ' / yr';
     document.getElementById('sim-verdict').textContent      = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
 
@@ -1773,10 +1795,12 @@
     ctx.fillRect(32, 136, W - 64, 1);
 
     // Three APY blocks
+    var methApyEl2  = document.getElementById('meth-apy-val');
+    var cmethApyEl2 = document.getElementById('cmeth-apy-val');
     var assets = [
-      { name: 'USDY',  rate: '3.55%', label: 'APY' },
-      { name: 'mETH',  rate: '1.90%', label: 'APR' },
-      { name: 'cmETH', rate: '1.92%', label: 'APY' },
+      { name: 'USDY',  rate: (document.getElementById('usdy-apy-val') ? document.getElementById('usdy-apy-val').textContent : '3.55%'), label: 'APY' },
+      { name: 'mETH',  rate: (methApyEl2  ? methApyEl2.textContent  : (METH_APR  * 100).toFixed(2) + '%'), label: 'APR' },
+      { name: 'cmETH', rate: (cmethApyEl2 ? cmethApyEl2.textContent : (CMETH_APY * 100).toFixed(2) + '%'), label: 'APY' },
     ];
     var blockW = (W - 64) / 3;
     assets.forEach(function (a, i) {
@@ -1864,7 +1888,7 @@
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$77.16 @ 1.90%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$77.16 @ 1.66%</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>
@@ -1882,7 +1906,7 @@
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$93.96 @ 1.90%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$93.96 @ 1.66%</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>

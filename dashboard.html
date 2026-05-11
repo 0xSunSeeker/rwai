@@ -688,6 +688,34 @@
       font-family: inherit; transition: border-color 0.2s, color 0.2s;
     }
     .sm-close-btn:hover { border-color: #333; color: #bbb; }
+
+    /* ── Connect wall ── */
+    #connect-wall {
+      display: none; min-height: calc(100vh - 64px);
+      align-items: center; justify-content: center; padding: 40px 20px;
+    }
+    .cw-card {
+      background: #111; border: 1px solid #222; border-radius: 20px;
+      padding: 48px 40px; max-width: 420px; width: 100%; text-align: center;
+    }
+    .cw-logo { height: 16px; margin: 0 auto 28px; display: block; }
+    .cw-title { font-size: 1.35rem; font-weight: 700; color: #f0f0f0; margin-bottom: 10px; }
+    .cw-sub { font-size: 0.88rem; color: #555; line-height: 1.6; margin-bottom: 32px; }
+    .cw-wallet-list { display: flex; flex-direction: column; gap: 10px; }
+    .cw-wallet-btn {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; padding: 14px 18px;
+      background: #161616; border: 1px solid #252525; border-radius: 12px;
+      color: #d0d0d0; font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: border-color 0.2s, background 0.2s;
+      text-align: left;
+    }
+    .cw-wallet-btn:hover { border-color: #1D9E75; background: #0d1a14; color: #f0f0f0; }
+    .cw-wallet-btn img { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; }
+    .cw-wallet-btn .cw-wname { flex: 1; }
+    .cw-no-wallet { font-size: 0.8rem; color: #444; margin-top: 16px; line-height: 1.5; }
+    .cw-no-wallet a { color: #1D9E75; text-decoration: none; }
+    .cw-err { font-size: 0.8rem; color: #c0392b; margin-top: 12px; display: none; }
   </style>
 </head>
 <body>
@@ -719,7 +747,23 @@
   </div>
 </nav>
 
-<div class="page">
+<!-- ── CONNECT WALL ── -->
+<div id="connect-wall">
+  <div class="cw-card">
+    <img src="/logo.svg" alt="RWAi" class="cw-logo" />
+    <div class="cw-title">Connect your wallet</div>
+    <div class="cw-sub">Link your wallet to see your USDY, mETH, and cmETH positions live on Mantle.</div>
+    <div class="cw-wallet-list" id="cw-wallet-list">
+      <div style="font-size:0.8rem;color:#444;text-align:center;padding:12px 0;">Detecting wallets…</div>
+    </div>
+    <div class="cw-no-wallet" id="cw-no-wallet" style="display:none;">
+      No wallet detected. Install <a href="https://metamask.io/download/" target="_blank">MetaMask</a> or <a href="https://rabby.io/" target="_blank">Rabby</a> and refresh.
+    </div>
+    <div class="cw-err" id="cw-err">Connection rejected. Try again.</div>
+  </div>
+</div>
+
+<div class="page" id="dash-page">
 
   <!-- ── PAGE HEADER ── -->
   <div class="page-header">
@@ -1260,10 +1304,90 @@
 (function () {
   'use strict';
 
-  /* ── Wallet gate — redirect home if no active session ── */
-  if (!sessionStorage.getItem('rwai_wallet')) {
-    window.location.replace('/');
-    return;
+  /* ── Wallet state ── */
+  var dashProvider = null;
+  var dashWalletName = '';
+  var announcedWallets = new Map();
+
+  window.addEventListener('eip6963:announceProvider', function (e) {
+    announcedWallets.set(e.detail.info.rdns, e.detail);
+    if (document.getElementById('connect-wall').style.display === 'flex') renderCWList();
+  });
+
+  function renderCWList() {
+    var list = document.getElementById('cw-wallet-list');
+    var noWallet = document.getElementById('cw-no-wallet');
+    list.innerHTML = '';
+    var hasAny = announcedWallets.size > 0 || !!window.ethereum;
+
+    for (var [, detail] of announcedWallets) {
+      list.appendChild(makeCWBtn(detail.info.icon, detail.info.name, detail.provider));
+    }
+    if (!announcedWallets.size && window.ethereum) {
+      list.appendChild(makeCWBtn('', 'Browser Wallet', window.ethereum));
+    }
+    noWallet.style.display = hasAny ? 'none' : 'block';
+    if (!hasAny) list.innerHTML = '';
+  }
+
+  function makeCWBtn(icon, name, provider) {
+    var btn = document.createElement('button');
+    btn.className = 'cw-wallet-btn';
+    btn.innerHTML = (icon ? '<img src="' + icon + '" alt="' + name + '" />' : '') +
+      '<span class="cw-wname">' + name + '</span>';
+    btn.addEventListener('click', function () { cwConnect(provider, name); });
+    return btn;
+  }
+
+  async function cwConnect(provider, name) {
+    var err = document.getElementById('cw-err');
+    err.style.display = 'none';
+    try {
+      var accounts = await provider.request({ method: 'eth_requestAccounts' });
+      if (!accounts || !accounts.length) return;
+      dashProvider = provider;
+      dashWalletName = name;
+      sessionStorage.removeItem('userDisconnected');
+      sessionStorage.setItem('rwai_wallet', accounts[0]);
+      updateNavWallet(accounts[0], name);
+      showDashboard();
+    } catch (e) {
+      if (e.code !== 4001) console.warn('Connect error:', e);
+      err.style.display = 'block';
+    }
+  }
+
+  function updateNavWallet(address, name) {
+    var short4 = address.slice(0, 6) + '…' + address.slice(-4);
+    var short2 = address.slice(0, 4) + '…' + address.slice(-4);
+    var badge = document.getElementById('wallet-badge');
+    if (badge) {
+      badge.querySelector('.wallet-addr-full').textContent = short4 + (name ? ' · ' + name : '');
+      badge.querySelector('.wallet-addr-short').textContent = short2;
+    }
+  }
+
+  function showDashboard() {
+    document.getElementById('connect-wall').style.display = 'none';
+    document.getElementById('dash-page').style.display = '';
+    document.getElementById('wallet-badge').style.display = '';
+    document.getElementById('btn-disconnect').style.display = '';
+  }
+
+  function showConnectWall() {
+    document.getElementById('connect-wall').style.display = 'flex';
+    document.getElementById('dash-page').style.display = 'none';
+    document.getElementById('wallet-badge').style.display = 'none';
+    document.getElementById('btn-disconnect').style.display = 'none';
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    setTimeout(renderCWList, 100);
+  }
+
+  // Initial state
+  if (sessionStorage.getItem('rwai_wallet')) {
+    showDashboard();
+  } else {
+    showConnectWall();
   }
 
   /* ── Constants ── */
@@ -1557,10 +1681,13 @@
   var btnDisconnect = document.querySelector('.btn-disconnect');
   if (btnDisconnect) {
     btnDisconnect.addEventListener('click', function () {
+      // Revoke wallet permission so extension prompts on next connect
+      try { if (dashProvider?.request) dashProvider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }).catch(function(){}); } catch(e) {}
       sessionStorage.clear();
       sessionStorage.setItem('userDisconnected', 'true');
       localStorage.clear();
-      window.location.href = '/';
+      dashProvider = null;
+      showConnectWall();
     });
   }
 

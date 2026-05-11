@@ -1480,10 +1480,9 @@
   /* ── Donut chart ── */
   var CIRC = 2 * Math.PI * 44;
   function updateDonut() {
-    if (usdyUSD === null || methUSD === null || cmethUSD === null) return;
-    var usdyVal  = USDY_BALANCE  * usdyUSD;
-    var methVal  = METH_BALANCE  * methUSD;
-    var cmethVal = CMETH_BALANCE * cmethUSD;
+    var usdyVal  = parseFloat(((document.getElementById('usdy-usd')  || {}).textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var methVal  = parseFloat(((document.getElementById('meth-usd')  || {}).textContent  || '').replace(/[^0-9.]/g, '')) || 0;
+    var cmethVal = parseFloat(((document.getElementById('cmeth-usd') || {}).textContent  || '').replace(/[^0-9.]/g, '')) || 0;
     var total = usdyVal + methVal + cmethVal;
     if (total === 0) return;
     var usdyPct  = usdyVal  / total;
@@ -1507,9 +1506,12 @@
     var pu = document.getElementById('donut-usdy-pct');
     var pm = document.getElementById('donut-meth-pct');
     var pc = document.getElementById('donut-cmeth-pct');
-    if (pu) pu.textContent = '~' + Math.round(usdyPct * 100) + '%';
-    if (pm) pm.textContent = '~' + Math.round(methPct * 100) + '%';
-    if (pc) pc.textContent = '~' + Math.round(cmethPct * 100) + '%';
+    var usdyRounded = Math.round(usdyPct * 100);
+    var methRounded = Math.round(methPct * 100);
+    var cmethRounded = 100 - usdyRounded - methRounded;
+    if (pu) pu.textContent = '~' + usdyRounded + '%';
+    if (pm) pm.textContent = '~' + methRounded + '%';
+    if (pc) pc.textContent = cmethVal > 0 ? '~' + cmethRounded + '%' : '—';
   }
 
   /* ── Total — reads from DOM so it's never wrong if one API fails ── */

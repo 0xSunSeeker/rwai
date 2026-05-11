@@ -93,6 +93,8 @@
       pointer-events: none;
       animation: tooltip-fade 2s ease forwards;
     }
+    .btn-nav-connect { font-size: 0.8rem; font-weight: 600; padding: 8px 16px; border-radius: 9999px; background: #1D9E75; color: #0d0d0d; border: none; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+    .btn-nav-connect:hover { background: #17b37a; }
     .btn-disconnect {
       padding: 8px 16px; border-radius: 9999px;
       border: 1px solid #252525; background: transparent;
@@ -717,7 +719,7 @@
     .cw-no-wallet a { color: #1D9E75; text-decoration: none; }
     .cw-err { font-size: 0.8rem; color: #c0392b; margin-top: 12px; display: none; }
     /* ── Dashboard nav links ── */
-    .dash-nav-links { display: flex; align-items: center; gap: 8px; }
+    .dash-nav-links { display: flex; align-items: center; gap: 8px; margin-right: 8px; }
     .dash-nav-links .nav-link { font-size: 0.875rem; color: rgba(255,255,255,0.45); padding: 4px 8px; text-decoration: none; transition: color 0.2s; white-space: nowrap; }
     .dash-nav-links .nav-link:hover { color: #fff; }
     .dash-nav-links .btn-nav-green { font-size: 0.75rem; font-weight: 600; padding: 8px 14px; border-radius: 9999px; background: #1D9E75; color: #0d0d0d; border: none; cursor: pointer; transition: background 0.2s; white-space: nowrap; text-decoration: none; }
@@ -756,13 +758,13 @@
     <div class="nav-left">
       <img src="/logo.svg" alt="RWAi" style="height:14px; display:block;" />
     </div>
-    <div class="dash-nav-links">
-      <a href="/" class="nav-link">Home</a>
-      <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
-      <a href="https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code" class="nav-link" target="_blank">Contract</a>
-      <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
-    </div>
     <div class="nav-right">
+      <div class="dash-nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
+        <a href="https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code" class="nav-link" target="_blank">Contract</a>
+        <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
+      </div>
       <div class="wallet-badge" id="wallet-badge">
         <span class="wallet-dot"></span>
         <span class="wallet-addr-full">0x9297…56d3 · Rabby Wallet</span>
@@ -774,6 +776,7 @@
           </svg>
         </button>
       </div>
+      <button class="btn-nav-connect" id="btn-nav-connect">Connect Wallet</button>
       <button class="btn-disconnect" id="btn-disconnect">Disconnect</button>
     </div>
   </div>
@@ -1413,6 +1416,7 @@
     document.getElementById('dash-page').style.display = '';
     document.getElementById('wallet-badge').style.display = '';
     document.getElementById('btn-disconnect').style.display = '';
+    document.getElementById('btn-nav-connect').style.display = 'none';
   }
 
   function showConnectWall() {
@@ -1420,6 +1424,7 @@
     document.getElementById('dash-page').style.display = 'none';
     document.getElementById('wallet-badge').style.display = 'none';
     document.getElementById('btn-disconnect').style.display = 'none';
+    document.getElementById('btn-nav-connect').style.display = '';
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     setTimeout(renderCWList, 100);
   }
@@ -1741,6 +1746,13 @@
   });
 
   /* ── Disconnect ── */
+  var btnNavConnect = document.getElementById('btn-nav-connect');
+  if (btnNavConnect) {
+    btnNavConnect.addEventListener('click', function () {
+      document.getElementById('connect-wall').scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+
   var btnDisconnect = document.querySelector('.btn-disconnect');
   if (btnDisconnect) {
     btnDisconnect.addEventListener('click', function () {

@@ -5,9 +5,32 @@
 import cron from "node-cron";
 import dotenv from "dotenv";
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
+import { ethers } from "ethers";
 import { fetchAllYieldData } from "./dataFetcher.js";
 import { generateExplanation, generatePrediction } from "./promptEngine.js";
 dotenv.config();
+
+const VAULT_ADDRESS = process.env.VAULT_ADDRESS;
+const MANTLE_RPC    = process.env.MANTLE_RPC || 'https://rpc.mantle.xyz';
+const PRIVATE_KEY   = process.env.MANTLE_PRIVATE_KEY;
+
+const VAULT_ABI = [
+  'function executeSwap(address user, address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, bytes32 reasonHash, address[] calldata swapPath) external returns (uint256)',
+  'function userCaps(address user) view returns (uint256)',
+  'function DEFAULT_CAP() view returns (uint256)',
+];
+
+const ERC20_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+];
+
+const USDY_ADDRESS = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+const mETH_ADDRESS = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+const WMNT_ADDRESS = '0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8';
+
+const SWAP_PATH_USDY_TO_METH = [USDY_ADDRESS, WMNT_ADDRESS, mETH_ADDRESS];
+const SWAP_PATH_METH_TO_USDY = [mETH_ADDRESS, WMNT_ADDRESS, USDY_ADDRESS];
 
 // ─── PATHS ────────────────────────────────────────────────────────────────────
 const DATA_DIR = "./data";
@@ -171,6 +194,85 @@ function resolveOldPredictions(currentYield) {
   }
 }
 
+// ─── TIER 3 EXECUTION ─────────────────────────────────────────────────────────
+async function executeTier3Swap(user, yieldData) {
+  if (!VAULT_ADDRESS || !PRIVATE_KEY) {
+    console.log('Tier 3: VAULT_ADDRESS or MANTLE_PRIVATE_KEY not set — skipping execution');
+    return null;
+  }
+
+  try {
+    const provider = new ethers.JsonRpcProvider(MANTLE_RPC);
+    const wallet   = new ethers.Wallet(PRIVATE_KEY, provider);
+    const vault    = new ethers.Contract(VAULT_ADDRESS, VAULT_ABI, wallet);
+
+    const usdyLeads = yieldData.usdyCurrentAPY > yieldData.methCurrentAPR;
+    const tokenIn   = usdyLeads ? mETH_ADDRESS  : USDY_ADDRESS;
+    const tokenOut  = usdyLeads ? USDY_ADDRESS  : mETH_ADDRESS;
+    const swapPath  = usdyLeads ? SWAP_PATH_METH_TO_USDY : SWAP_PATH_USDY_TO_METH;
+
+    const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, provider);
+    const userAddress     = user.walletAddress || wallet.address;
+    const userBalance     = await tokenInContract.balanceOf(userAddress);
+
+    if (userBalance === 0n) {
+      console.log('Tier 3: zero balance for tokenIn — skipping');
+      return null;
+    }
+
+    const userCap    = await vault.userCaps(wallet.address);
+    const defaultCap = await vault.DEFAULT_CAP();
+    const cap        = userCap > 0n ? userCap : defaultCap;
+
+    const swapAmount = userBalance / 4n;
+    const amountIn   = swapAmount > cap ? cap : swapAmount;
+
+    if (amountIn === 0n) {
+      console.log('Tier 3: calculated swap amount is zero — skipping');
+      return null;
+    }
+
+    const allowance = await tokenInContract.allowance(wallet.address, VAULT_ADDRESS);
+    if (allowance < amountIn) {
+      console.log('Tier 3: insufficient allowance — user needs to approve vault first');
+      return null;
+    }
+
+    const reasoning  = `RWAI Tier 3 auto-rebalance: spread ${(yieldData.currentSpread).toFixed(2)}% exceeds 2.0% threshold. Moving 25% of position to higher-yielding asset.`;
+    const reasonHash = ethers.keccak256(ethers.toUtf8Bytes(reasoning));
+
+    console.log(`Tier 3: executing swap — ${ethers.formatUnits(amountIn, 18)} tokenIn via [${swapPath.join(' → ')}]`);
+
+    const tx = await vault.executeSwap(
+      wallet.address,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      0n,
+      reasonHash,
+      swapPath,
+      { gasLimit: 500000n }
+    );
+
+    console.log(`Tier 3: tx submitted — ${tx.hash}`);
+    const receipt = await tx.wait();
+    console.log(`Tier 3: confirmed in block ${receipt.blockNumber}`);
+
+    return {
+      txHash:      tx.hash,
+      amountIn:    ethers.formatUnits(amountIn, 18),
+      tokenIn,
+      tokenOut,
+      reasoning,
+      blockNumber: receipt.blockNumber,
+    };
+
+  } catch (err) {
+    console.error('Tier 3 execution error:', err.message);
+    return null;
+  }
+}
+
 // ─── CORE LOOP FUNCTION ───────────────────────────────────────────────────────
 async function runAgentLoop() {
   console.log(`\n[${new Date().toISOString()}] Agent loop running...`);
@@ -198,7 +300,8 @@ async function runAgentLoop() {
     const previousSpread = yieldData.usdyPreviousAPY - yieldData.methPreviousAPR;
     const spreadCrossedAlert  = currentSpread >= SPREAD_ALERT_THRESHOLD && previousSpread < SPREAD_ALERT_THRESHOLD;
     const spreadAboveProposal = currentSpread >= SPREAD_PROPOSAL_THRESHOLD;
-    const spreadAboveAlert    = currentSpread >= SPREAD_ALERT_THRESHOLD;
+    const spreadAboveAlert       = currentSpread >= SPREAD_ALERT_THRESHOLD;
+    const spreadAboveAutoExecute = currentSpread >= SPREAD_AUTOEXECUTE_THRESHOLD;
 
     console.log(`Delegation tier: ${user.userTier}`);
     console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Alert: ${SPREAD_ALERT_THRESHOLD}% | Proposal: ${SPREAD_PROPOSAL_THRESHOLD}%`);
@@ -225,11 +328,22 @@ async function runAgentLoop() {
       console.log(explanation);
       console.log("=============\n");
 
-      // Tier 1 (Watch Only): log but don't write a pending action alert
       if (user.tierCode === 1) {
         console.log("Tier 1 active — alert logged, no action proposed.");
+      } else if (user.tierCode === 3 && spreadAboveAutoExecute && alertType === 'rebalance_proposal') {
+        console.log('Tier 3: spread above auto-execute threshold — attempting execution...');
+        const result = await executeTier3Swap(user, yieldData);
+        if (result) {
+          writePendingAlert(
+            `✅ Auto-rebalance executed.\n\nMoved ${result.amountIn} tokens toward higher yield.\nTx: https://mantlescan.xyz/tx/${result.txHash}\n\nSpread was ${yieldData.currentSpread.toFixed(2)}% — above your 2.0% auto-execute threshold.`,
+            prediction,
+            yieldData,
+            'auto_executed'
+          );
+        } else if (!hasPendingUnsentAlert()) {
+          writePendingAlert(explanation, prediction, yieldData, alertType);
+        }
       } else if (!hasPendingUnsentAlert()) {
-        // Tier 2: write pendingAlert.json for bot to pick up and send
         writePendingAlert(explanation, prediction, yieldData, alertType);
       } else {
         console.log("Previous alert still unsent — skipping overwrite.");

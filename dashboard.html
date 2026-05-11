@@ -1569,7 +1569,7 @@
       var chart = json.data;
       if (!Array.isArray(chart) || chart.length < 1) throw new Error('no data');
       var latest = chart[chart.length - 1];
-      var apr = parseFloat(latest.apy || latest.apyBase || 0);
+      var apr = parseFloat(latest.apyBase7d || latest.apyMean30d || latest.apy || latest.apyBase || 0);
       if (apr <= 0) throw new Error('zero APR');
       METH_APR  = apr / 100;
       CMETH_APY = (apr + 0.25) / 100;

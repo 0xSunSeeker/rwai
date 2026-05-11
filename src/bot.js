@@ -5,11 +5,52 @@
 
 import { Telegraf, Markup } from 'telegraf';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { ethers } from 'ethers';
 import { generateExplanation, generateInsight, generateStrategy } from './promptEngine.js';
 import { logDecision } from './reputation.js';
 import { fetchYieldData, shouldAlert, RISK_PROFILES } from './dataFetcher.js';
 import dotenv from 'dotenv';
 dotenv.config();
+
+// ─── WALLET BALANCE FETCHER ───────────────────────────────────────────────────
+async function fetchWalletBalances(walletAddress) {
+  const provider = new ethers.JsonRpcProvider(process.env.MANTLE_RPC || 'https://rpc.mantle.xyz');
+  const ERC20_ABI = ['function balanceOf(address) view returns (uint256)'];
+  const USDY_ADDRESS  = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+  const METH_ADDRESS  = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+  const CMETH_ADDRESS = '0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA';
+
+  const [usdyRaw, methRaw, cmethRaw] = await Promise.all([
+    new ethers.Contract(USDY_ADDRESS,  ERC20_ABI, provider).balanceOf(walletAddress),
+    new ethers.Contract(METH_ADDRESS,  ERC20_ABI, provider).balanceOf(walletAddress),
+    new ethers.Contract(CMETH_ADDRESS, ERC20_ABI, provider).balanceOf(walletAddress),
+  ]);
+
+  const usdyBalance  = parseFloat(ethers.formatUnits(usdyRaw,  18));
+  const methBalance  = parseFloat(ethers.formatUnits(methRaw,  18));
+  const cmethBalance = parseFloat(ethers.formatUnits(cmethRaw, 18));
+
+  let ethPrice = 2500;
+  try {
+    const res  = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+    const data = await res.json();
+    ethPrice = data?.ethereum?.usd || 2500;
+  } catch {}
+
+  const usdyUSD  = usdyBalance  * 1.013;
+  const methUSD  = methBalance  * ethPrice;
+  const cmethUSD = cmethBalance * ethPrice;
+  const totalUSD = usdyUSD + methUSD + cmethUSD;
+
+  return {
+    totalUSD,
+    positions: {
+      USDY:  { balance: usdyBalance,  usdValue: usdyUSD,  apy: 3.55 },
+      mETH:  { balance: methBalance,  usdValue: methUSD,  apy: 2.06 },
+      cmETH: { balance: cmethBalance, usdValue: cmethUSD, apy: 2.31 },
+    }
+  };
+}
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -44,6 +85,14 @@ function saveProfile(updates) {
   return updated;
 }
 
+function saveUser(profile) {
+  try {
+    writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2));
+  } catch (err) {
+    console.error('Failed to save user profile:', err.message);
+  }
+}
+
 // Use loadProfile() everywhere instead of the static TEST_USER
 const TEST_USER = loadProfile();
 
@@ -55,19 +104,91 @@ async function getYieldSnapshot() {
 
 // ─── /start ──────────────────────────────────────────────────────────────────
 bot.start(async (ctx) => {
-  const name = ctx.from.first_name || 'there';
-  await ctx.reply(
-    `👋 Hey ${name}! I'm RWAI — your autonomous RWA yield agent on Mantle.\n\n` +
-    `I monitor USDY, mETH, and cmETH on Mantle 24/7, explain yield changes in plain English, and propose rebalances when the math makes sense.\n\n` +
-    `Here's what I can do:\n` +
-    `/status — your current yield snapshot\n` +
-    `/compare — USDY vs mETH vs cmETH with risk profiles\n` +
-    `/strategy — get a personalised yield strategy\n` +
-    `/explain — what is USDY, mETH, or cmETH?\n` +
-    `/history — recent agent decisions\n` +
-    `/setup — choose your delegation tier\n\n` +
-    `I'll message you automatically when something worth knowing happens. 🟢`
-  );
+  const payload = ctx.startPayload;
+
+  if (payload && payload.startsWith('wallet_')) {
+    // Journey 1: user came from dashboard with wallet address
+    const walletAddress = payload.replace('wallet_', '').trim();
+
+    if (!walletAddress.match(/^0x[0-9a-fA-F]{40}$/)) {
+      return ctx.reply('Invalid wallet address in link. Please try reconnecting from the dashboard.');
+    }
+
+    await ctx.reply('🔍 Found your wallet. Fetching your Mantle positions...');
+
+    try {
+      const balances = await fetchWalletBalances(walletAddress);
+
+      const profile = loadProfile();
+      profile.walletAddress = walletAddress;
+      profile.telegramId = ctx.from.id.toString();
+      profile.userPositionUSD = balances.totalUSD;
+      profile.positions = balances.positions;
+      profile.lastUpdated = Date.now();
+      profile.source = 'dashboard';
+      profile.onboardingComplete = false;
+      saveUser(profile);
+
+      const usdyLine  = balances.positions.USDY.usdValue  > 0 ? `• USDY — $${balances.positions.USDY.usdValue.toFixed(2)}\n`  : '';
+      const methLine  = balances.positions.mETH.usdValue  > 0 ? `• mETH — $${balances.positions.mETH.usdValue.toFixed(2)}\n`  : '';
+      const cmethLine = balances.positions.cmETH.usdValue > 0 ? `• cmETH — $${balances.positions.cmETH.usdValue.toFixed(2)}\n` : '';
+
+      if (balances.totalUSD === 0) {
+        await ctx.reply(
+          `✅ Wallet connected.\n\n` +
+          `I don't currently see USDY, mETH, or cmETH in this wallet.\n\n` +
+          `RWAi will watch live yields and alert you when you hold supported assets.\n\n` +
+          `Use /status anytime to see current Mantle yield conditions.`
+        );
+      } else {
+        await ctx.reply(
+          `✅ Connected to RWAi.\n\n` +
+          `I found your Mantle portfolio:\n` +
+          usdyLine + methLine + cmethLine +
+          `\n*Total monitored:* $${balances.totalUSD.toFixed(2)}\n\n` +
+          `RWAi is now watching your positions 24/7.\n\n` +
+          `One last step — choose how you want RWAi to act when it detects an opportunity:`,
+          { parse_mode: 'Markdown' }
+        );
+
+        await ctx.reply(
+          `Choose your delegation tier:`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '👁 Watch Only — alerts only, no actions',      callback_data: 'set_tier_1' }],
+                [{ text: '✅ Propose and Confirm — I approve each move', callback_data: 'set_tier_2' }],
+                [{ text: '⚡ Delegated — auto-execute within my cap',    callback_data: 'set_tier_3' }],
+              ]
+            }
+          }
+        );
+      }
+    } catch (err) {
+      console.error('Wallet fetch error:', err.message);
+      await ctx.reply(
+        `✅ Wallet saved. I had trouble fetching live balances right now — I'll retry on the next cycle.\n\n` +
+        `Use /status to check your current positions.`
+      );
+    }
+
+  } else {
+    // Journey 2: direct Telegram entry, no wallet
+    await ctx.reply(
+      `👋 Welcome to RWAi.\n\n` +
+      `I monitor tokenized real-world asset yields on Mantle — USDY, mETH, and cmETH — and alert you when conditions change.\n\n` +
+      `Every prediction is permanently logged on Mantle via ERC-8004.\n\n` +
+      `To get started:`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔗 Connect wallet', callback_data: 'request_wallet' }],
+            [{ text: '📊 View live yields without wallet', callback_data: 'watch_mode' }],
+          ]
+        }
+      }
+    );
+  }
 });
 
 // ─── /setup ──────────────────────────────────────────────────────────────────
@@ -118,12 +239,74 @@ bot.action('tier_3_disabled', async (ctx) => {
   await ctx.answerCbQuery('Coming soon — Tier 2 is the live option right now.').catch(() => {});
 });
 
+// ─── JOURNEY 1: TIER SELECTION (from dashboard deep-link) ────────────────────
+bot.action('set_tier_1', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  saveProfile({ userTier: 'Watch Only', tierCode: 1, onboardingComplete: true });
+  await ctx.reply(
+    `✅ Watch Only mode activated.\n\n` +
+    `I'll explain every yield change and opportunity — you decide if and when to act.\n\n` +
+    `Use /status anytime to check your positions.`
+  );
+});
+
+bot.action('set_tier_2', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  saveProfile({ userTier: 'Propose and Confirm', tierCode: 2, onboardingComplete: true });
+  await ctx.reply(
+    `✅ Propose and Confirm mode activated.\n\n` +
+    `When I detect a meaningful opportunity, I'll send you a one-tap approval request.\n\n` +
+    `Nothing moves without your confirmation. Use /status to check your positions.`
+  );
+});
+
+bot.action('set_tier_3', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  saveProfile({ userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
+  await ctx.reply(
+    `⚡ Delegated mode activated.\n\n` +
+    `I can auto-execute rebalances up to $500 per swap when spread conditions justify it.\n\n` +
+    `Every execution is logged permanently on Mantle. Use /status to check your positions.`
+  );
+});
+
+bot.action('request_wallet', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const profile = loadProfile();
+  profile.awaitingWallet = true;
+  profile.telegramId = ctx.from.id.toString();
+  saveUser(profile);
+  await ctx.reply(`Send me your Mantle wallet address (starts with 0x) and I'll fetch your positions automatically.`);
+});
+
+bot.action('watch_mode', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  saveProfile({ userTier: 'Watch Only', tierCode: 1, walletAddress: null, onboardingComplete: true });
+  await ctx.reply(
+    `📊 Watch mode activated.\n\n` +
+    `I'll track live USDY and mETH yields on Mantle and alert you when spreads change.\n\n` +
+    `Connect a wallet anytime for personalized position monitoring.\n\n` +
+    `Use /status to see current yields.`
+  );
+});
+
 // ─── /status ─────────────────────────────────────────────────────────────────
 bot.command('status', async (ctx) => {
   await ctx.reply('📡 Fetching live yield data...');
 
   try {
     const profile = loadProfile();
+
+    // Refresh on-chain balances if wallet is known
+    if (profile.walletAddress) {
+      try {
+        const balances = await fetchWalletBalances(profile.walletAddress);
+        saveProfile({ userPositionUSD: balances.totalUSD, positions: balances.positions, lastUpdated: Date.now() });
+        profile.userPositionUSD = balances.totalUSD;
+      } catch (err) {
+        console.warn('Balance refresh failed on /status:', err.message);
+      }
+    }
     const data = await getYieldSnapshot();
     const usdyYield = Number(data.usdyCurrentAPY);
     const methYield = Number(data.methCurrentAPR);
@@ -139,8 +322,22 @@ bot.command('status', async (ctx) => {
       console.warn('On-chain anchor failed:', anchorErr.message);
     }
 
-    const positionUsdy = profile.userPositionUSD;
-    const annualYield = (positionUsdy * data.usdyCurrentAPY / 100).toFixed(0);
+    const positions = profile.positions || {};
+    const usdyVal  = positions.USDY?.usdValue  || 0;
+    const methVal  = positions.mETH?.usdValue  || 0;
+    const cmethVal = positions.cmETH?.usdValue || 0;
+    const totalVal = usdyVal + methVal + cmethVal;
+
+    const usdyEarnings  = (usdyVal  * data.usdyCurrentAPY  / 100).toFixed(2);
+    const methEarnings  = (methVal  * data.methCurrentAPR   / 100).toFixed(2);
+    const cmethEarnings = (cmethVal * data.cmethCurrentAPY  / 100).toFixed(2);
+    const totalEarnings = (parseFloat(usdyEarnings) + parseFloat(methEarnings) + parseFloat(cmethEarnings)).toFixed(2);
+
+    let positionLines = '';
+    if (usdyVal  > 0) positionLines += `• USDY: $${usdyVal.toFixed(2)} (earns ~$${usdyEarnings}/yr)\n`;
+    if (methVal  > 0) positionLines += `• mETH: $${methVal.toFixed(2)} (earns ~$${methEarnings}/yr)\n`;
+    if (cmethVal > 0) positionLines += `• cmETH: $${cmethVal.toFixed(2)} (earns ~$${cmethEarnings}/yr)\n`;
+    if (totalVal === 0) positionLines = '_No supported positions detected_\n';
 
     await ctx.reply(
       `📊 *RWAI Status — ${new Date().toLocaleDateString('en-GB')}*\n\n` +
@@ -148,8 +345,9 @@ bot.command('status', async (ctx) => {
       `*mETH* — ${data.methCurrentAPR}% APR${data.methAprFromRate ? ` _(rate-derived: ${data.methAprFromRate}%)_` : ''} _(risk 3/5)_\n` +
       `*cmETH* — ${data.cmethCurrentAPY}% APY _(auto-compounding mETH, risk 3/5)_\n` +
       `*Spread* — ${Math.abs(spread)}% (${spreadDir})\n\n` +
-      `*Your position:* $${positionUsdy.toLocaleString()} USDY\n` +
-      `*Est. annual yield:* $${annualYield}\n` +
+      `*Your portfolio:*\n${positionLines}` +
+      `*Total monitored:* $${totalVal.toFixed(2)}\n` +
+      `*Est. annual yield:* $${totalEarnings}\n` +
       `*Delegation tier:* ${profile.userTier}\n\n` +
       `All positions healthy ✅\n\n` +
       `🤖 ${safeInsight}\n\n` +
@@ -319,6 +517,64 @@ bot.command('history', async (ctx) => {
 
 // ─── FREE TEXT: Ask RWAI anything ────────────────────────────────────────────
 bot.on('text', async (ctx) => {
+  // Intercept wallet addresses when in onboarding flow
+  const onboardingProfile = loadProfile();
+  if (onboardingProfile.awaitingWallet) {
+    const text = ctx.message.text.trim();
+
+    if (text.match(/^0x[0-9a-fA-F]{40}$/)) {
+      onboardingProfile.awaitingWallet = false;
+      onboardingProfile.walletAddress = text;
+      saveUser(onboardingProfile);
+
+      await ctx.reply('🔍 Found your wallet. Fetching your Mantle positions...');
+
+      try {
+        const balances = await fetchWalletBalances(text);
+        onboardingProfile.userPositionUSD = balances.totalUSD;
+        onboardingProfile.positions = balances.positions;
+        onboardingProfile.lastUpdated = Date.now();
+        onboardingProfile.source = 'telegram';
+        saveUser(onboardingProfile);
+
+        const usdyLine  = balances.positions.USDY.usdValue  > 0 ? `• USDY — $${balances.positions.USDY.usdValue.toFixed(2)}\n`   : '';
+        const methLine  = balances.positions.mETH.usdValue  > 0 ? `• mETH — $${balances.positions.mETH.usdValue.toFixed(2)}\n`   : '';
+        const cmethLine = balances.positions.cmETH.usdValue > 0 ? `• cmETH — $${balances.positions.cmETH.usdValue.toFixed(2)}\n` : '';
+
+        if (balances.totalUSD === 0) {
+          await ctx.reply(
+            `✅ Wallet connected.\n\nI don't currently see USDY, mETH, or cmETH in this wallet.\n\nRWAi will watch live yields and alert you when you hold supported assets.\n\nUse /status anytime to see current Mantle yield conditions.`
+          );
+        } else {
+          await ctx.reply(
+            `✅ Connected to RWAi.\n\nI found your Mantle portfolio:\n` +
+            usdyLine + methLine + cmethLine +
+            `\n*Total monitored:* $${balances.totalUSD.toFixed(2)}\n\nRWAi is now watching your positions 24/7.\n\nChoose how you want RWAi to act:`,
+            { parse_mode: 'Markdown' }
+          );
+          await ctx.reply('Choose your delegation tier:', {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '👁 Watch Only — alerts only, no actions',      callback_data: 'set_tier_1' }],
+                [{ text: '✅ Propose and Confirm — I approve each move', callback_data: 'set_tier_2' }],
+                [{ text: '⚡ Delegated — auto-execute within my cap',    callback_data: 'set_tier_3' }],
+              ]
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Wallet fetch error:', err.message);
+        await ctx.reply('✅ Wallet saved. Use /status to check your positions.');
+      }
+      return;
+    } else {
+      onboardingProfile.awaitingWallet = false;
+      saveUser(onboardingProfile);
+      await ctx.reply("That doesn't look like a valid Mantle wallet address. Please send an address starting with 0x followed by 40 characters.");
+      return;
+    }
+  }
+
   const question = ctx.message.text;
 
   // Skip if it's a command

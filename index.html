@@ -83,7 +83,10 @@
     .yield-card { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); padding: 24px; cursor: default; display: flex; flex-direction: column; transition: background 0.3s, border-color 0.3s; }
     .yield-card.green:hover { border-color: rgba(34,197,94,0.3); background: rgba(255,255,255,0.05); }
     .yield-card.amber:hover { border-color: rgba(245,158,11,0.3); background: rgba(255,255,255,0.05); }
-    .yield-asset { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); margin-bottom: 16px; line-height: 1.3; }
+    .yield-asset { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); margin-bottom: 16px; line-height: 1.3; }
+    .yield-token-icon { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; background: rgba(255,255,255,0.06); }
+    .yield-token-icon-pair { display: inline-flex; align-items: center; flex-shrink: 0; }
+    .yield-token-icon-pair img:last-child { margin-left: -6px; }
     .yield-pct { font-size: 3rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin-bottom: 12px; }
     .yield-pct.green { color: rgb(34,197,94); }
     .yield-pct.amber { color: rgb(245,158,11); }
@@ -340,7 +343,7 @@
   <h2>What the agent is watching.</h2>
   <div class="yield-grid">
     <div class="yield-card green">
-      <p class="yield-asset">USDY — ONDO FINANCE</p>
+      <p class="yield-asset"><img class="yield-token-icon" id="usdy-icon" alt="USDY" />USDY — ONDO FINANCE</p>
       <div class="yield-pct green loading" id="usdy-apy">—</div>
       <p class="yield-desc">Tokenized US Treasuries</p>
       <div class="yield-risk-panel">
@@ -357,7 +360,7 @@
       </div>
     </div>
     <div class="yield-card green">
-      <p class="yield-asset">METH — MANTLE STAKING</p>
+      <p class="yield-asset"><img class="yield-token-icon" id="meth-icon" alt="mETH" />METH — MANTLE STAKING</p>
       <div class="yield-pct green loading" id="meth-apr">—</div>
       <p class="yield-desc">Native ETH liquid staking on Mantle</p>
       <div class="yield-risk-panel">
@@ -374,7 +377,7 @@
       </div>
     </div>
     <div class="yield-card green">
-      <p class="yield-asset">CMETH — AUTO-COMPOUND</p>
+      <p class="yield-asset"><img class="yield-token-icon" id="cmeth-icon" alt="cmETH" />CMETH — AUTO-COMPOUND</p>
       <div class="yield-pct green loading" id="cmeth-apy">—</div>
       <p class="yield-desc">Auto-compounding mETH vault strategy</p>
       <div class="yield-risk-panel">
@@ -391,7 +394,7 @@
       </div>
     </div>
     <div class="yield-card amber">
-      <p class="yield-asset">SPREAD (USDY – METH)</p>
+      <p class="yield-asset"><span class="yield-token-icon-pair"><img class="yield-token-icon" id="spread-icon-usdy" alt="USDY" /><img class="yield-token-icon" id="spread-icon-meth" alt="mETH" /></span>SPREAD (USDY – METH)</p>
       <div class="yield-pct amber loading" id="spread">—</div>
       <p class="yield-desc" id="spread-sub">Arbitrage spread between USDY and mETH yields</p>
       <div class="yield-risk-panel">
@@ -587,38 +590,70 @@
 <script>
 // ── YIELD TICKER ──────────────────────────────────────────────────────────────
 let liveUSDYApy  = 3.55;
-let liveMethApy  = 1.02;
-let liveCmethApy = 1.02;
+let liveMethApy  = 1.98;
+let liveCmethApy = 1.98;
 
 async function loadYields() {
   try {
     const res = await fetch('https://yields.llama.fi/pools');
     const { data } = await res.json();
-    const usdyPool = data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY' && p.chain === 'Mantle')
-                  ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY');
+
+    const usdyPool = data.find(p => p.symbol === 'USDY' && p.chain === 'Mantle')
+                  ?? data.find(p => p.project === 'ondo-yield-assets' && p.symbol === 'USDY')
+                  ?? data.find(p => p.symbol === 'USDY');
+
     const methPool = data.find(p => p.pool === 'b9f2f00a-ba96-4589-a171-dde979a23d87')
+                  ?? data.find(p => p.symbol === 'METH' && p.chain === 'Mantle')
+                  ?? data.find(p => p.project === 'meth-protocol' && p.chain === 'Mantle')
                   ?? data.find(p => p.project === 'meth-protocol');
-    liveUSDYApy  = parseFloat(usdyPool?.apy ?? 3.55);
-    liveMethApy  = parseFloat(methPool?.apy ?? 1.02);
-    liveCmethApy = parseFloat(((Math.pow(1 + liveMethApy / 100 / 365, 365) - 1) * 100).toFixed(2));
-    const methApr   = liveMethApy;
-    const cmethApy  = liveCmethApy;
-    const spread = (liveUSDYApy - methApr).toFixed(2);
+
+    const cmethPool = data.find(p => p.symbol === 'CMETH' && p.chain === 'Mantle')
+                   ?? data.find(p => p.symbol === 'CMETH');
+
+    liveUSDYApy  = parseFloat(usdyPool?.apy  ?? 3.55);
+    liveMethApy  = parseFloat(methPool?.apy  ?? 1.98);
+    liveCmethApy = cmethPool
+      ? parseFloat(cmethPool.apy ?? liveMethApy)
+      : parseFloat(((Math.pow(1 + liveMethApy / 100 / 365, 365) - 1) * 100).toFixed(4));
+
+    const methApr  = liveMethApy;
+    const cmethApy = liveCmethApy;
+    const spreadNum = liveUSDYApy - methApr;
+    const spreadStr = (spreadNum >= 0 ? '+' : '') + spreadNum.toFixed(2) + '%';
+
     const set = (id, val) => {
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = val;
       el.classList.remove('loading');
     };
-    set('usdy-apy', liveUSDYApy.toFixed(2) + '%');
-    set('meth-apr', methApr.toFixed(2) + '%');
+    set('usdy-apy',  liveUSDYApy.toFixed(2) + '%');
+    set('meth-apr',  methApr.toFixed(2) + '%');
     set('cmeth-apy', cmethApy.toFixed(2) + '%');
-    set('spread', spread + '%');
-    const wide = parseFloat(spread) >= 1.5;
+    set('spread',    spreadStr);
+
+    const wide = spreadNum >= 1.5;
     const sub = document.getElementById('spread-sub');
-    if (sub) sub.textContent = wide ? 'Spread > 1.5% — rebalance worth considering' : 'Within normal range';
+    if (sub) sub.textContent = wide
+      ? 'Spread > 1.5% — rebalance worth considering'
+      : 'Within normal range';
+
     const dy = document.getElementById('dash-yield');
     if (dy && dy.textContent !== '—') dy.textContent = liveUSDYApy.toFixed(2) + '% APY';
+
+    // Set token icons from DeFiLlama protocol logos
+    const usdyProject  = usdyPool?.project  ?? 'ondo-yield-assets';
+    const methProject  = methPool?.project  ?? 'meth-protocol';
+    const setIcon = (id, project) => {
+      const el = document.getElementById(id);
+      if (el) el.src = `https://icons.llama.fi/${project}.png`;
+    };
+    setIcon('usdy-icon',        usdyProject);
+    setIcon('meth-icon',        methProject);
+    setIcon('cmeth-icon',       methProject);
+    setIcon('spread-icon-usdy', usdyProject);
+    setIcon('spread-icon-meth', methProject);
+
   } catch {
     ['usdy-apy','meth-apr','cmeth-apy','spread'].forEach(id => {
       const el = document.getElementById(id);

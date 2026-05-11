@@ -299,7 +299,7 @@ async function runAgentLoop() {
     console.log(`Delegation tier: ${user.userTier}`);
     console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Alert: ${SPREAD_ALERT_THRESHOLD}% | Proposal: ${SPREAD_PROPOSAL_THRESHOLD}%`);
 
-    const shouldAlert = significantChange || spreadCrossedAlert || spreadAboveProposal;
+    const shouldAlert = significantChange || spreadCrossedAlert || spreadAboveProposal || spreadAboveAutoExecute;
 
     if (shouldAlert) {
       // Determine alert type
@@ -323,7 +323,7 @@ async function runAgentLoop() {
 
       if (user.tierCode === 1) {
         console.log("Tier 1 active — alert logged, no action proposed.");
-      } else if (user.tierCode === 3 && spreadAboveAutoExecute && alertType === 'rebalance_proposal') {
+      } else if (user.tierCode === 3 && spreadAboveAutoExecute) {
         console.log('Tier 3: spread above auto-execute threshold — attempting execution...');
         const result = await executeTier3Swap(user, yieldData);
         if (result) {

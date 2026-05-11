@@ -288,6 +288,7 @@
       .cta-btns { flex-direction: row; justify-content: center; }
     }
     @media (min-width: 768px) {
+      .macro-pill-4 { display: inline-flex; }
       nav { padding: 16px 48px; }
       .nav-links { gap: 12px; }
       .nav-link { display: block; }
@@ -400,6 +401,14 @@
     </div>
   </div>
 </section>
+
+<!-- MACRO TICKER -->
+<div id="macro-ticker">
+  <span class="macro-pill" id="macro-0"><span class="macro-dot"></span><span id="macro-text-0">Monitoring Mantle yields live</span></span>
+  <span class="macro-pill" id="macro-1"><span class="macro-dot"></span><span id="macro-text-1">Spread evaluating</span></span>
+  <span class="macro-pill" id="macro-2"><span class="macro-dot"></span><span id="macro-text-2">Mantle Mainnet verified</span></span>
+  <span class="macro-pill macro-pill-4" id="macro-3"><span class="macro-dot"></span><span id="macro-text-3">24 predictions anchored</span></span>
+</div>
 
 <!-- YIELD CARDS -->
 <section class="page-section">
@@ -1186,6 +1195,56 @@ function triggerShimmer(id) {
   setTimeout(() => el.classList.remove('shimmer'), 700);
 }
 
+// ── MACRO TICKER ──────────────────────────────────────────────────────────────
+function initMacroTicker() {
+  const ticker = document.getElementById('macro-ticker');
+  if (!ticker) return;
+
+  // Show ticker after yields load (values will be real)
+  setTimeout(() => ticker.classList.add('visible'), 3000);
+
+  const stateGroups = [
+    [
+      'Monitoring Mantle yields live',
+      () => `Spread ${(liveUSDYApy - liveMethApy) >= 1.5 ? 'wide' : 'normal'} — ${(liveUSDYApy - liveMethApy >= 0 ? '+' : '') + (liveUSDYApy - liveMethApy).toFixed(2)}%`,
+      'Mantle Mainnet verified',
+      '24 predictions anchored',
+    ],
+    [
+      'USDY oracle heartbeat confirmed',
+      () => `USDY ${liveUSDYApy.toFixed(2)}% vs mETH ${liveMethApy.toFixed(2)}%`,
+      'ETH staking APR ' + (liveMethApy < 1.98 ? 'cooling' : 'stable'),
+      'Rebalance threshold: 1.5%',
+    ],
+    [
+      'Yield intelligence active',
+      'Treasury yields stable',
+      'Validator yield compression: monitoring',
+      'ERC-8004 anchoring live',
+    ],
+  ];
+
+  let groupIdx = 0;
+
+  function rotateTicker() {
+    groupIdx = (groupIdx + 1) % stateGroups.length;
+    const group = stateGroups[groupIdx];
+    [0, 1, 2, 3].forEach(i => {
+      const pill = document.getElementById(`macro-${i}`);
+      const textEl = document.getElementById(`macro-text-${i}`);
+      if (!pill || !textEl) return;
+      pill.classList.add('fading');
+      setTimeout(() => {
+        const val = group[i];
+        textEl.textContent = typeof val === 'function' ? val() : val;
+        pill.classList.remove('fading');
+      }, 500);
+    });
+  }
+
+  setInterval(rotateTicker, 5000);
+}
+
 // ── HERO STATUS ROTATION ──────────────────────────────────────────────────────
 function initHeroStatus() {
   const el = document.getElementById('hero-status');
@@ -1217,6 +1276,7 @@ tryAutoReconnect();
 initTerminal();
 initAnimatedDots();
 initHeroStatus();
+initMacroTicker();
 </script>
 </body>
 </html>

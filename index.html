@@ -142,7 +142,8 @@
 
     /* YIELD CARDS */
     .yield-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 40px; }
-    .yield-card { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); padding: 24px; cursor: default; display: flex; flex-direction: column; transition: background 0.3s, border-color 0.3s; }
+    .yield-card { border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); padding: 24px; cursor: default; display: flex; flex-direction: column; transition: background 0.3s, border-color 0.3s, transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .yield-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
     .yield-card.green:hover { border-color: rgba(34,197,94,0.3); background: rgba(255,255,255,0.05); }
     .yield-card.amber:hover { border-color: rgba(245,158,11,0.3); background: rgba(255,255,255,0.05); }
     .yield-asset { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); margin-bottom: 16px; line-height: 1.3; }
@@ -407,7 +408,11 @@
   <div class="yield-grid">
     <div class="yield-card green">
       <p class="yield-asset"><img class="yield-token-icon" id="usdy-icon" alt="USDY" />USDY — ONDO FINANCE</p>
-      <div class="yield-pct green loading" id="usdy-apy">—</div>
+      <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
+        <div class="yield-pct green loading" id="usdy-apy">—</div>
+        <span class="yield-dir" id="usdy-dir" style="color:rgba(255,255,255,0.2)">—</span>
+      </div>
+      <canvas class="yield-sparkline" id="usdy-sparkline"></canvas>
       <p class="yield-desc">Tokenized US Treasuries</p>
       <div class="yield-risk-panel">
         <div class="yield-risk-inner">
@@ -424,7 +429,11 @@
     </div>
     <div class="yield-card green">
       <p class="yield-asset"><img class="yield-token-icon" id="meth-icon" alt="mETH" />METH — MANTLE STAKING</p>
-      <div class="yield-pct green loading" id="meth-apr">—</div>
+      <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
+        <div class="yield-pct green loading" id="meth-apr">—</div>
+        <span class="yield-dir" id="meth-dir" style="color:rgba(255,255,255,0.2)">—</span>
+      </div>
+      <canvas class="yield-sparkline" id="meth-sparkline"></canvas>
       <p class="yield-desc">Native ETH liquid staking on Mantle</p>
       <div class="yield-risk-panel">
         <div class="yield-risk-inner">
@@ -441,7 +450,11 @@
     </div>
     <div class="yield-card green">
       <p class="yield-asset"><img class="yield-token-icon" id="cmeth-icon" alt="cmETH" />CMETH — AUTO-COMPOUND</p>
-      <div class="yield-pct green loading" id="cmeth-apy">—</div>
+      <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
+        <div class="yield-pct green loading" id="cmeth-apy">—</div>
+        <span class="yield-dir" id="cmeth-dir" style="color:rgba(255,255,255,0.2)">—</span>
+      </div>
+      <canvas class="yield-sparkline" id="cmeth-sparkline"></canvas>
       <p class="yield-desc">Auto-compounding mETH vault strategy</p>
       <div class="yield-risk-panel">
         <div class="yield-risk-inner">
@@ -458,7 +471,11 @@
     </div>
     <div class="yield-card amber">
       <p class="yield-asset"><span class="yield-token-icon-pair"><img class="yield-token-icon" id="spread-icon-usdy" alt="USDY" /><img class="yield-token-icon" id="spread-icon-meth" alt="mETH" /></span>SPREAD (USDY – METH)</p>
-      <div class="yield-pct amber loading" id="spread">—</div>
+      <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
+        <div class="yield-pct amber loading" id="spread">—</div>
+        <span class="yield-dir" id="spread-dir" style="color:rgba(255,255,255,0.2);font-size:1.1rem">—</span>
+      </div>
+      <canvas class="yield-sparkline" id="spread-sparkline"></canvas>
       <p class="yield-desc" id="spread-sub">Arbitrage spread between USDY and mETH yields</p>
       <div class="yield-risk-panel">
         <div class="yield-risk-inner">

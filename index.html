@@ -1276,6 +1276,86 @@ function initMacroTicker() {
   setInterval(rotateTicker, 5000);
 }
 
+// ── WOW DEMO SEQUENCE ─────────────────────────────────────────────────────────
+function runWowSequence() {
+  // Read live yield values (in scope from loadYields)
+  const spread = (liveUSDYApy - liveMethApy).toFixed(2);
+  const spreadSign = parseFloat(spread) >= 0 ? '+' : '';
+  const estGain = Math.round((liveUSDYApy - liveMethApy) / 100 * 4200 * 0.25);
+
+  // Terminal: opportunity detected
+  const logsEl = document.getElementById('terminal-logs');
+  function addWowLine(text, color) {
+    if (!logsEl) return;
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.style.animationDelay = '0s';
+    const now = new Date();
+    const t = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
+    line.innerHTML = `<span class="log-time">${t}</span><span style="color:${color}">${text}</span>`;
+    logsEl.appendChild(line);
+    while (logsEl.children.length > 12) logsEl.removeChild(logsEl.firstChild);
+    logsEl.parentElement.scrollTop = logsEl.parentElement.scrollHeight;
+  }
+
+  addWowLine(`Spread opportunity detected: USDY ${spreadSign}${spread}% vs mETH ${liveMethApy.toFixed(2)}% — threshold crossed`, '#F59E0B');
+
+  setTimeout(() => {
+    addWowLine('Generating rebalance proposal...', '#569cd6');
+  }, 2000);
+
+  setTimeout(() => {
+    // Update phone bubble with live values
+    const spreadEl = document.getElementById('tg-spread-val');
+    const suggestEl = document.getElementById('tg-suggest-text');
+    if (spreadEl) spreadEl.textContent = `${spreadSign}${spread}%`;
+    if (suggestEl) suggestEl.innerHTML = `Suggested: move <span style="color:rgba(255,255,255,0.8)">25%</span> from mETH → USDY. Est. +$${estGain > 0 ? estGain : '~12'}/yr`;
+  }, 3500);
+
+  setTimeout(() => {
+    // Pulse the Approve button
+    const btn = document.getElementById('tg-approve-btn');
+    if (btn) {
+      btn.classList.add('pulsing');
+      setTimeout(() => btn.classList.remove('pulsing'), 450);
+    }
+  }, 5000);
+
+  setTimeout(() => {
+    addWowLine('Decision anchored on Mantle · tx 0xa041…36a', '#00d084');
+  }, 6000);
+
+  setTimeout(() => {
+    // Show confirmation in phone
+    const confirm = document.getElementById('tg-confirm');
+    if (confirm) confirm.classList.add('visible');
+  }, 8000);
+
+  setTimeout(() => {
+    // Reset phone to default state
+    const confirm = document.getElementById('tg-confirm');
+    const spreadEl = document.getElementById('tg-spread-val');
+    const suggestEl = document.getElementById('tg-suggest-text');
+    if (confirm) confirm.classList.remove('visible');
+    if (spreadEl) spreadEl.textContent = `${spreadSign}${spread}%`;
+    if (suggestEl) suggestEl.innerHTML = `Suggested: move <span style="color:rgba(255,255,255,0.8)">25%</span> from mETH → USDY to capture the spread.`;
+  }, 13000);
+}
+
+// ── PHONE NOTIFICATION BADGE ──────────────────────────────────────────────────
+function showPhoneNotif() {
+  const wrap = document.getElementById('tg-avatar-wrap');
+  if (!wrap) return;
+  // Remove any existing badge first
+  const existing = wrap.querySelector('.phone-notif-badge');
+  if (existing) existing.remove();
+  const badge = document.createElement('span');
+  badge.className = 'phone-notif-badge';
+  wrap.appendChild(badge);
+  // Remove after 4 seconds
+  setTimeout(() => { if (badge.parentNode) badge.remove(); }, 4000);
+}
+
 // ── HERO STATUS ROTATION ──────────────────────────────────────────────────────
 function initHeroStatus() {
   const el = document.getElementById('hero-status');
@@ -1298,6 +1378,56 @@ function initHeroStatus() {
   }, 4000);
 }
 
+// ── AMBIENT LOOP ──────────────────────────────────────────────────────────────
+function ambientLoop() {
+  // Terminal ambient lines — randomised 12–18s interval
+  function scheduleAmbientLine() {
+    const delay = 12000 + Math.random() * 6000;
+    setTimeout(() => {
+      const ambientLines = [
+        () => `Spread threshold ${(liveUSDYApy - liveMethApy) >= 1.5 ? 'crossed' : 'unchanged'} — ${((liveUSDYApy - liveMethApy) >= 0 ? '+' : '') + (liveUSDYApy - liveMethApy).toFixed(2)}%`,
+        'USDY oracle heartbeat confirmed',
+        `Validator APR compression: monitoring`,
+        `Position snapshot updated`,
+        'Mantle block verified',
+        `Cross-referencing USDY vs Treasury rates`,
+        `mETH exchange rate stable`,
+        () => `Yield delta: USDY ${liveUSDYApy.toFixed(2)}% — within normal bounds`,
+        'ERC-8004 reputation log: no anomalies',
+        'Monitoring staking queue depth',
+      ];
+      const pick = ambientLines[Math.floor(Math.random() * ambientLines.length)];
+      const logsEl = document.getElementById('terminal-logs');
+      if (logsEl) {
+        const text = typeof pick === 'function' ? pick() : pick;
+        const now = new Date();
+        const t = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.style.animationDelay = '0s';
+        line.innerHTML = `<span class="log-time">${t}</span><span style="color:rgba(255,255,255,0.45)">${text}</span>`;
+        logsEl.appendChild(line);
+        while (logsEl.children.length > 12) logsEl.removeChild(logsEl.firstChild);
+        logsEl.parentElement.scrollTop = logsEl.parentElement.scrollHeight;
+      }
+      scheduleAmbientLine();
+    }, delay);
+  }
+  scheduleAmbientLine();
+
+  // Wow demo loop — every 30s, first run at 8s (after yields loaded)
+  setTimeout(() => {
+    runWowSequence();
+    setInterval(runWowSequence, 30000);
+  }, 8000);
+
+  // Phone notification badge — every 20s
+  setTimeout(() => {
+    showPhoneNotif();
+    setInterval(showPhoneNotif, 20000);
+  }, 15000);
+}
+
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 window.dispatchEvent(new Event('eip6963:requestProvider'));
 loadYields();
@@ -1308,6 +1438,7 @@ initTerminal();
 initAnimatedDots();
 initHeroStatus();
 initMacroTicker();
+ambientLoop();
 </script>
 </body>
 </html>

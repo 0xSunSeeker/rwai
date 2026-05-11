@@ -69,7 +69,7 @@ No other submission arrives at demo day with a prediction history. RWAI does.
 | | |
 |---|---|
 | **RWAIVault** | Execution layer — agent-gated swaps between USDY, mETH, cmETH |
-| **Address** | [`0x020D48EE13A2Da9a45Fc4F753a4D0E3a939916d0`](https://mantlescan.xyz/address/0x020D48EE13A2Da9a45Fc4F753a4D0E3a939916d0#code) |
+| **Address** | [`0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69`](https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code) |
 | **Network** | Mantle Mainnet (chainId 5000) |
 | **Verified** | ✅ Source verified on Mantlescan |
 

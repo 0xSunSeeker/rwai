@@ -106,7 +106,8 @@ contract RWAIVault is Ownable, ReentrancyGuard, Pausable {
         address tokenOut,
         uint256 amountIn,
         uint256 minAmountOut,
-        bytes32 reasonHash
+        bytes32 reasonHash,
+        address[] calldata swapPath
     ) external nonReentrant whenNotPaused onlyAgent returns (uint256 amountOut) {
         require(user != address(0), "RWAIVault: zero user");
         require(tokenIn != tokenOut, "RWAIVault: same token");
@@ -123,9 +124,19 @@ contract RWAIVault is Ownable, ReentrancyGuard, Pausable {
         // Approve router for exactly amountIn (forceApprove handles USDT-style tokens)
         IERC20(tokenIn).forceApprove(address(router), amountIn);
 
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = tokenOut;
+        address[] memory path;
+        if (swapPath.length >= 2) {
+            require(swapPath[0] == tokenIn, "RWAIVault: path start mismatch");
+            require(swapPath[swapPath.length - 1] == tokenOut, "RWAIVault: path end mismatch");
+            path = new address[](swapPath.length);
+            for (uint256 i = 0; i < swapPath.length; i++) {
+                path[i] = swapPath[i];
+            }
+        } else {
+            path = new address[](2);
+            path[0] = tokenIn;
+            path[1] = tokenOut;
+        }
 
         // Swap — output goes directly to user, vault balance returns to zero
         uint256[] memory amounts = router.swapExactTokensForTokens(

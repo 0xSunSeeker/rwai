@@ -41,7 +41,7 @@ describe("RWAIVault", function () {
     await expect(
       vault.connect(user).executeSwap(
         user.address, fakeToken, fakeToken2,
-        ethers.parseUnits("1", 18), 0, ethers.ZeroHash
+        ethers.parseUnits("1", 18), 0, ethers.ZeroHash, []
       )
     ).to.be.revertedWith("RWAIVault: not agent");
   });

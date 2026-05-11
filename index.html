@@ -429,7 +429,7 @@
   <h2>What the agent is watching.</h2>
   <div class="yield-grid">
     <div class="yield-card green">
-      <p class="yield-asset"><img class="yield-token-icon" id="usdy-icon" alt="USDY" />USDY — ONDO FINANCE</p>
+      <p class="yield-asset"><img class="yield-token-icon" id="usdy-icon" src="https://icons.llama.fi/ondo-finance.png" alt="USDY" />USDY — ONDO FINANCE</p>
       <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
         <div class="yield-pct green loading" id="usdy-apy">—</div>
         <span class="yield-dir" id="usdy-dir" style="color:rgba(255,255,255,0.2)">—</span>
@@ -492,7 +492,7 @@
       </div>
     </div>
     <div class="yield-card amber">
-      <p class="yield-asset"><span class="yield-token-icon-pair"><img class="yield-token-icon" id="spread-icon-usdy" alt="USDY" /><img class="yield-token-icon" id="spread-icon-meth" alt="mETH" /></span>SPREAD (USDY – METH)</p>
+      <p class="yield-asset"><span class="yield-token-icon-pair"><img class="yield-token-icon" id="spread-icon-usdy" src="https://icons.llama.fi/ondo-finance.png" alt="USDY" /><img class="yield-token-icon" id="spread-icon-meth" src="https://icons.llama.fi/meth-protocol.png" alt="mETH" /></span>SPREAD (USDY – METH)</p>
       <div class="yield-pct-row" style="display:flex;align-items:baseline;gap:4px;">
         <div class="yield-pct amber loading" id="spread">—</div>
         <span class="yield-dir" id="spread-dir" style="color:rgba(255,255,255,0.2);font-size:1.1rem">—</span>
@@ -746,10 +746,9 @@ async function loadYields() {
                     ?? data.find(p => p.symbol === 'USDY');
       liveUSDYApy = parseFloat(usdyPool?.apy ?? 3.55);
 
-      const usdyProject = usdyPool?.project ?? 'ondo-yield-assets';
       ['usdy-icon','spread-icon-usdy'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.src = `https://icons.llama.fi/${usdyProject}.png`;
+        if (el) el.src = 'https://icons.llama.fi/ondo-finance.png';
       });
     }
 

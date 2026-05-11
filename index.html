@@ -260,7 +260,7 @@
     .tg-bubble .dim { color: rgba(255,255,255,0.5); margin-top: 8px; display: block; }
     .tg-meta { font-size: 10px; color: rgba(255,255,255,0.2); text-align: right; }
     .tg-actions { display: flex; gap: 8px; padding-top: 4px; }
-    .tg-approve { flex: 1; padding: 8px; border-radius: 12px; background: rgb(34,197,94); color: rgb(13,13,13); font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; }
+    .tg-approve { flex: 1; padding: 8px; border-radius: 12px; background: rgb(34,197,94); color: rgb(13,13,13); font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; animation: btn-breathe 3s ease-in-out infinite; }
     .tg-dismiss { flex: 1; padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); font-size: 0.75rem; font-weight: 600; background: transparent; cursor: pointer; }
     .phone-bottom-bar { display: flex; align-items: center; justify-content: center; padding: 16px; }
     .phone-home-bar { width: 96px; height: 4px; border-radius: 9999px; background: rgba(255,255,255,0.1); }
@@ -634,23 +634,24 @@
         <div class="phone-top-bar"><div class="phone-notch"></div></div>
         <div class="phone-status"><span>09:41</span><span>●●●</span></div>
         <div class="tg-header">
-          <div class="tg-avatar"><span>Ri</span></div>
+          <div class="tg-avatar" id="tg-avatar-wrap"><span>Ri</span></div>
           <div>
             <div class="tg-name">RWAi Agent</div>
-            <div class="tg-status">● online</div>
+            <div class="tg-status"><span class="tg-status-dot">●</span> online</div>
           </div>
         </div>
         <div class="tg-chat">
           <div class="tg-bubble">
             <p class="tg-bubble-title">⚡ Yield Alert</p>
-            <p>USDY spread vs mETH just crossed <span class="accent">1.5%</span>. This is above your alert threshold.</p>
-            <span class="dim">Suggested: move <span style="color:rgba(255,255,255,0.8)">15%</span> from mETH → USDY to capture the spread.</span>
+            <p>USDY spread vs mETH just crossed <span class="accent" id="tg-spread-val">1.5%</span>. This is above your alert threshold.</p>
+            <span class="dim" id="tg-suggest-text">Suggested: move <span style="color:rgba(255,255,255,0.8)">25%</span> from mETH → USDY to capture the spread.</span>
           </div>
           <div class="tg-meta">RWAi · just now</div>
           <div class="tg-actions">
-            <button class="tg-approve">✓ Approve</button>
+            <button class="tg-approve" id="tg-approve-btn">✓ Approve</button>
             <button class="tg-dismiss">Dismiss</button>
           </div>
+          <div class="tg-confirm" id="tg-confirm">✓ Decision anchored on Mantle · tx 0xa041…36a</div>
         </div>
         <div class="phone-bottom-bar"><div class="phone-home-bar"></div></div>
       </div>

@@ -855,18 +855,18 @@
         <div class="hero-tag"><span class="hero-tag-dot"></span>RWAi Agent</div>
         <h2 class="hero-headline">Opportunity detected</h2>
         <p class="hero-body">
-          USDY is currently yielding 1.65% more than mETH. On your <span id="hero-usdy-val">$29.91</span> USDY position,
-          staying put earns you an extra $0.49 per year. Hold current position — no rebalance needed at these levels.
+          USDY is currently yielding <span id="hero-spread-pct">—</span> more than mETH. On your <span id="hero-usdy-val">—</span> USDY position,
+          staying put earns you an extra <span id="hero-impact-amt">—</span> per year. Hold current position — no rebalance needed at these levels.
         </p>
 
         <div class="hero-metrics">
           <div class="hero-metric">
             <div class="hero-metric-label">Potential Annual Impact</div>
-            <div class="hero-metric-value green">+$0.49 / yr</div>
+            <div class="hero-metric-value green" id="hero-annual-impact">—</div>
           </div>
           <div class="hero-metric">
             <div class="hero-metric-label">Confidence Score</div>
-            <div class="hero-metric-value">82%</div>
+            <div class="hero-metric-value">—</div>
           </div>
           <div class="hero-metric">
             <div class="hero-metric-label">Logged on Mantle</div>
@@ -886,21 +886,21 @@
         <!-- Simulate panel (JS hooks preserved) -->
         <div class="sim-panel" id="sim-panel">
           <button class="sim-close" id="sim-panel-close" aria-label="Close">&times;</button>
-          <div class="sim-panel-title">Rebalance simulation — <span id="sim-usdy-val">$29.91</span> USDY → mETH</div>
+          <div class="sim-panel-title">Rebalance simulation — <span id="sim-usdy-val">$0.00</span> USDY → mETH</div>
           <div class="sim-row">
             <span class="sim-row-label" id="sim-meth-rate-label">New annual yield (mETH at 1.66%)</span>
-            <span class="sim-row-val">$0.57 / year</span>
+            <span class="sim-row-val" id="sim-inline-meth-yield">$0.00 / year</span>
           </div>
           <div class="sim-row">
             <span class="sim-row-label">Current annual yield (USDY at 3.55%)</span>
-            <span class="sim-row-val green">$1.06 / year</span>
+            <span class="sim-row-val green" id="sim-inline-usdy-yield">$0.00 / year</span>
           </div>
           <div class="sim-row">
             <span class="sim-row-label">Difference</span>
-            <span class="sim-row-val red">−$0.49 / year</span>
+            <span class="sim-row-val red" id="sim-inline-diff">—</span>
           </div>
           <div class="sim-verdict">
-            <strong>Not worth it</strong> — USDY still leads by 1.65% at current rates. Rebalancing would cost you $0.49/year on this position size.
+            <strong id="sim-verdict-label">Not worth it</strong> — USDY still leads by <span id="sim-spread-pct">—</span> at current rates. Rebalancing would cost you <span id="sim-cost-yr">—</span>/year on this position size.
           </div>
         </div>
 
@@ -972,13 +972,13 @@
     </div>
     <div class="summary-card highlight" style="animation-delay:0.1s">
       <p class="summary-card-label">Yield Opportunity</p>
-      <p class="summary-card-value amber" id="yield-spread-val">+1.65%</p>
-      <p class="summary-card-sub">USDY leads mETH — relative spread favours holding</p>
+      <p class="summary-card-value amber" id="yield-spread-val">—</p>
+      <p class="summary-card-sub" id="spread-direction-sub">Loading live spread…</p>
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
-      <p class="summary-card-value green">73%</p>
-      <p class="summary-card-sub">Across 24 live yield forecasts on Mantle</p>
+      <p class="summary-card-value green">—</p>
+      <p class="summary-card-sub">Building track record on Mantle</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
       <p class="summary-card-label">Projected Annual Yield</p>
@@ -1060,7 +1060,7 @@
           </div>
         </div>
         <div class="pos-balance" id="usdy-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:4px">Loading...</div>
-        <div class="pos-sub">Tokenized US Treasuries · 29.91 USDY · Highest yield</div>
+        <div class="pos-sub">Tokenized US Treasuries · <span id="usdy-token-qty">—</span> USDY · Highest yield</div>
         <hr class="pos-divider" />
         <div class="pos-footer">
           <div>
@@ -1149,7 +1149,7 @@
         <div class="next-action-left">
           <div class="next-action-rec-label">Agent decision</div>
           <div class="next-action-content">Hold current positions</div>
-          <div class="next-action-sub">Spread of 1.65% is above alert threshold but below your auto-execute threshold of 2.0% — no action required</div>
+          <div class="next-action-sub" id="next-action-spread-txt">Calculating live spread…</div>
         </div>
         <div class="next-action-right">
           <div class="next-action-countdown-label">Next scan in</div>
@@ -1168,39 +1168,39 @@
     <p class="section-label">Prediction Confidence Timeline</p>
     <div class="predictions-timeline">
 
-    <div class="prediction-row" style="animation-delay:0.4s">
+    <div class="prediction-row" style="animation-delay:0.4s; opacity:0.5;">
       <div class="pred-dot green"></div>
       <div class="pred-body">
-        <div class="pred-asset">USDY stable</div>
-        <div class="pred-desc">Predicted yield would hold at 3.55% for 24h</div>
+        <div class="pred-asset">USDY stable <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
+        <div class="pred-desc">Predicted yield would hold steady for 24h</div>
       </div>
       <div class="pred-right">
-        <span class="pred-time">Today 10:05</span>
+        <span class="pred-time">Sample</span>
         <span class="pred-badge correct">Correct</span>
       </div>
     </div>
 
-    <div class="prediction-row" style="animation-delay:0.45s">
+    <div class="prediction-row" style="animation-delay:0.45s; opacity:0.5;">
       <div class="pred-dot green"></div>
       <div class="pred-body">
-        <div class="pred-asset">mETH stable</div>
-        <div class="pred-desc">Predicted APR would hold near 1.90%</div>
+        <div class="pred-asset">mETH stable <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
+        <div class="pred-desc">Predicted APR would hold near current level</div>
       </div>
       <div class="pred-right">
-        <span class="pred-time">Today 10:05</span>
+        <span class="pred-time">Sample</span>
         <span class="pred-badge correct">Correct</span>
       </div>
     </div>
 
-    <div class="prediction-row" style="animation-delay:0.5s">
+    <div class="prediction-row" style="animation-delay:0.5s; opacity:0.5;">
       <div class="pred-dot green"></div>
       <div class="pred-body">
-        <div class="pred-asset">Spread widening</div>
+        <div class="pred-asset">Spread widening <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
         <div class="pred-desc">Predicted spread would exceed 1.5% within 24h</div>
-        <div class="pred-desc" style="color:#1D9E75;font-size:0.72rem;margin-top:3px">Spread reached 1.65% — threshold exceeded ✓</div>
+        <div class="pred-desc" style="color:#1D9E75;font-size:0.72rem;margin-top:3px">Spread exceeded threshold ✓</div>
       </div>
       <div class="pred-right">
-        <span class="pred-time">Yesterday 22:05</span>
+        <span class="pred-time">Sample</span>
         <span class="pred-badge correct">Correct</span>
       </div>
     </div>
@@ -1227,14 +1227,14 @@
     <p class="section-label">Agent History</p>
 
     <!-- Entry 1: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.55s">
+    <div class="history-card" style="animation-delay:0.55s; opacity:0.5;">
       <span class="history-icon">🤖</span>
       <div class="history-body">
         <div class="history-top">
-          <span class="history-type">Yield Prediction</span>
-          <span class="history-time">Today 10:05</span>
+          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
+          <span class="history-time">Sample</span>
         </div>
-        <p class="history-desc">USDY held at 3.55% as expected. T-bill rates stable overnight — no yield movement detected.</p>
+        <p class="history-desc">USDY held at current level as expected. T-bill rates stable overnight — no yield movement detected.</p>
         <div class="history-footer">
           <div class="history-footer-left">
             <span class="history-badge correct">Correct</span>
@@ -1246,14 +1246,14 @@
     </div>
 
     <!-- Entry 2: Alert -->
-    <div class="history-card" style="animation-delay:0.6s">
+    <div class="history-card" style="animation-delay:0.6s; opacity:0.5;">
       <span class="history-icon">👁</span>
       <div class="history-body">
         <div class="history-top">
-          <span class="history-type">Alert Sent</span>
-          <span class="history-time">Today 10:05</span>
+          <span class="history-type">Alert Sent <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
+          <span class="history-time">Sample</span>
         </div>
-        <p class="history-desc">Spread of 1.65% exceeded alert threshold of 1.5%. Telegram alert sent to user.</p>
+        <p class="history-desc">Spread exceeded alert threshold of 1.5%. Telegram alert sent to user.</p>
         <div class="history-footer">
           <div class="history-footer-left">
             <span class="history-badge delivered">Delivered</span>
@@ -1265,14 +1265,14 @@
     </div>
 
     <!-- Entry 3: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.65s">
+    <div class="history-card" style="animation-delay:0.65s; opacity:0.5;">
       <span class="history-icon">🤖</span>
       <div class="history-body">
         <div class="history-top">
-          <span class="history-type">Yield Prediction</span>
-          <span class="history-time">Yesterday 22:05</span>
+          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
+          <span class="history-time">Sample</span>
         </div>
-        <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend. Spread reached 1.65% — threshold exceeded ✓</p>
+        <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend. Spread exceeded threshold ✓</p>
         <div class="history-footer">
           <div class="history-footer-left">
             <span class="history-badge correct">Correct</span>
@@ -1284,14 +1284,14 @@
     </div>
 
     <!-- Entry 4: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.7s">
+    <div class="history-card" style="animation-delay:0.7s; opacity:0.5;">
       <span class="history-icon">🤖</span>
       <div class="history-body">
         <div class="history-top">
-          <span class="history-type">Yield Prediction</span>
-          <span class="history-time">Yesterday 10:05</span>
+          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
+          <span class="history-time">Sample</span>
         </div>
-        <p class="history-desc">mETH APR held near 1.90% — Ethereum validator set stable, no network events.</p>
+        <p class="history-desc">mETH APR stable — Ethereum validator set stable, no network events.</p>
         <div class="history-footer">
           <div class="history-footer-left">
             <span class="history-badge correct">Correct</span>
@@ -1303,14 +1303,14 @@
     </div>
 
     <!-- Entry 5: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.75s">
+    <div class="history-card" style="animation-delay:0.75s; opacity:0.5;">
       <span class="history-icon">🤖</span>
       <div class="history-body">
         <div class="history-top">
-          <span class="history-type">Yield Prediction</span>
-          <span class="history-time">2 days ago 10:05</span>
+          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
+          <span class="history-time">Sample</span>
         </div>
-        <p class="history-desc">USDY yield stable at 3.55% — weekly T-bill reset not due for 4 days.</p>
+        <p class="history-desc">USDY yield stable — weekly T-bill reset not due for several days.</p>
         <div class="history-footer">
           <div class="history-footer-left">
             <span class="history-badge correct">Correct</span>
@@ -1331,7 +1331,7 @@
     <div class="tg-card" style="animation-delay:0.6s">
       <div class="tg-left">
         <h3>Never miss a yield opportunity</h3>
-        <p>RWAI monitors Mantle 24/7 and alerts you the moment yield conditions change.</p>
+        <p>RWAi monitors Mantle 24/7 and alerts you the moment yield conditions change.</p>
       </div>
       <button class="btn-telegram">
         <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -1439,7 +1439,7 @@
   }
 
   /* ── Constants ── */
-  var USDY_BALANCE  = 29.91;
+  var USDY_BALANCE  = 0;
   var METH_BALANCE  = 0.0303;
   var CMETH_BALANCE = 0.00;
   var USDY_APY      = 0.0355;
@@ -1528,6 +1528,9 @@
     if (heroVal) heroVal.textContent = fmt(usdyVal);
     var simVal = document.getElementById('sim-usdy-val');
     if (simVal) simVal.textContent = fmt(usdyVal);
+    var qtyEl = document.getElementById('usdy-token-qty');
+    if (qtyEl) qtyEl.textContent = USDY_BALANCE > 0 ? USDY_BALANCE.toFixed(2) : '0';
+    updateSpread();
   }
 
   /* ── USDY price + 24h change ── */
@@ -1627,9 +1630,10 @@
       if (cmethApyEl) cmethApyEl.textContent = (apr + 0.25).toFixed(2) + '%';
       var simLabel = document.getElementById('sim-meth-rate-label');
       if (simLabel) simLabel.textContent = 'New annual yield (mETH at ' + apr.toFixed(2) + '%)';
+      updateSpread();
       updateReasoningBullets();
     })
-    .catch(function() { /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
+    .catch(function() { updateSpread(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
 
   /* ── Header minute timer ── */
   var lastChecked = 4, nextCheck = 26;
@@ -1709,11 +1713,11 @@
     var modal = document.getElementById('rebalance-modal');
     if (!modal) return;
 
-    var usdyText = document.getElementById('usdy-usd') ? document.getElementById('usdy-usd').textContent : '$33.80';
-    var methText = document.getElementById('meth-usd') ? document.getElementById('meth-usd').textContent : '$77.16';
+    var usdyText = document.getElementById('usdy-usd') ? document.getElementById('usdy-usd').textContent : '$0.00';
+    var methText = document.getElementById('meth-usd') ? document.getElementById('meth-usd').textContent : '$0.00';
 
-    var usdyVal = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 33.80;
-    var methVal = parseFloat(methText.replace(/[^0-9.]/g, '')) || 77.16;
+    var usdyVal = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
+    var methVal = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
 
     var usdyAfter   = usdyVal / 2;
     var methAfter   = methVal + usdyAfter;
@@ -1805,8 +1809,13 @@
   var btnShareX = document.getElementById('btn-share-x');
   btnShareX.addEventListener('click', function () {
     generateShareCard();
+    var spreadEl = document.getElementById('yield-spread-val');
+    var liveSpread = spreadEl ? spreadEl.textContent.trim() : '';
+    var spreadPhrase = liveSpread && liveSpread !== '—'
+      ? liveSpread + ' more'
+      : 'more';
     var text = encodeURIComponent(
-      'USDY is paying 1.65% more than mETH on @0xMantle right now. RWAi caught it. rwai.fyi #Mantle #RWA'
+      'USDY is paying ' + spreadPhrase + ' than mETH on @0xMantle right now. RWAi caught it. rwai.fyi #Mantle #RWA'
     );
     window.open('https://twitter.com/intent/tweet?text=' + text, '_blank', 'noopener,noreferrer');
   });
@@ -1838,9 +1847,12 @@
     ctx.fillText('Ai', 32 + rwWidth, 48);
 
     // Headline
+    var liveSpreadEl2 = document.getElementById('yield-spread-val');
+    var liveSpreadTxt = liveSpreadEl2 ? liveSpreadEl2.textContent.trim() : '';
+    var headlineSpread = liveSpreadTxt && liveSpreadTxt !== '—' ? liveSpreadTxt + ' more' : 'more';
     ctx.font = '700 20px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';
     ctx.fillStyle = '#f0f0f0';
-    ctx.fillText('USDY is paying 1.65% more than mETH', 32, 96);
+    ctx.fillText('USDY is paying ' + headlineSpread + ' than mETH', 32, 96);
     ctx.font = '400 15px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';
     ctx.fillStyle = '#666';
     ctx.fillText('right now on Mantle Mainnet', 32, 118);
@@ -1890,6 +1902,60 @@
     } catch (e) {}
   }
 
+  /* ── Update all spread-dependent UI elements from live yield values ── */
+  function updateSpread() {
+    var usdyApyEl = document.getElementById('usdy-apy-val');
+    var methApyEl = document.getElementById('meth-apy-val');
+    if (!usdyApyEl || !methApyEl) return;
+    var usdyApy = parseFloat(usdyApyEl.textContent.replace('%', ''));
+    var methApr = parseFloat(methApyEl.textContent.replace('%', ''));
+    if (isNaN(usdyApy) || isNaN(methApr)) return;
+    var spread = usdyApy - methApr;
+    var spreadStr = (spread >= 0 ? '+' : '') + spread.toFixed(2) + '%';
+
+    // Summary card
+    var spreadEl = document.getElementById('yield-spread-val');
+    if (spreadEl) spreadEl.textContent = spreadStr;
+    var subEl = document.getElementById('spread-direction-sub');
+    if (subEl) subEl.textContent = spread >= 0
+      ? 'USDY leads mETH by ' + spread.toFixed(2) + '% — spread favours holding USDY'
+      : 'mETH leads USDY by ' + Math.abs(spread).toFixed(2) + '% — consider rebalancing';
+
+    // Hero body
+    var heroSpreadEl = document.getElementById('hero-spread-pct');
+    if (heroSpreadEl) heroSpreadEl.textContent = Math.abs(spread).toFixed(2) + '%';
+
+    // Annual impact (uses current USDY USD value)
+    var usdyUsdEl = document.getElementById('usdy-usd');
+    var usdyUsdVal = usdyUsdEl ? parseFloat(usdyUsdEl.textContent.replace(/[^0-9.]/g, '')) : 0;
+    if (usdyUsdVal > 0 && !isNaN(usdyUsdVal)) {
+      var annualImpact = usdyUsdVal * (Math.abs(spread) / 100);
+      var impactStr = '$' + annualImpact.toFixed(2);
+      var heroImpact = document.getElementById('hero-impact-amt');
+      if (heroImpact) heroImpact.textContent = impactStr;
+      var heroAnnual = document.getElementById('hero-annual-impact');
+      if (heroAnnual) heroAnnual.textContent = '+' + impactStr + ' / yr';
+      var simCost = document.getElementById('sim-cost-yr');
+      if (simCost) simCost.textContent = impactStr;
+    }
+
+    // Sim verdict spread
+    var simSpreadEl = document.getElementById('sim-spread-pct');
+    if (simSpreadEl) simSpreadEl.textContent = Math.abs(spread).toFixed(2) + '%';
+
+    // Next action sub
+    var nextActionEl = document.getElementById('next-action-spread-txt');
+    if (nextActionEl) {
+      if (spread >= 2.0) {
+        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above your auto-execute threshold of 2.0% — rebalance may execute automatically';
+      } else if (spread >= 1.5) {
+        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above the 1.5% alert threshold — no action required';
+      } else {
+        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is below the 1.5% alert threshold — holding current allocation';
+      }
+    }
+  }
+
   /* ── Dynamic reasoning bullets ── */
   function updateReasoningBullets() {
     var usdyApyEl = document.getElementById('usdy-apy-val');
@@ -1924,7 +1990,7 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', updateReasoningBullets);
+  document.addEventListener('DOMContentLoaded', function() { updateSpread(); updateReasoningBullets(); });
 
 })();
 </script>
@@ -1939,11 +2005,11 @@
       <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">Before</div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">USDY</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-before">$33.80 @ 3.55%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-before">$0.00 @ 3.55%</span>
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$77.16 @ 1.66%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$0.00 @ 1.66%</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>
@@ -1957,11 +2023,11 @@
       <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">After (50% shift)</div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">USDY</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-after">$16.90 @ 3.55%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-after">$0.00 @ 3.55%</span>
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$93.96 @ 1.66%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$0.00 @ 1.66%</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>

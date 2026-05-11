@@ -947,7 +947,7 @@
         </div>
         <div class="hero-status-row">
           <span class="hero-status-row-label">Predictions logged</span>
-          <span class="hero-status-row-val green">24</span>
+          <span class="hero-status-row-val green" id="predictions-total">—</span>
         </div>
         <div class="hero-status-row">
           <span class="hero-status-row-label">Agent tier</span>
@@ -977,8 +977,8 @@
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
-      <p class="summary-card-value green">—</p>
-      <p class="summary-card-sub">Building track record on Mantle</p>
+      <p class="summary-card-value green" id="accuracy-val">—</p>
+      <p class="summary-card-sub" id="accuracy-sub">Loading…</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
       <p class="summary-card-label">Projected Annual Yield</p>
@@ -1634,6 +1634,30 @@
       updateReasoningBullets();
     })
     .catch(function() { updateSpread(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
+
+  /* ── Agent accuracy from /api/stats ── */
+  fetch('/api/stats')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var accEl  = document.getElementById('accuracy-val');
+      var subEl  = document.getElementById('accuracy-sub');
+      var totEl  = document.getElementById('predictions-total');
+      if (data.accuracy !== null && data.accuracy !== undefined) {
+        if (accEl) { accEl.textContent = data.accuracy + '%'; }
+        if (subEl) { subEl.textContent = 'Across ' + data.resolved + ' resolved predictions on Mantle'; }
+        if (totEl) { totEl.textContent = data.total; }
+      } else {
+        if (accEl) accEl.textContent = '—';
+        if (subEl) subEl.textContent = data.total + ' predictions logged — resolving over 24h';
+        if (totEl) totEl.textContent = data.total || '—';
+      }
+    })
+    .catch(function () {
+      var accEl = document.getElementById('accuracy-val');
+      var subEl = document.getElementById('accuracy-sub');
+      if (accEl) accEl.textContent = '—';
+      if (subEl) subEl.textContent = 'Building track record on Mantle';
+    });
 
   /* ── Header minute timer ── */
   var lastChecked = 4, nextCheck = 26;

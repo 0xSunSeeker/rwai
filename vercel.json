@@ -2,6 +2,8 @@
   "framework": null,
   "rewrites": [
     { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/tos", "destination": "/tos.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

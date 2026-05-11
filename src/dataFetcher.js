@@ -1,6 +1,13 @@
 import { ethers } from "ethers";
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 dotenv.config();
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, "../data");
+const METH_PRICE_HISTORY_PATH = `${DATA_DIR}/methPriceHistory.json`;
 
 // Risk profiles for each monitored asset
 export const RISK_PROFILES = {
@@ -12,8 +19,10 @@ export const RISK_PROFILES = {
 // cmETH is auto-compounding mETH (ERC-4626 vault). No standalone DeFiLlama pool exists.
 // Effective APY = (1 + APR/100/365)^365 - 1, expressed as a percentage.
 export function deriveCMETHApy(methAPR) {
-  const daily = methAPR / 100 / 365;
-  return parseFloat(((Math.pow(1 + daily, 365) - 1) * 100).toFixed(4));
+  // cmETH earns mETH base yield plus restaking rewards
+  // Official cmETH APY runs ~0.2-0.3% above mETH APY
+  // Use 0.25% premium as conservative estimate
+  return Math.round((methAPR + 0.25) * 100) / 100;
 }
 
 // USDY token on Mantle Mainnet (OFT bridge wrapper)
@@ -76,6 +85,29 @@ export async function fetchUSDYData() {
   }
 }
 
+function getMethPriceHistory(currentPrice) {
+  const now = Date.now();
+  let history = [];
+
+  try {
+    if (existsSync(METH_PRICE_HISTORY_PATH)) {
+      history = JSON.parse(readFileSync(METH_PRICE_HISTORY_PATH, 'utf8'));
+    }
+  } catch {}
+
+  history.push({ price: currentPrice, timestamp: now });
+
+  // Keep only last 8 days of entries (one per 30min = 384 entries max)
+  const eightDaysAgo = now - (8 * 24 * 60 * 60 * 1000);
+  history = history.filter(h => h.timestamp > eightDaysAgo);
+
+  try {
+    writeFileSync(METH_PRICE_HISTORY_PATH, JSON.stringify(history));
+  } catch {}
+
+  return history;
+}
+
 // mETH pool ID on DeFiLlama (stable, doesn't change)
 const METH_POOL_ID = "b9f2f00a-ba96-4589-a171-dde979a23d87";
 
@@ -96,14 +128,25 @@ export async function fetchMETHData() {
       // Use DeFiLlama's own APY as primary value
       const currentAPR = parseFloat(latest.apy ?? latest.apyBase ?? 0);
 
-      // ── Layer 2: cross-validate with pricePerShare change ────────────────
-      // mETH yield is baked into the ETH/mETH exchange rate.
-      // APR = ((rate_today / rate_yesterday) ^ 365 − 1) × 100
+      // ── Layer 2: 7-day pricePerShare window APY ──────────────────────────
+      // Official mETH methodology: APY = ((price_day7 / price_day0) ^ (365/7)) - 1
       let aprFromRate = null;
-      if (latest.pricePerShare && prev.pricePerShare && latest.pricePerShare !== prev.pricePerShare) {
-        const daily = latest.pricePerShare / prev.pricePerShare;
-        aprFromRate = parseFloat(((Math.pow(daily, 365) - 1) * 100).toFixed(4));
-        console.log(`mETH pricePerShare: ${prev.pricePerShare} → ${latest.pricePerShare} | rate-derived APR: ${aprFromRate}%`);
+      if (latest.pricePerShare) {
+        const history = getMethPriceHistory(latest.pricePerShare);
+
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const oldEntry = history.reduce((closest, entry) => {
+          return Math.abs(entry.timestamp - sevenDaysAgo) < Math.abs(closest.timestamp - sevenDaysAgo)
+            ? entry : closest;
+        }, history[0]);
+
+        const ageDays = (Date.now() - oldEntry.timestamp) / (24 * 60 * 60 * 1000);
+
+        if (ageDays >= 1 && oldEntry.price !== latest.pricePerShare) {
+          const apy7d = (Math.pow(latest.pricePerShare / oldEntry.price, 365 / ageDays) - 1) * 100;
+          aprFromRate = Math.round(apy7d * 100) / 100;
+          console.log(`mETH 7-day APY: ${aprFromRate}% (${ageDays.toFixed(1)}d window)`);
+        }
       }
 
       if (currentAPR > 0) {

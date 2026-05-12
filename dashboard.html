@@ -626,6 +626,20 @@
     .history-badge.delivered { background: rgba(59,130,246,0.12); color: #60a5fa; }
     .history-badge.approved  { background: rgba(29,158,117,0.12); color: #1D9E75; }
     .history-badge.dismissed { background: rgba(100,100,100,0.12); color: #555; }
+    body.rwai-paused .hero-card {
+      background: linear-gradient(180deg, rgba(245,158,11,0.03), rgba(0,0,0,0)) !important;
+      border-color: rgba(245,158,11,0.25) !important;
+    }
+    body.rwai-paused .hero-pulse-dot {
+      background: #F59E0B !important;
+      box-shadow: 0 0 8px rgba(245,158,11,0.4) !important;
+      animation: none !important;
+    }
+    body.rwai-paused .hero-pulse-ring {
+      border-color: rgba(245,158,11,0.3) !important;
+      animation: none !important;
+    }
+
     .pred-card {
       background: #111; border: 1px solid #1c1c1c;
       border-radius: 12px; padding: 15px 20px;
@@ -1063,7 +1077,7 @@
           </div>
           <div>
             <div class="hero-status-title" id="hero-status-label">Monitoring 24/7</div>
-            <div class="hero-status-sub">Active on Mantle Mainnet</div>
+            <div class="hero-status-sub" id="hero-status-sub">Active on Mantle Mainnet</div>
           </div>
         </div>
         <hr class="hero-status-divider" />
@@ -1088,8 +1102,8 @@
           <span class="hero-status-row-val">Tier 2</span>
         </div>
         <div class="hero-verify-strip">
-          <div class="hero-verify">✓ &nbsp;Mantle logging active</div>
-          <div class="hero-verify">✓ &nbsp;ERC-8004 verified</div>
+          <div class="hero-verify" id="mantle-logging-check">✓ &nbsp;Mantle logging active</div>
+          <div class="hero-verify" id="erc8004-check">✓ &nbsp;ERC-8004 verified</div>
         </div>
         <hr class="hero-status-divider" />
         <button id="btn-pause-agent" style="width:100%; padding:8px; background:rgba(240,180,0,0.08); border:1px solid rgba(240,180,0,0.2); border-radius:6px; color:#F0B400; font-size:0.72rem; font-weight:700; cursor:pointer; letter-spacing:0.04em;">⏸ Pause Agent</button>
@@ -2236,7 +2250,8 @@
 
     fetchPendingAlert();
     setInterval(fetchPendingAlert, 30000);
-    restoreAgentPauseState();
+    renderPauseState();
+    setInterval(renderPauseState, 15000);
     updateLatestTx();
     setInterval(updateLatestTx, 60000);
     loadPredictionsAndHistory();
@@ -2611,20 +2626,72 @@
 
   async function togglePauseAgent() {
     applyPauseState(!agentPaused);
-    fetch('/api/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentPaused: agentPaused })
-    }).catch(function() {});
+    try {
+      await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentPaused: agentPaused })
+      });
+    } catch(e) {}
+    await renderPauseState();
   }
 
-  async function restoreAgentPauseState() {
+  async function renderPauseState() {
     try {
       var res = await fetch('/api/profile');
       if (!res.ok) return;
       var profile = await res.json();
-      if (profile.agentPaused) applyPauseState(true);
-    } catch(e) {}
+      var paused = profile.agentPaused === true;
+
+      var statusLabel   = document.getElementById('hero-status-label');
+      var statusSub     = document.getElementById('hero-status-sub');
+      var heroTitleEl   = document.getElementById('hero-title');
+      var heroBodyEl    = document.querySelector('.hero-body');
+      var nextCheckEl   = document.getElementById('next-check');
+      var nextCheckUnit = document.getElementById('next-check-unit');
+      var pauseBtn      = document.getElementById('btn-pause-agent');
+      var nextActionEl  = document.querySelector('.next-action-content');
+      var countdownEl   = document.getElementById('next-action-countdown');
+
+      if (paused) {
+        if (statusLabel) { statusLabel.textContent = 'Agent paused'; statusLabel.style.color = '#F59E0B'; }
+        if (statusSub)   { statusSub.textContent = 'No active monitoring'; statusSub.style.color = '#888'; }
+        if (heroTitleEl) heroTitleEl.textContent = 'Agent paused';
+        if (heroBodyEl)  heroBodyEl.textContent = 'Monitoring is paused. Yield positions and on-chain data will not be updated until you resume the agent from the dashboard or Telegram.';
+        if (nextCheckEl)   nextCheckEl.textContent = '—';
+        if (nextCheckUnit) nextCheckUnit.style.display = 'none';
+        if (countdownEl)   countdownEl.textContent = '—:——';
+        if (nextActionEl)  nextActionEl.textContent = 'Agent paused — no recommendation';
+        if (pauseBtn) {
+          pauseBtn.textContent = '▶ Resume Agent';
+          pauseBtn.style.color = '#1D9E75';
+          pauseBtn.style.borderColor = 'rgba(29,158,117,0.3)';
+          pauseBtn.style.background = 'rgba(29,158,117,0.08)';
+        }
+        ['mantle-logging-check', 'erc8004-check'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) { el.style.opacity = '0.35'; el.style.color = '#555'; }
+        });
+        document.body.classList.add('rwai-paused');
+      } else {
+        if (statusLabel) { statusLabel.style.color = ''; }
+        if (statusSub)   { statusSub.textContent = 'Active on Mantle Mainnet'; statusSub.style.color = ''; }
+        if (pauseBtn) {
+          pauseBtn.textContent = '⏸ Pause Agent';
+          pauseBtn.style.color = '#F0B400';
+          pauseBtn.style.borderColor = 'rgba(240,180,0,0.2)';
+          pauseBtn.style.background = 'rgba(240,180,0,0.08)';
+        }
+        ['mantle-logging-check', 'erc8004-check'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) { el.style.opacity = ''; el.style.color = ''; }
+        });
+        document.body.classList.remove('rwai-paused');
+        if (typeof renderHeroState === 'function') renderHeroState();
+      }
+    } catch(err) {
+      console.warn('renderPauseState failed:', err);
+    }
   }
 
   /* ── Predictions & History ── */

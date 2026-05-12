@@ -62,6 +62,7 @@ function escapeMarkdown(text) {
 
 // ─── USER PROFILE ─────────────────────────────────────────────────────────────
 const PROFILE_PATH = './data/userProfile.json';
+const API_BASE = process.env.API_BASE || 'https://rwai.fyi';
 
 const DEFAULT_PROFILE = {
   userPositionUSD: 4200,
@@ -71,30 +72,49 @@ const DEFAULT_PROFILE = {
   agentAccuracy: '73% accurate over 24 predictions',
 };
 
-function loadProfile() {
+async function loadProfile() {
+  try {
+    const res = await fetch(`${API_BASE}/api/profile`);
+    if (res.ok) {
+      const profile = await res.json();
+      return { ...DEFAULT_PROFILE, ...profile };
+    }
+  } catch (err) {
+    console.warn('loadProfile API failed, falling back to local file:', err.message);
+  }
   if (existsSync(PROFILE_PATH)) {
     try { return { ...DEFAULT_PROFILE, ...JSON.parse(readFileSync(PROFILE_PATH, 'utf8')) }; } catch {}
   }
   return { ...DEFAULT_PROFILE };
 }
 
-function saveProfile(updates) {
-  const current = loadProfile();
-  const updated = { ...current, ...updates };
+async function saveProfile(updates) {
+  const merged = { ...updates, lastSyncSource: 'telegram' };
+  try {
+    const res = await fetch(`${API_BASE}/api/profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    if (res.ok) {
+      const profile = await res.json();
+      try { writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2)); } catch {}
+      return profile;
+    }
+  } catch (err) {
+    console.warn('saveProfile API failed, writing local only:', err.message);
+  }
+  const current = existsSync(PROFILE_PATH)
+    ? JSON.parse(readFileSync(PROFILE_PATH, 'utf8'))
+    : { ...DEFAULT_PROFILE };
+  const updated = { ...current, ...merged, lastUpdated: Date.now() };
   writeFileSync(PROFILE_PATH, JSON.stringify(updated, null, 2));
   return updated;
 }
 
-function saveUser(profile) {
-  try {
-    writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2));
-  } catch (err) {
-    console.error('Failed to save user profile:', err.message);
-  }
+async function saveUser(profile) {
+  return await saveProfile(profile);
 }
-
-// Use loadProfile() everywhere instead of the static TEST_USER
-const TEST_USER = loadProfile();
 
 // ─── HELPER: get latest yield data ───────────────────────────────────────────
 async function getYieldSnapshot() {
@@ -119,7 +139,7 @@ bot.start(async (ctx) => {
     try {
       const balances = await fetchWalletBalances(walletAddress);
 
-      const profile = loadProfile();
+      const profile = await loadProfile();
       profile.walletAddress = walletAddress;
       profile.telegramId = ctx.from.id.toString();
       profile.userPositionUSD = balances.totalUSD;
@@ -127,7 +147,7 @@ bot.start(async (ctx) => {
       profile.lastUpdated = Date.now();
       profile.source = 'dashboard';
       profile.onboardingComplete = false;
-      saveUser(profile);
+      await saveUser(profile);
 
       const usdyLine  = balances.positions.USDY.usdValue  > 0 ? `• USDY — $${balances.positions.USDY.usdValue.toFixed(2)}\n`  : '';
       const methLine  = balances.positions.mETH.usdValue  > 0 ? `• mETH — $${balances.positions.mETH.usdValue.toFixed(2)}\n`  : '';
@@ -193,7 +213,7 @@ bot.start(async (ctx) => {
 
 // ─── /setup ──────────────────────────────────────────────────────────────────
 bot.command('setup', async (ctx) => {
-  const profile = loadProfile();
+  const profile = await loadProfile();
   const current = profile.userTier;
   await ctx.reply(
     `⚙️ *RWAI Delegation Setup*\n\n` +
@@ -215,7 +235,7 @@ bot.command('setup', async (ctx) => {
 
 bot.action('tier_1', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Watch Only', tierCode: 1 });
+  await saveProfile({ userTier: 'Watch Only', tierCode: 1 });
   await ctx.reply(
     `👁 *Tier 1 — Watch Only activated*\n\n` +
     `I'll alert you when yields shift meaningfully, but won't propose any actions. You stay fully in control.\n\n` +
@@ -226,7 +246,7 @@ bot.action('tier_1', async (ctx) => {
 
 bot.action('tier_2', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Propose and Confirm', tierCode: 2 });
+  await saveProfile({ userTier: 'Propose and Confirm', tierCode: 2 });
   await ctx.reply(
     `✅ *Tier 2 — Propose and Confirm activated*\n\n` +
     `When yields shift enough to act on, I'll send you a proposal with Approve / Dismiss buttons. One tap to confirm, nothing auto-executes.\n\n` +
@@ -242,9 +262,9 @@ bot.action('tier_3_disabled', async (ctx) => {
 // ─── JOURNEY 1: TIER SELECTION (from dashboard deep-link) ────────────────────
 bot.action('set_tier_1', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   if (!profile.alertSensitivity) profile.alertSensitivity = 'major';
-  saveUser({ ...profile, userTier: 'Watch Only', tierCode: 1, onboardingComplete: true });
+  await saveUser({ ...profile, userTier: 'Watch Only', tierCode: 1, onboardingComplete: true });
   await ctx.reply(
     `✅ Watch Only mode activated.\n\n` +
     `I'll explain every yield change and opportunity — you decide if and when to act.\n\n` +
@@ -254,9 +274,9 @@ bot.action('set_tier_1', async (ctx) => {
 
 bot.action('set_tier_2', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   if (!profile.alertSensitivity) profile.alertSensitivity = 'balanced';
-  saveUser({ ...profile, userTier: 'Propose and Confirm', tierCode: 2, onboardingComplete: true });
+  await saveUser({ ...profile, userTier: 'Propose and Confirm', tierCode: 2, onboardingComplete: true });
   await ctx.reply(
     `✅ Propose and Confirm mode activated.\n\n` +
     `When I detect a meaningful opportunity, I'll send you a one-tap approval request.\n\n` +
@@ -266,9 +286,9 @@ bot.action('set_tier_2', async (ctx) => {
 
 bot.action('set_tier_3', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   if (!profile.alertSensitivity) profile.alertSensitivity = 'high';
-  saveUser({ ...profile, userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
+  await saveUser({ ...profile, userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
   await ctx.reply(
     `⚡ Delegated mode activated.\n\n` +
     `I can auto-execute rebalances up to $500 per swap when spread conditions justify it.\n\n` +
@@ -278,7 +298,7 @@ bot.action('set_tier_3', async (ctx) => {
 
 // ─── /sensitivity ──────────────────────────────────────────────────────────────
 bot.command('sensitivity', async (ctx) => {
-  const profile = loadProfile();
+  const profile = await loadProfile();
   const current = profile.alertSensitivity || 'balanced';
   const labels = {
     high:     'High Sensitivity — alerts on small opportunities (0.5% spread)',
@@ -303,40 +323,40 @@ bot.command('sensitivity', async (ctx) => {
 
 bot.action('sens_high', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   profile.alertSensitivity = 'high';
-  saveUser(profile);
+  await saveUser(profile);
   await ctx.reply(`🔍 High Sensitivity active. I'll alert you whenever spread exceeds 0.5%.`);
 });
 
 bot.action('sens_balanced', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   profile.alertSensitivity = 'balanced';
-  saveUser(profile);
+  await saveUser(profile);
   await ctx.reply(`⚖️ Balanced sensitivity active. I'll alert you when spread exceeds 1.5%.`);
 });
 
 bot.action('sens_major', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   profile.alertSensitivity = 'major';
-  saveUser(profile);
+  await saveUser(profile);
   await ctx.reply(`🎯 Major Opportunities Only active. I'll only alert you on spreads above 2.0%.`);
 });
 
 bot.action('request_wallet', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  const profile = loadProfile();
+  const profile = await loadProfile();
   profile.awaitingWallet = true;
   profile.telegramId = ctx.from.id.toString();
-  saveUser(profile);
+  await saveUser(profile);
   await ctx.reply(`Send me your Mantle wallet address (starts with 0x) and I'll fetch your positions automatically.`);
 });
 
 bot.action('watch_mode', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Watch Only', tierCode: 1, walletAddress: null, onboardingComplete: true });
+  await saveProfile({ userTier: 'Watch Only', tierCode: 1, walletAddress: null, onboardingComplete: true });
   await ctx.reply(
     `📊 Watch mode activated.\n\n` +
     `I'll track live USDY and mETH yields on Mantle and alert you when spreads change.\n\n` +
@@ -350,13 +370,13 @@ bot.command('status', async (ctx) => {
   await ctx.reply('📡 Fetching live yield data...');
 
   try {
-    const profile = loadProfile();
+    const profile = await loadProfile();
 
     // Refresh on-chain balances if wallet is known
     if (profile.walletAddress) {
       try {
         const balances = await fetchWalletBalances(profile.walletAddress);
-        saveProfile({ userPositionUSD: balances.totalUSD, positions: balances.positions, lastUpdated: Date.now() });
+        await saveProfile({ userPositionUSD: balances.totalUSD, positions: balances.positions, lastUpdated: Date.now() });
         profile.userPositionUSD = balances.totalUSD;
       } catch (err) {
         console.warn('Balance refresh failed on /status:', err.message);
@@ -419,7 +439,7 @@ bot.command('compare', async (ctx) => {
   await ctx.reply('⚖️ Comparing USDY vs mETH vs cmETH...');
 
   try {
-    const profile = loadProfile();
+    const profile = await loadProfile();
     const data = await getYieldSnapshot();
     const pos = profile.userPositionUSD;
 
@@ -455,7 +475,7 @@ bot.command('strategy', async (ctx) => {
   await ctx.reply('🧠 Analysing current yields and your profile...');
 
   try {
-    const profile = loadProfile();
+    const profile = await loadProfile();
     const data = await getYieldSnapshot();
     const recommendation = await generateStrategy(data, profile);
     await ctx.reply(`📈 *RWAI Strategy Recommendation*\n\n${recommendation}`, { parse_mode: 'Markdown' });
@@ -573,14 +593,14 @@ bot.command('history', async (ctx) => {
 // ─── FREE TEXT: Ask RWAI anything ────────────────────────────────────────────
 bot.on('text', async (ctx) => {
   // Intercept wallet addresses when in onboarding flow
-  const onboardingProfile = loadProfile();
+  const onboardingProfile = await loadProfile();
   if (onboardingProfile.awaitingWallet) {
     const text = ctx.message.text.trim();
 
     if (text.match(/^0x[0-9a-fA-F]{40}$/)) {
       onboardingProfile.awaitingWallet = false;
       onboardingProfile.walletAddress = text;
-      saveUser(onboardingProfile);
+      await saveUser(onboardingProfile);
 
       await ctx.reply('🔍 Found your wallet. Fetching your Mantle positions...');
 
@@ -590,7 +610,7 @@ bot.on('text', async (ctx) => {
         onboardingProfile.positions = balances.positions;
         onboardingProfile.lastUpdated = Date.now();
         onboardingProfile.source = 'telegram';
-        saveUser(onboardingProfile);
+        await saveUser(onboardingProfile);
 
         const usdyLine  = balances.positions.USDY.usdValue  > 0 ? `• USDY — $${balances.positions.USDY.usdValue.toFixed(2)}\n`   : '';
         const methLine  = balances.positions.mETH.usdValue  > 0 ? `• mETH — $${balances.positions.mETH.usdValue.toFixed(2)}\n`   : '';
@@ -624,7 +644,7 @@ bot.on('text', async (ctx) => {
       return;
     } else {
       onboardingProfile.awaitingWallet = false;
-      saveUser(onboardingProfile);
+      await saveUser(onboardingProfile);
       await ctx.reply("That doesn't look like a valid Mantle wallet address. Please send an address starting with 0x followed by 40 characters.");
       return;
     }
@@ -640,7 +660,7 @@ bot.on('text', async (ctx) => {
   try {
     const yieldData = await getYieldSnapshot();
     const explanation = await generateExplanation(yieldData, {
-      ...loadProfile(),
+      ...(await loadProfile()),
       priorDecisions: `User asked: "${question}". Answer this question directly using current yield context.`,
     });
 

@@ -409,7 +409,7 @@ async function runAgentLoop() {
         } else if (!await hasPendingUnsentAlert()) {
           await writePendingAlert(explanation, prediction, yieldData, alertType);
         }
-      } else if (!hasPendingUnsentAlert()) {
+      } else if (!await hasPendingUnsentAlert()) {
         await writePendingAlert(explanation, prediction, yieldData, alertType);
       } else {
         console.log("Previous alert still unsent — skipping overwrite.");

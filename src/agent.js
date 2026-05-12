@@ -90,11 +90,22 @@ function loadUser() {
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function hasPendingUnsentAlert() {
+async function hasPendingUnsentAlert() {
+  // Primary: check Redis (source of truth — web/bot approvals write here)
+  try {
+    const res = await fetch('https://rwai.fyi/api/pending-alert');
+    if (res.ok) {
+      const data = await res.json();
+      // pending:true means unresponded; null means no alert at all
+      if (data === null) return false;
+      return data.pending === true;
+    }
+  } catch {}
+  // Fallback: local file (in case API is unreachable)
   if (!existsSync(PENDING_ALERT_PATH)) return false;
   try {
     const alert = JSON.parse(readFileSync(PENDING_ALERT_PATH, "utf8"));
-    return alert.sent === false;
+    return alert.sent === false && !alert.approved && !alert.dismissed;
   } catch {
     return false;
   }
@@ -395,7 +406,7 @@ async function runAgentLoop() {
             yieldData,
             'auto_executed'
           );
-        } else if (!hasPendingUnsentAlert()) {
+        } else if (!await hasPendingUnsentAlert()) {
           await writePendingAlert(explanation, prediction, yieldData, alertType);
         }
       } else if (!hasPendingUnsentAlert()) {

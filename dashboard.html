@@ -1309,7 +1309,7 @@
       <div class="next-action-top">
         <div class="next-action-left">
           <div class="next-action-rec-label">Agent decision</div>
-          <div class="next-action-content">Hold current positions</div>
+          <div class="next-action-content" id="next-action-content">Checking agent…</div>
           <div class="next-action-sub" id="next-action-spread-txt">Calculating live spread…</div>
         </div>
         <div class="next-action-right">
@@ -2220,16 +2220,46 @@
     var simSpreadEl = document.getElementById('sim-spread-pct');
     if (simSpreadEl) simSpreadEl.textContent = Math.abs(spread).toFixed(2) + '%';
 
-    // Next action sub
-    var nextActionEl = document.getElementById('next-action-spread-txt');
-    if (nextActionEl) {
-      if (spread >= 2.0) {
-        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above your auto-execute threshold of 2.0% — rebalance may execute automatically';
-      } else if (spread >= 1.5) {
-        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above the 1.5% alert threshold — no action required';
-      } else {
-        nextActionEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is below the 1.5% alert threshold — holding current allocation';
-      }
+    // Next action sub — kick off async recommendation update
+    updateRecommendation(spread);
+  }
+
+  async function updateRecommendation(spread) {
+    var contentEl  = document.getElementById('next-action-content');
+    var subEl      = document.getElementById('next-action-spread-txt');
+    var sensitivity = window.USER_SENSITIVITY || localStorage.getItem('rwai_sensitivity') || 'balanced';
+    var actionThresholds = {
+      high:     { alert: 0.5, proposal: 0.8,  autoExec: 1.2 },
+      balanced: { alert: 1.5, proposal: 1.65, autoExec: 2.0 },
+      major:    { alert: 2.0, proposal: 2.5,  autoExec: 3.0 },
+    };
+    var t = actionThresholds[sensitivity] || actionThresholds.balanced;
+
+    // Check live agent state from Redis
+    var hasActiveAlert = false;
+    var alertType = null;
+    try {
+      var res = await fetch('/api/pending-alert');
+      var data = await res.json();
+      hasActiveAlert = !!(data && data.pending === true);
+      alertType = data && data.alertType;
+    } catch {}
+
+    if (hasActiveAlert && spread >= t.proposal) {
+      if (contentEl) contentEl.textContent = 'Rebalance recommended';
+      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% exceeds proposal threshold — agent awaiting your approval';
+    } else if (spread >= t.autoExec) {
+      if (contentEl) contentEl.textContent = 'Auto-execute may fire';
+      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above auto-execute threshold of ' + t.autoExec + '%';
+    } else if (spread >= t.proposal) {
+      if (contentEl) contentEl.textContent = 'Rebalance opportunity';
+      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% above proposal threshold — awaiting next agent cycle';
+    } else if (spread >= t.alert) {
+      if (contentEl) contentEl.textContent = 'Monitoring spread';
+      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% above alert threshold — no action yet';
+    } else {
+      if (contentEl) contentEl.textContent = 'Hold current positions';
+      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is below your alert threshold — holding current allocation';
     }
   }
 
@@ -2350,6 +2380,12 @@
     setInterval(updateLatestTx, 60000);
     loadPredictionsAndHistory();
     setInterval(loadPredictionsAndHistory, 60000);
+    updateRecommendation(0);
+    setInterval(function() {
+      var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
+      var s = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
+      updateRecommendation(s);
+    }, 30000);
   });
 
   /* ── Latest tx meta-link ── */

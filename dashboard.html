@@ -2279,34 +2279,50 @@
     var btnPause = document.getElementById('btn-pause-agent');
     if (btnPause) btnPause.addEventListener('click', togglePauseAgent);
 
-    // Restore Tier 3 state from localStorage
-    var fullyActivated = localStorage.getItem('rwai_tier3_activated') === 'true';
-    var usdyOnly = localStorage.getItem('rwai_tier3_usdy_approved') === 'true' && !fullyActivated;
+    // Restore Tier 3 state — localStorage as quick cache, API as source of truth
+    (async function restoreTier3State() {
+      var cachedActivated = localStorage.getItem('rwai_tier3_activated') === 'true';
+      var cachedUsdyOnly  = localStorage.getItem('rwai_tier3_usdy_approved') === 'true' && !cachedActivated;
 
-    if (fullyActivated) {
-      var step1 = document.getElementById('approval-step-1');
-      var step2 = document.getElementById('approval-step-2');
-      var revokePanel = document.getElementById('tier-3-revoke');
-      if (step1) step1.style.display = 'none';
-      if (step2) step2.style.display = 'none';
-      if (revokePanel) revokePanel.style.display = 'block';
-      var txHash = localStorage.getItem('rwai_tier3_meth_tx') || localStorage.getItem('rwai_tier3_usdy_tx');
-      var statusEl = document.getElementById('activation-status');
-      if (statusEl && txHash) {
-        statusEl.innerHTML = '✓ Tier 3 active. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View approval</a>';
-        statusEl.style.color = '#1D9E75';
+      if (cachedActivated) renderTier3Activated(localStorage.getItem('rwai_tier3_meth_tx') || localStorage.getItem('rwai_tier3_usdy_tx'));
+      else if (cachedUsdyOnly) renderTier3StepTwo();
+
+      var apiState = await fetchTier3StateFromAPI();
+      if (!apiState) return;
+
+      if (apiState.activated) {
+        localStorage.setItem('rwai_tier3_activated', 'true');
+        if (apiState.txHash) localStorage.setItem('rwai_tier3_meth_tx', apiState.txHash);
+        renderTier3Activated(apiState.txHash);
+        var tierLabel = document.getElementById('tier-label');
+        if (tierLabel && apiState.tierCode === 3) tierLabel.textContent = 'Tier 3 — Auto-Execute';
+      } else if (apiState.tierCode !== 3) {
+        if (cachedActivated) {
+          localStorage.removeItem('rwai_tier3_activated');
+          localStorage.removeItem('rwai_tier3_usdy_approved');
+          localStorage.removeItem('rwai_tier3_meth_tx');
+          localStorage.removeItem('rwai_tier3_usdy_tx');
+          resetTier3UI();
+        }
       }
-    } else if (usdyOnly) {
-      var step1u = document.getElementById('approval-step-1');
-      var step2u = document.getElementById('approval-step-2');
-      if (step1u) step1u.style.display = 'none';
-      if (step2u) step2u.style.display = 'block';
-      var statusElU = document.getElementById('activation-status');
-      if (statusElU) {
-        statusElU.innerHTML = '✓ USDY approved. Now approve mETH to complete activation.';
-        statusElU.style.color = '#1D9E75';
+    })();
+
+    (async function restoreTierLabel() {
+      var apiState = await fetchTier3StateFromAPI();
+      if (!apiState) return;
+      var tierLabel = document.getElementById('tier-label');
+      if (!tierLabel) return;
+      var labels = { 1: 'Tier 1 — Monitor Only', 2: 'Tier 2 — Propose and Confirm', 3: 'Tier 3 — Auto-Execute' };
+      if (labels[apiState.tierCode]) tierLabel.textContent = labels[apiState.tierCode];
+      document.querySelectorAll('.tier-option').forEach(function(opt) {
+        opt.classList.remove('selected');
+        if (parseInt(opt.dataset.tier) === apiState.tierCode) opt.classList.add('selected');
+      });
+      if (apiState.tierCode === 3) {
+        var panel = document.getElementById('tier-3-activation');
+        if (panel) panel.style.display = 'block';
       }
-    }
+    })();
 
     fetchPendingAlert();
     setInterval(fetchPendingAlert, 30000);
@@ -2464,6 +2480,66 @@
       statusEl.style.color = '#e05252';
       btn.disabled = false;
       btn.style.opacity = '1';
+    }
+  }
+
+  async function fetchTier3StateFromAPI() {
+    try {
+      var res = await fetch('/api/profile');
+      if (!res.ok) return null;
+      var profile = await res.json();
+      return {
+        activated: profile.tier3Activated === true,
+        txHash: profile.tier3ApprovalTx || null,
+        tierCode: profile.tierCode || 1,
+      };
+    } catch (err) {
+      console.warn('Tier 3 state fetch failed:', err.message);
+      return null;
+    }
+  }
+
+  function renderTier3Activated(txHash) {
+    var step1 = document.getElementById('approval-step-1');
+    var step2 = document.getElementById('approval-step-2');
+    var revoke = document.getElementById('tier-3-revoke');
+    var statusEl = document.getElementById('activation-status');
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'none';
+    if (revoke) revoke.style.display = 'block';
+    if (statusEl && txHash) {
+      statusEl.innerHTML = '✓ Tier 3 active. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View approval</a>';
+      statusEl.style.color = '#1D9E75';
+    }
+  }
+
+  function renderTier3StepTwo() {
+    var step1 = document.getElementById('approval-step-1');
+    var step2 = document.getElementById('approval-step-2');
+    var statusEl = document.getElementById('activation-status');
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'block';
+    if (statusEl) {
+      statusEl.innerHTML = '✓ USDY approved. Now approve mETH to complete activation.';
+      statusEl.style.color = '#1D9E75';
+    }
+  }
+
+  function resetTier3UI() {
+    var step1 = document.getElementById('approval-step-1');
+    var step2 = document.getElementById('approval-step-2');
+    var revoke = document.getElementById('tier-3-revoke');
+    var statusEl = document.getElementById('activation-status');
+    var activateBtn = document.getElementById('btn-activate-tier-3');
+    if (step1) step1.style.display = 'block';
+    if (step2) step2.style.display = 'none';
+    if (revoke) revoke.style.display = 'none';
+    if (statusEl) { statusEl.innerHTML = ''; statusEl.style.color = ''; }
+    if (activateBtn) {
+      activateBtn.textContent = 'Approve USDY';
+      activateBtn.style.background = '#1D9E75';
+      activateBtn.style.color = '#fff';
+      activateBtn.disabled = false;
     }
   }
 
@@ -2649,7 +2725,7 @@
         fetch('/api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierCode: 2, userTier: 'Propose and Confirm', tier3Activated: false, tier3ApprovalTx: null })
+          body: JSON.stringify({ tierCode: 2, userTier: 'Propose and Confirm', tier3Activated: false, tier3ApprovalTx: null, lastSyncSource: 'web' })
         }).catch(function() {});
 
         var t = document.createElement('div');

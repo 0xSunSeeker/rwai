@@ -1,7 +1,7 @@
 {
-  "userPositionUSD": 100.17279242127948,
-  "userTier": "Propose and Confirm",
-  "tierCode": 2,
+  "userPositionUSD": 99.8200848142821,
+  "userTier": "Delegated",
+  "tierCode": 3,
   "alertSensitivity": "balanced",
   "priorDecisions": "No prior decisions",
   "agentAccuracy": "63% accurate over 91 predictions (USDY 100%)",
@@ -16,7 +16,7 @@
     },
     "mETH": {
       "balance": 0.03032739527062696,
-      "usdValue": 69.87310560771368,
+      "usdValue": 69.5203980007163,
       "apy": 2.06
     },
     "cmETH": {
@@ -25,7 +25,10 @@
       "apy": 2.31
     }
   },
-  "lastUpdated": 1778550129205,
+  "lastUpdated": 1778580823206,
   "source": "telegram",
-  "onboardingComplete": true
+  "onboardingComplete": true,
+  "lastSyncSource": "telegram",
+  "agentPaused": true,
+  "tier3Activated": true
 }

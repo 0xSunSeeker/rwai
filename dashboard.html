@@ -1050,11 +1050,11 @@
         <hr class="hero-status-divider" />
         <div class="hero-status-row">
           <span class="hero-status-row-label">Last scan</span>
-          <span class="hero-status-row-val"><span id="last-checked">4</span> min ago</span>
+          <span class="hero-status-row-val"><span id="last-checked">—</span> <span id="last-checked-unit" style="display:none;">min ago</span></span>
         </div>
         <div class="hero-status-row">
           <span class="hero-status-row-label">Next scan in</span>
-          <span class="hero-status-row-val"><span id="next-check">26</span> min</span>
+          <span class="hero-status-row-val"><span id="next-check">—</span> <span id="next-check-unit" style="display:none;">min</span></span>
         </div>
         <div class="hero-status-row">
           <span class="hero-status-row-label">Positions tracked</span>
@@ -1909,14 +1909,15 @@
     });
 
   /* ── Header minute timer ── */
-  var lastChecked = 4, nextCheck = 26;
+  var lastChecked = null, nextCheck = null;
   var lastEl = document.getElementById('last-checked');
   var nextEl = document.getElementById('next-check');
   setInterval(function () {
+    if (lastChecked === null || nextCheck === null) return;
     lastChecked += 1; nextCheck -= 1;
     if (nextCheck <= 0) { lastChecked = 0; nextCheck = 30; }
-    lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
-    nextEl.textContent = nextCheck;
+    if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
+    if (nextEl) nextEl.textContent = nextCheck;
   }, 60000);
 
   /* ── Next Action countdown (real seconds) ── */
@@ -2383,6 +2384,10 @@
       nextCheck   = Math.max(1, 30 - minsSince);
       if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
       if (nextEl) nextEl.textContent = nextCheck;
+      var lastUnit = document.getElementById('last-checked-unit');
+      var nextUnit = document.getElementById('next-check-unit');
+      if (lastUnit) lastUnit.style.display = '';
+      if (nextUnit) nextUnit.style.display = '';
     } catch(e) {
       console.warn('Latest tx fetch failed:', e);
     }

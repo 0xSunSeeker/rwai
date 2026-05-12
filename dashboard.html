@@ -1638,43 +1638,36 @@
     var threshold = getSensitivityThreshold();
     var label = getSensitivityLabel();
 
+    var usdyEl  = document.getElementById('usdy-usd');
+    var usdyVal = usdyEl ? parseFloat(usdyEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
+    var annualBenefit = (usdyVal * currentSpread) / 100;
+    var worthwhile = annualBenefit >= 5;
+
     var heroTitle  = document.getElementById('hero-title');
-    var heroBody   = document.querySelector('.hero-body');
     var heroStatus = document.getElementById('hero-status-label');
 
-    var title, body, statusLabel, statusColor;
+    var title, statusLabel, statusColor;
 
-    if (currentSpread >= threshold) {
+    if (currentSpread >= threshold && worthwhile) {
       title       = 'Action recommended';
       statusLabel = 'Threshold exceeded';
       statusColor = '#1D9E75';
-      body        = 'Current spread of ' + currentSpread.toFixed(2) + '% exceeds your ' + label.pct + ' ' + label.name + ' threshold. RWAi recommends reviewing your allocation.';
+    } else if (currentSpread >= threshold && !worthwhile) {
+      title       = 'Threshold exceeded — holding';
+      statusLabel = 'Below action threshold';
+      statusColor = '#F59E0B';
     } else if (currentSpread >= threshold * 0.85) {
       title       = 'Opportunity emerging';
       statusLabel = 'Approaching threshold';
       statusColor = '#F59E0B';
-      body        = 'Current spread is ' + currentSpread.toFixed(2) + '% — approaching your ' + label.pct + ' threshold. RWAi is watching closely for the next move.';
     } else {
       title       = 'Monitoring conditions';
       statusLabel = 'Below your threshold';
       statusColor = '#888';
-      body        = 'Current spread of ' + currentSpread.toFixed(2) + '% is below your ' + label.pct + ' ' + label.name + ' threshold. RWAi is watching and will alert you when conditions change.';
     }
 
     if (heroTitle)  heroTitle.textContent  = title;
     if (heroStatus) { heroStatus.textContent = statusLabel; heroStatus.style.color = statusColor; }
-    if (heroBody) {
-      var spreadSpan = heroBody.querySelector('#hero-spread-pct');
-      var usdySpan   = heroBody.querySelector('#hero-usdy-val');
-      var impactSpan = heroBody.querySelector('#hero-impact-amt');
-      if (spreadSpan || usdySpan || impactSpan) {
-        // Hero body has live spans — update only the static text around them
-        heroBody.firstChild && (heroBody.firstChild.textContent !== undefined)
-          ? null : null; // preserve spans, just set title-driven text via status label
-      } else {
-        heroBody.textContent = body;
-      }
-    }
   }
 
   function openTelegram() {

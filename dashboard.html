@@ -1028,7 +1028,9 @@
             Share on X
           </button>
         </div>
-        <div class="hero-meta-link">4 mins ago · <a href="https://mantlescan.xyz/tx/0xa041618da351ae12037d409c5981abd05aa708557337a798ab1a48426948b36c" target="_blank" rel="noopener noreferrer">View on Mantle Explorer</a></div>
+        <div class="hero-meta-link" id="hero-meta-link">
+          <span id="hero-tx-time">Loading…</span> · <a id="hero-tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Mantle Explorer</a>
+        </div>
       </div>
 
       <!-- RIGHT: status panel -->
@@ -2333,7 +2335,36 @@
     fetchPendingAlert();
     setInterval(fetchPendingAlert, 30000);
     restoreAgentPauseState();
+    updateLatestTx();
+    setInterval(updateLatestTx, 60000);
   });
+
+  /* ── Latest tx meta-link ── */
+  function timeAgo(ts) {
+    var then = new Date(ts).getTime();
+    var diff = Date.now() - then;
+    var mins  = Math.floor(diff / 60000);
+    var hours = Math.floor(mins / 60);
+    var days  = Math.floor(hours / 24);
+    if (days  > 0) return days  + (days  === 1 ? ' day ago'  : ' days ago');
+    if (hours > 0) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+    if (mins  > 0) return mins  + (mins  === 1 ? ' min ago'  : ' mins ago');
+    return 'just now';
+  }
+
+  async function updateLatestTx() {
+    try {
+      var res  = await fetch('/api/latest-tx');
+      var data = await res.json();
+      if (!data.found) return;
+      var timeEl = document.getElementById('hero-tx-time');
+      var linkEl = document.getElementById('hero-tx-link');
+      if (timeEl) timeEl.textContent = timeAgo(data.loggedAt);
+      if (linkEl) linkEl.href = 'https://mantlescan.xyz/tx/' + data.txHash;
+    } catch(e) {
+      console.warn('Latest tx fetch failed:', e);
+    }
+  }
 
   /* ── Tier 3 vault approval ── */
   var VAULT_ADDRESS_T3    = '0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69';

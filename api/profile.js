@@ -1,10 +1,14 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { Redis } from '@upstash/redis';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-// On Vercel, /var/task is read-only. Use /tmp for writes (per-instance ephemeral).
-// Reads check /tmp first (recently written this invocation chain), then the committed bundle file.
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
 const BUNDLE_PATH = join(process.cwd(), 'data', 'userProfile.json');
-const TMP_PATH    = '/tmp/userProfile.json';
+const REDIS_KEY = 'rwai:profile';
 
 const DEFAULT_PROFILE = {
   userPositionUSD: 0,
@@ -22,27 +26,39 @@ const DEFAULT_PROFILE = {
   lastUpdated: null,
 };
 
-function readProfile() {
-  for (const p of [TMP_PATH, BUNDLE_PATH]) {
-    if (existsSync(p)) {
-      try { return JSON.parse(readFileSync(p, 'utf8')); } catch {}
-    }
+async function readProfile() {
+  try {
+    const data = await redis.get(REDIS_KEY);
+    if (data) return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (err) {
+    console.warn('Redis read failed:', err.message);
+  }
+  if (existsSync(BUNDLE_PATH)) {
+    try { return JSON.parse(readFileSync(BUNDLE_PATH, 'utf8')); } catch {}
   }
   return null;
 }
 
-export default function handler(req, res) {
+async function writeProfile(profile) {
+  try {
+    await redis.set(REDIS_KEY, JSON.stringify(profile));
+    return true;
+  } catch (err) {
+    console.error('Redis write failed:', err.message);
+    return false;
+  }
+}
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
     try {
-      const profile = readProfile();
+      const profile = await readProfile();
       return res.status(200).json({ ...DEFAULT_PROFILE, ...(profile || {}) });
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -52,16 +68,15 @@ export default function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const updates = req.body;
-      const current = readProfile() || DEFAULT_PROFILE;
-
+      const current = (await readProfile()) || { ...DEFAULT_PROFILE };
       const merged = {
         ...current,
         ...updates,
         lastSyncSource: updates.lastSyncSource || 'web',
         lastUpdated: Date.now(),
       };
-
-      writeFileSync(TMP_PATH, JSON.stringify(merged, null, 2));
+      const ok = await writeProfile(merged);
+      if (!ok) return res.status(500).json({ error: 'Could not persist profile' });
       return res.status(200).json(merged);
     } catch (err) {
       return res.status(500).json({ error: err.message });

@@ -1,10 +1,39 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { Redis } from '@upstash/redis';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const BUNDLE_PATH = join(process.cwd(), 'data', 'pendingAlert.json');
-const TMP_PATH    = '/tmp/pendingAlert.json';
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
-export default function handler(req, res) {
+const BUNDLE_PATH = join(process.cwd(), 'data', 'pendingAlert.json');
+const REDIS_KEY = 'rwai:pending-alert';
+
+async function readAlert() {
+  try {
+    const data = await redis.get(REDIS_KEY);
+    if (data) return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (err) {
+    console.warn('Redis read failed:', err.message);
+  }
+  if (existsSync(BUNDLE_PATH)) {
+    try { return JSON.parse(readFileSync(BUNDLE_PATH, 'utf8')); } catch {}
+  }
+  return null;
+}
+
+async function writeAlert(alert) {
+  try {
+    await redis.set(REDIS_KEY, JSON.stringify(alert));
+    return true;
+  } catch (err) {
+    console.error('Redis write failed:', err.message);
+    return false;
+  }
+}
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,13 +47,7 @@ export default function handler(req, res) {
         return res.status(400).json({ error: 'action must be approve or dismiss' });
       }
 
-      let current = null;
-      for (const p of [TMP_PATH, BUNDLE_PATH]) {
-        if (existsSync(p)) {
-          try { current = JSON.parse(readFileSync(p, 'utf8')); break; } catch {}
-        }
-      }
-
+      const current = await readAlert();
       if (!current) return res.status(404).json({ error: 'No pending alert' });
 
       const updated = {
@@ -35,7 +58,8 @@ export default function handler(req, res) {
         respondedVia: 'web',
       };
 
-      writeFileSync(TMP_PATH, JSON.stringify(updated, null, 2));
+      const ok = await writeAlert(updated);
+      if (!ok) return res.status(500).json({ error: 'Could not persist response' });
       return res.status(200).json(updated);
     } catch (err) {
       return res.status(500).json({ error: err.message });

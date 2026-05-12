@@ -295,6 +295,12 @@ async function executeTier3Swap(user, yieldData) {
 async function runAgentLoop() {
   console.log(`\n[${new Date().toISOString()}] Agent loop running...`);
 
+  const profile = loadUser();
+  if (profile.agentPaused === true) {
+    console.log('⏸ Agent is paused — skipping cycle. Resume from dashboard or Telegram to continue.');
+    return;
+  }
+
   try {
     // Step 1 — Fetch live yield data
     const yieldData = await fetchAllYieldData(previousSnapshot);

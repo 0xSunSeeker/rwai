@@ -626,6 +626,17 @@
     .history-badge.delivered { background: rgba(59,130,246,0.12); color: #60a5fa; }
     .history-badge.approved  { background: rgba(29,158,117,0.12); color: #1D9E75; }
     .history-badge.dismissed { background: rgba(100,100,100,0.12); color: #555; }
+    .pred-card {
+      background: #111; border: 1px solid #1c1c1c;
+      border-radius: 12px; padding: 15px 20px;
+      display: flex; align-items: flex-start; gap: 16px;
+      margin-bottom: 8px;
+      animation: fade-up 0.4s ease both;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .pred-card:hover { background: #131313; border-color: #242424; transform: translateX(3px); }
+    .pred-card:last-child { margin-bottom: 0; }
+    .pred-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; margin-left: auto; }
     .pred-status { font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; }
     .pred-status.correct { background: rgba(29,158,117,0.15); color: #1D9E75; }
     .pred-status.wrong   { background: rgba(245,158,11,0.15);  color: #F59E0B; }
@@ -987,7 +998,7 @@
           </div>
           <div class="hero-metric">
             <div class="hero-metric-label">Confidence Score</div>
-            <div class="hero-metric-value">—</div>
+            <div class="hero-metric-value" id="hero-confidence">—</div>
           </div>
           <div class="hero-metric">
             <div class="hero-metric-label">Logged on Mantle</div>
@@ -2643,28 +2654,43 @@
       el.innerHTML = '<div class="prediction-row" style="opacity:0.5;"><div class="pred-dot"></div><div class="pred-body"><div class="pred-asset">No predictions yet</div><div class="pred-desc">The agent will log predictions here once it runs.</div></div></div>';
       return;
     }
-    el.innerHTML = predictions.map(function(p) {
-      var resolved  = p.resolved;
-      var correct   = p.outcome === 'correct';
-      var dotClass  = !resolved ? '' : (correct ? 'green' : 'red');
-      var badgeHtml = resolved
-        ? '<span class="pred-badge ' + (correct ? 'correct' : 'incorrect') + '">' + (correct ? 'Correct' : 'Incorrect') + '</span>'
-        : '<span class="pred-badge pending">Pending</span>';
-      var usdyLine = p.usdyDirection !== 'unknown'
-        ? '<div class="pred-asset">USDY ' + directionLabel(p.usdyDirection) + ' <span style="font-size:0.65rem;color:#555;">' + Math.round((p.usdyConfidence||0)*100) + '% confidence</span></div>'
-        : '';
-      var methLine = p.methDirection !== 'unknown'
-        ? '<div class="pred-asset">mETH ' + directionLabel(p.methDirection) + ' <span style="font-size:0.65rem;color:#555;">' + Math.round((p.methConfidence||0)*100) + '% confidence</span></div>'
-        : '';
-      var reasonLine = (p.usdyReasoning || p.methReasoning)
-        ? '<div class="pred-desc">' + (p.usdyReasoning || p.methReasoning).slice(0, 120) + (((p.usdyReasoning || p.methReasoning).length > 120) ? '…' : '') + '</div>'
-        : '';
-      return '<div class="prediction-row">'
-        + '<div class="pred-dot ' + dotClass + '"></div>'
-        + '<div class="pred-body">' + usdyLine + methLine + reasonLine + '</div>'
-        + '<div class="pred-right">'
-        + '<span class="pred-time">' + timeAgoShort(p.loggedAt) + '</span>'
-        + badgeHtml
+
+    // Deduplicate by USDY+mETH direction combo, keep most recent of each
+    var seen   = {};
+    var unique = [];
+    for (var i = 0; i < predictions.length; i++) {
+      var p   = predictions[i];
+      var key = (p.usdyDirection || '') + '_' + (p.methDirection || '');
+      if (!seen[key]) {
+        seen[key] = true;
+        unique.push(p);
+      }
+      if (unique.length >= 3) break;
+    }
+
+    el.innerHTML = unique.map(function(p) {
+      var usdyDir  = p.usdyDirection || 'unknown';
+      var methDir  = p.methDirection || 'unknown';
+      var usdyCap  = usdyDir.charAt(0).toUpperCase() + usdyDir.slice(1);
+      var methCap  = methDir.charAt(0).toUpperCase() + methDir.slice(1);
+      var resolved = p.resolved;
+      var correct  = p.outcome === 'correct';
+      var statusBadge = resolved
+        ? '<span class="pred-status ' + (correct ? 'correct' : 'wrong') + '">' + (correct ? 'CORRECT' : 'REVISED') + '</span>'
+        : '<span class="pred-status pending">PENDING</span>';
+      var reason = (p.usdyReasoning || p.methReasoning || '');
+      var reasonTrunc = reason.slice(0, 120) + (reason.length > 120 ? '…' : '');
+      var explorerUrl = p.txHash ? 'https://mantlescan.xyz/tx/' + p.txHash : 'https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63';
+      return '<div class="pred-card">'
+        + '<div class="pred-dot"></div>'
+        + '<div class="pred-body">'
+        + '<div class="pred-asset">USDY ' + usdyCap + ' <span style="font-size:0.7rem;color:#666;">' + (p.usdyConfidence || 0) + '% conf</span></div>'
+        + '<div class="pred-asset" style="margin-top:4px;">mETH ' + methCap + ' <span style="font-size:0.7rem;color:#666;">' + (p.methConfidence || 0) + '% conf</span></div>'
+        + (reasonTrunc ? '<div class="pred-desc" style="margin-top:8px;color:#888;font-size:0.75rem;">' + reasonTrunc + '</div>' : '')
+        + '</div>'
+        + '<div class="pred-meta">'
+        + '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer" class="pred-time" style="color:#888;text-decoration:none;">' + timeAgoShort(p.loggedAt) + '</a>'
+        + statusBadge
         + '</div>'
         + '</div>';
     }).join('');
@@ -2713,6 +2739,15 @@
       var data = await res.json();
       renderPredictionTimeline(data.predictions);
       renderAgentHistory(data.predictions);
+      if (data.predictions && data.predictions[0]) {
+        var latest = data.predictions[0];
+        var avgConf = Math.round(((latest.usdyConfidence || 0) + (latest.methConfidence || 0)) / 2);
+        var confEl  = document.getElementById('hero-confidence');
+        if (confEl) {
+          confEl.textContent = avgConf + '%';
+          confEl.style.color = avgConf >= 70 ? '#1D9E75' : '#F59E0B';
+        }
+      }
     } catch(e) {}
   }
 

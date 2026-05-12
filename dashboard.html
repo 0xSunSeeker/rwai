@@ -1176,7 +1176,7 @@
               stroke-dasharray="0 276.5"
               stroke-dashoffset="-278.5"
               transform="rotate(-90 60 60)"/>
-            <text x="60" y="56" text-anchor="middle" fill="#f0f0f0" font-size="13" font-weight="800" font-family="inherit">3</text>
+            <text x="60" y="56" text-anchor="middle" fill="#f0f0f0" font-size="13" font-weight="800" font-family="inherit" id="donut-asset-count">3</text>
             <text x="60" y="70" text-anchor="middle" fill="#3a3a3a" font-size="9" font-family="inherit" letter-spacing="0.5">assets</text>
           </svg>
         </div>
@@ -1191,7 +1191,7 @@
             <span class="donut-legend-name">mETH</span>
             <span class="donut-legend-pct" id="donut-meth-pct">~1%</span>
           </div>
-          <div class="donut-legend-item">
+          <div class="donut-legend-item" id="donut-cmeth-legend">
             <div class="donut-legend-dot" style="background:#8B5CF6"></div>
             <span class="donut-legend-name">cmETH</span>
             <span class="donut-legend-pct" id="donut-cmeth-pct">—</span>
@@ -1632,19 +1632,31 @@
       cm.setAttribute('stroke-dasharray', methArc.toFixed(1) + ' ' + (CIRC - methArc).toFixed(1));
       cm.setAttribute('stroke-dashoffset', (-usdyArc).toFixed(1));
     }
-    if (cc) {
-      cc.setAttribute('stroke-dasharray', cmethArc.toFixed(1) + ' ' + (CIRC - cmethArc).toFixed(1));
-      cc.setAttribute('stroke-dashoffset', (-(usdyArc + methArc)).toFixed(1));
+    var cmethLegend = document.getElementById('donut-cmeth-legend');
+    var assetCount  = document.getElementById('donut-asset-count');
+    if (cmethVal > 0) {
+      if (cc) {
+        cc.setAttribute('stroke-dasharray', cmethArc.toFixed(1) + ' ' + (CIRC - cmethArc).toFixed(1));
+        cc.setAttribute('stroke-dashoffset', (-(usdyArc + methArc)).toFixed(1));
+        cc.style.display = '';
+      }
+      if (cmethLegend) cmethLegend.style.display = '';
+      if (assetCount) assetCount.textContent = '3';
+    } else {
+      if (cc) { cc.setAttribute('stroke-dasharray', '0 ' + CIRC); cc.style.display = 'none'; }
+      if (cmethLegend) cmethLegend.style.display = 'none';
+      if (assetCount) assetCount.textContent = methVal > 0 ? '2' : '1';
     }
     var pu = document.getElementById('donut-usdy-pct');
     var pm = document.getElementById('donut-meth-pct');
     var pc = document.getElementById('donut-cmeth-pct');
-    var usdyRounded = Math.round(usdyPct * 100);
-    var methRounded = Math.round(methPct * 100);
+    var activePct  = usdyVal + methVal;
+    var usdyRounded  = activePct > 0 ? Math.round((usdyVal / activePct) * 100) : 100;
+    var methRounded  = activePct > 0 ? 100 - usdyRounded : 0;
     var cmethRounded = 100 - usdyRounded - methRounded;
     if (pu) pu.textContent = '~' + usdyRounded + '%';
     if (pm) pm.textContent = '~' + methRounded + '%';
-    if (pc) pc.textContent = cmethVal > 0 ? '~' + cmethRounded + '%' : '—';
+    if (pc) pc.textContent = cmethVal > 0 ? '~' + cmethRounded + '%' : '';
   }
 
   /* ── Total — reads from DOM so it's never wrong if one API fails ── */

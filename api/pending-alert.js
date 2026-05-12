@@ -33,7 +33,12 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const alert = await readAlert();
-      return res.status(200).json(alert);
+      if (!alert) return res.status(200).json(null);
+      return res.status(200).json({
+        ...alert,
+        pending: !alert.respondedAt && !alert.approved && !alert.dismissed,
+        alreadySent: alert.alreadySent === true,
+      });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -41,11 +46,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const alert = req.body;
-      if (!alert || !alert.explanation) {
-        return res.status(400).json({ error: 'explanation field required' });
+      const incoming = req.body;
+      if (!incoming || !incoming.explanation) {
+        // Partial update (e.g. alreadySent flag) — merge with existing
+        const current = await readAlert();
+        if (!current) return res.status(404).json({ error: 'No alert to update' });
+        const merged = { ...current, ...incoming };
+        await redis.set(REDIS_KEY, JSON.stringify(merged));
+        return res.status(200).json({ ok: true });
       }
-      await redis.set(REDIS_KEY, JSON.stringify(alert));
+      await redis.set(REDIS_KEY, JSON.stringify(incoming));
       return res.status(200).json({ ok: true });
     } catch (err) {
       return res.status(500).json({ error: err.message });

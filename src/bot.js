@@ -678,16 +678,15 @@ bot.on('text', async (ctx) => {
 // In production this becomes a webhook or is triggered directly by agent.js
 async function checkAndSendPendingAlert(chatId) {
   try {
-    if (!existsSync('./data/pendingAlert.json')) return;
+    const res = await fetch('https://rwai.fyi/api/pending-alert');
+    if (!res.ok) return;
+    const data = await res.json();
 
-    const alert = JSON.parse(readFileSync('./data/pendingAlert.json', 'utf8'));
+    if (!data || !data.pending) return;
+    if (data.alreadySent) return;
 
-    // Only send if not already handled
-    if (alert.sent || alert.approved || alert.dismissed) return;
-
-    // Send the alert
     await bot.telegram.sendMessage(chatId,
-      `🔔 *RWAI Alert*\n\n${alert.explanation}`,
+      `🔔 *RWAI Alert*\n\n${data.explanation}`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -697,9 +696,12 @@ async function checkAndSendPendingAlert(chatId) {
       }
     );
 
-    // Mark as sent
-    alert.sent = true;
-    writeFileSync('./data/pendingAlert.json', JSON.stringify(alert, null, 2));
+    // Mark as sent in Redis so we don't re-send on next poll
+    await fetch('https://rwai.fyi/api/pending-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, alreadySent: true }),
+    });
 
     console.log(`Alert sent to chat ${chatId}`);
   } catch (err) {
@@ -712,23 +714,33 @@ bot.action('approve', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
 
   try {
-    const alert = JSON.parse(readFileSync('./data/pendingAlert.json', 'utf8'));
-    const yieldSpread = Math.abs(alert.yieldData.usdyCurrentAPY - alert.yieldData.methCurrentAPR).toFixed(2);
+    const alertRes = await fetch('https://rwai.fyi/api/pending-alert');
+    const alertData = alertRes.ok ? await alertRes.json() : {};
+
+    const yieldData = alertData.yieldData || {};
+    const spread = yieldData.usdyCurrentAPY && yieldData.methCurrentAPR
+      ? Math.abs(yieldData.usdyCurrentAPY - yieldData.methCurrentAPR).toFixed(2)
+      : '0';
 
     // Log the approved decision on-chain via ERC-8004
-    const result = await logDecision(yieldSpread, alert.explanation);
+    let explorerLine = '_(on-chain anchor unavailable right now)_';
+    try {
+      const result = await logDecision(spread, alertData.explanation || '');
+      if (result?.explorerUrl) explorerLine = `[View on Mantle Explorer](${result.explorerUrl})`;
+    } catch (err) {
+      console.error('Anchor failed:', err.message);
+    }
 
-    // Mark alert handled so agent writes a fresh one next time
-    alert.approved = true;
-    writeFileSync('./data/pendingAlert.json', JSON.stringify(alert, null, 2));
-
-    const explorerLine = result?.explorerUrl
-      ? `[View on Mantle Explorer](${result.explorerUrl})`
-      : '_(on-chain anchor unavailable right now)_';
+    // Record response in Redis
+    await fetch('https://rwai.fyi/api/respond', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve', source: 'telegram' }),
+    });
 
     await ctx.reply(
       `✅ *Rebalance approved and logged on-chain*\n\n` +
-      `Yield spread at decision: ${yieldSpread}%\n\n` +
+      `Yield spread at decision: ${spread}%\n\n` +
       `${explorerLine}\n\n` +
       `_(Wallet execution coming in Week 3)_`,
       { parse_mode: 'Markdown' }
@@ -743,16 +755,16 @@ bot.action('dismiss', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
 
   try {
-    const alert = JSON.parse(readFileSync('./data/pendingAlert.json', 'utf8'));
-    alert.dismissed = true;
-    writeFileSync('./data/pendingAlert.json', JSON.stringify(alert, null, 2));
-  } catch {
-    // Non-fatal — alert file may have been cleaned up already
+    await fetch('https://rwai.fyi/api/respond', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'dismiss', source: 'telegram' }),
+    });
+  } catch (err) {
+    console.warn('Dismiss POST failed:', err.message);
   }
 
-  await ctx.reply(
-    `👍 Got it — no action taken. I'll keep watching and ping you if conditions change.`
-  );
+  await ctx.reply(`👍 Got it — no action taken. I'll keep watching and ping you if conditions change.`);
 });
 
 // ─── GLOBAL ERROR HANDLER — keeps the process alive on bad callbacks ──────────

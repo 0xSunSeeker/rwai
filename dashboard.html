@@ -1533,10 +1533,10 @@
     badge.querySelector('.sensitivity-current').textContent = label.pct + ' threshold';
   }
 
-  function renderHeroState() {
+  async function renderHeroState() {
     var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
     var currentSpread = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
-    var alertThreshold = getSensitivityThreshold();
+    var threshold = getSensitivityThreshold();
 
     var tierLabelEl = document.getElementById('tier-label');
     var userTierText = tierLabelEl ? tierLabelEl.textContent : '';
@@ -1551,29 +1551,31 @@
     var presets = actionThresholds[sensitivity] || actionThresholds.balanced;
     var actionThreshold = isTier3 ? presets.autoExec : presets.proposal;
 
-    var usdyEl  = document.getElementById('usdy-usd');
-    var usdyVal = usdyEl ? parseFloat(usdyEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
-    var annualBenefit = (usdyVal * currentSpread) / 100;
-    var worthwhile = annualBenefit >= 5;
+    var hasActiveAlert = false;
+    try {
+      var res = await fetch('/api/pending-alert');
+      var data = await res.json();
+      hasActiveAlert = !!(data && data.pending === true);
+    } catch {}
 
     var heroTitle  = document.getElementById('hero-title');
     var heroStatus = document.getElementById('hero-status-label');
 
     var title, statusLabel, statusColor;
 
-    if (currentSpread >= actionThreshold && worthwhile) {
+    if (hasActiveAlert && currentSpread >= actionThreshold) {
       title       = 'Agent recommends action';
       statusLabel = isTier3 ? 'Auto-execute armed' : 'Action recommended';
       statusColor = '#1D9E75';
-    } else if (currentSpread >= actionThreshold && !worthwhile) {
-      title       = 'Threshold exceeded — holding';
-      statusLabel = 'Position size too small';
-      statusColor = '#F59E0B';
-    } else if (currentSpread >= alertThreshold && currentSpread < actionThreshold) {
+    } else if (currentSpread >= actionThreshold) {
+      title       = 'Threshold crossed — already responded';
+      statusLabel = 'Awaiting next cycle';
+      statusColor = '#888';
+    } else if (currentSpread >= threshold) {
       title       = 'Threshold crossed — monitoring';
       statusLabel = 'Below action threshold';
       statusColor = '#F59E0B';
-    } else if (currentSpread >= alertThreshold * 0.85) {
+    } else if (currentSpread >= threshold * 0.85) {
       title       = 'Opportunity emerging';
       statusLabel = 'Approaching threshold';
       statusColor = '#F59E0B';

@@ -626,6 +626,14 @@
     .history-badge.delivered { background: rgba(59,130,246,0.12); color: #60a5fa; }
     .history-badge.approved  { background: rgba(29,158,117,0.12); color: #1D9E75; }
     .history-badge.dismissed { background: rgba(100,100,100,0.12); color: #555; }
+    .pred-status { font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; }
+    .pred-status.correct { background: rgba(29,158,117,0.15); color: #1D9E75; }
+    .pred-status.wrong   { background: rgba(245,158,11,0.15);  color: #F59E0B; }
+    .pred-status.pending { background: rgba(255,255,255,0.05); color: #888; }
+    .status-badge { font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; display: inline-block; margin-right: 8px; }
+    .status-badge.correct { background: rgba(29,158,117,0.15); color: #1D9E75; }
+    .status-badge.wrong   { background: rgba(245,158,11,0.15);  color: #F59E0B; }
+    .status-badge.pending { background: rgba(255,255,255,0.05); color: #888; }
     .history-verify {
       display: inline-flex; align-items: center; gap: 4px;
       font-size: 0.58rem; color: rgba(29,158,117,0.55); font-weight: 600;
@@ -1294,59 +1302,11 @@
   <!-- ── PREDICTIONS ── -->
   <div class="predictions-section">
     <p class="section-label">Prediction Confidence Timeline</p>
-    <div class="predictions-timeline">
-
-    <div class="prediction-row" style="animation-delay:0.4s; opacity:0.5;">
-      <div class="pred-dot green"></div>
-      <div class="pred-body">
-        <div class="pred-asset">USDY stable <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
-        <div class="pred-desc">Predicted yield would hold steady for 24h</div>
+    <div class="predictions-timeline" id="prediction-timeline">
+      <div class="prediction-row" style="opacity:0.4;">
+        <div class="pred-dot green"></div>
+        <div class="pred-body"><div class="pred-asset">Loading predictions…</div></div>
       </div>
-      <div class="pred-right">
-        <span class="pred-time">Sample</span>
-        <span class="pred-badge correct">Correct</span>
-      </div>
-    </div>
-
-    <div class="prediction-row" style="animation-delay:0.45s; opacity:0.5;">
-      <div class="pred-dot green"></div>
-      <div class="pred-body">
-        <div class="pred-asset">mETH stable <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
-        <div class="pred-desc">Predicted APR would hold near current level</div>
-      </div>
-      <div class="pred-right">
-        <span class="pred-time">Sample</span>
-        <span class="pred-badge correct">Correct</span>
-      </div>
-    </div>
-
-    <div class="prediction-row" style="animation-delay:0.5s; opacity:0.5;">
-      <div class="pred-dot green"></div>
-      <div class="pred-body">
-        <div class="pred-asset">Spread widening <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></div>
-        <div class="pred-desc">Predicted spread would exceed 1.5% within 24h</div>
-        <div class="pred-desc" style="color:#1D9E75;font-size:0.72rem;margin-top:3px">Spread exceeded threshold ✓</div>
-      </div>
-      <div class="pred-right">
-        <span class="pred-time">Sample</span>
-        <span class="pred-badge correct">Correct</span>
-      </div>
-    </div>
-
-    <!--
-    Example INCORRECT row — uncomment to show:
-    <div class="prediction-row">
-      <div class="pred-dot red"></div>
-      <div class="pred-body">
-        <div class="pred-asset">mETH APR drop</div>
-        <div class="pred-desc">Predicted APR would fall below 1.5% within 48h</div>
-      </div>
-      <div class="pred-right">
-        <span class="pred-time">2 days ago 08:00</span>
-        <span class="pred-badge incorrect">Incorrect</span>
-      </div>
-    </div>
-    -->
     </div><!-- /predictions-timeline -->
   </div>
 
@@ -1354,97 +1314,13 @@
   <div class="history-section">
     <p class="section-label">Agent History</p>
 
-    <!-- Entry 1: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.55s; opacity:0.5;">
-      <span class="history-icon">🤖</span>
-      <div class="history-body">
-        <div class="history-top">
-          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
-          <span class="history-time">Sample</span>
-        </div>
-        <p class="history-desc">USDY held at current level as expected. T-bill rates stable overnight — no yield movement detected.</p>
-        <div class="history-footer">
-          <div class="history-footer-left">
-            <span class="history-badge correct">Correct</span>
-            <span class="history-verify">✓ Mantle verified</span>
+    <div class="agent-history-list" id="agent-history-list">
+      <div class="history-card" style="opacity:0.4;">
+        <span class="history-icon">🤖</span>
+        <div class="history-body">
+          <div class="history-top">
+            <span class="history-type">Loading agent history…</span>
           </div>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Entry 2: Alert -->
-    <div class="history-card" style="animation-delay:0.6s; opacity:0.5;">
-      <span class="history-icon">👁</span>
-      <div class="history-body">
-        <div class="history-top">
-          <span class="history-type">Alert Sent <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
-          <span class="history-time">Sample</span>
-        </div>
-        <p class="history-desc">Spread exceeded alert threshold of 1.5%. Telegram alert sent to user.</p>
-        <div class="history-footer">
-          <div class="history-footer-left">
-            <span class="history-badge delivered">Delivered</span>
-            <span class="history-verify">✓ Mantle verified</span>
-          </div>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Entry 3: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.65s; opacity:0.5;">
-      <span class="history-icon">🤖</span>
-      <div class="history-body">
-        <div class="history-top">
-          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
-          <span class="history-time">Sample</span>
-        </div>
-        <p class="history-desc">Predicted spread would widen beyond 1.5% within 24h based on T-bill trend. Spread exceeded threshold ✓</p>
-        <div class="history-footer">
-          <div class="history-footer-left">
-            <span class="history-badge correct">Correct</span>
-            <span class="history-verify">✓ Mantle verified</span>
-          </div>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Entry 4: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.7s; opacity:0.5;">
-      <span class="history-icon">🤖</span>
-      <div class="history-body">
-        <div class="history-top">
-          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
-          <span class="history-time">Sample</span>
-        </div>
-        <p class="history-desc">mETH APR stable — Ethereum validator set stable, no network events.</p>
-        <div class="history-footer">
-          <div class="history-footer-left">
-            <span class="history-badge correct">Correct</span>
-            <span class="history-verify">✓ Mantle verified</span>
-          </div>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Entry 5: Prediction — Correct -->
-    <div class="history-card" style="animation-delay:0.75s; opacity:0.5;">
-      <span class="history-icon">🤖</span>
-      <div class="history-body">
-        <div class="history-top">
-          <span class="history-type">Yield Prediction <span style="font-size:0.65rem;color:#444;font-weight:500;">(demo)</span></span>
-          <span class="history-time">Sample</span>
-        </div>
-        <p class="history-desc">USDY yield stable — weekly T-bill reset not due for several days.</p>
-        <div class="history-footer">
-          <div class="history-footer-left">
-            <span class="history-badge correct">Correct</span>
-            <span class="history-verify">✓ Mantle verified</span>
-          </div>
-          <a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View on Mantle →</a>
         </div>
       </div>
     </div>
@@ -2352,6 +2228,8 @@
     restoreAgentPauseState();
     updateLatestTx();
     setInterval(updateLatestTx, 60000);
+    loadPredictionsAndHistory();
+    setInterval(loadPredictionsAndHistory, 60000);
   });
 
   /* ── Latest tx meta-link ── */
@@ -2735,6 +2613,106 @@
       if (!res.ok) return;
       var profile = await res.json();
       if (profile.agentPaused) applyPauseState(true);
+    } catch(e) {}
+  }
+
+  /* ── Predictions & History ── */
+  function timeAgoShort(ts) {
+    if (!ts) return '—';
+    var diff = Date.now() - new Date(ts).getTime();
+    var mins  = Math.floor(diff / 60000);
+    var hours = Math.floor(mins / 60);
+    var days  = Math.floor(hours / 24);
+    if (days  > 0) return days  + 'd ago';
+    if (hours > 0) return hours + 'h ago';
+    if (mins  > 0) return mins  + 'm ago';
+    return 'just now';
+  }
+
+  function directionLabel(dir) {
+    if (!dir || dir === 'unknown') return '—';
+    if (dir === 'up')   return '↑ Up';
+    if (dir === 'down') return '↓ Down';
+    return dir.charAt(0).toUpperCase() + dir.slice(1);
+  }
+
+  function renderPredictionTimeline(predictions) {
+    var el = document.getElementById('prediction-timeline');
+    if (!el) return;
+    if (!predictions || predictions.length === 0) {
+      el.innerHTML = '<div class="prediction-row" style="opacity:0.5;"><div class="pred-dot"></div><div class="pred-body"><div class="pred-asset">No predictions yet</div><div class="pred-desc">The agent will log predictions here once it runs.</div></div></div>';
+      return;
+    }
+    el.innerHTML = predictions.map(function(p) {
+      var resolved  = p.resolved;
+      var correct   = p.outcome === 'correct';
+      var dotClass  = !resolved ? '' : (correct ? 'green' : 'red');
+      var badgeHtml = resolved
+        ? '<span class="pred-badge ' + (correct ? 'correct' : 'incorrect') + '">' + (correct ? 'Correct' : 'Incorrect') + '</span>'
+        : '<span class="pred-badge pending">Pending</span>';
+      var usdyLine = p.usdyDirection !== 'unknown'
+        ? '<div class="pred-asset">USDY ' + directionLabel(p.usdyDirection) + ' <span style="font-size:0.65rem;color:#555;">' + Math.round((p.usdyConfidence||0)*100) + '% confidence</span></div>'
+        : '';
+      var methLine = p.methDirection !== 'unknown'
+        ? '<div class="pred-asset">mETH ' + directionLabel(p.methDirection) + ' <span style="font-size:0.65rem;color:#555;">' + Math.round((p.methConfidence||0)*100) + '% confidence</span></div>'
+        : '';
+      var reasonLine = (p.usdyReasoning || p.methReasoning)
+        ? '<div class="pred-desc">' + (p.usdyReasoning || p.methReasoning).slice(0, 120) + (((p.usdyReasoning || p.methReasoning).length > 120) ? '…' : '') + '</div>'
+        : '';
+      return '<div class="prediction-row">'
+        + '<div class="pred-dot ' + dotClass + '"></div>'
+        + '<div class="pred-body">' + usdyLine + methLine + reasonLine + '</div>'
+        + '<div class="pred-right">'
+        + '<span class="pred-time">' + timeAgoShort(p.loggedAt) + '</span>'
+        + badgeHtml
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderAgentHistory(predictions) {
+    var el = document.getElementById('agent-history-list');
+    if (!el) return;
+    if (!predictions || predictions.length === 0) {
+      el.innerHTML = '<div class="history-card" style="opacity:0.5;"><span class="history-icon">🤖</span><div class="history-body"><div class="history-top"><span class="history-type">No history yet</span></div><p class="history-desc">The agent will log decisions here once it runs.</p></div></div>';
+      return;
+    }
+    el.innerHTML = predictions.map(function(p) {
+      var resolved = p.resolved;
+      var correct  = p.outcome === 'correct';
+      var badgeHtml = resolved
+        ? '<span class="history-badge ' + (correct ? 'correct' : 'incorrect') + '">' + (correct ? 'Correct' : 'Incorrect') + '</span>'
+        : '<span class="history-badge" style="background:#1a1a1a;color:#555;border:1px solid #2a2a2a;">Pending</span>';
+      var shortHash = p.txHash ? p.txHash.slice(0, 10) + '…' : '';
+      var explorerLink = p.txHash
+        ? '<a class="history-link" href="https://mantlescan.xyz/tx/' + p.txHash + '" target="_blank" rel="noopener noreferrer">View on Mantle →</a>'
+        : '<a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View registry →</a>';
+      var desc = (p.usdyReasoning || p.methReasoning || 'Yield prediction logged on Mantle.').slice(0, 160);
+      if ((p.usdyReasoning || p.methReasoning || '').length > 160) desc += '…';
+      return '<div class="history-card">'
+        + '<span class="history-icon">🤖</span>'
+        + '<div class="history-body">'
+        + '<div class="history-top">'
+        + '<span class="history-type">Yield Prediction</span>'
+        + '<span class="history-time">' + timeAgoShort(p.loggedAt) + '</span>'
+        + '</div>'
+        + '<p class="history-desc">' + desc + '</p>'
+        + '<div class="history-footer">'
+        + '<div class="history-footer-left">' + badgeHtml + '<span class="history-verify">✓ Mantle anchored' + (shortHash ? ' · ' + shortHash : '') + '</span></div>'
+        + explorerLink
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  async function loadPredictionsAndHistory() {
+    try {
+      var res  = await fetch('/api/predictions?limit=10');
+      if (!res.ok) return;
+      var data = await res.json();
+      renderPredictionTimeline(data.predictions);
+      renderAgentHistory(data.predictions);
     } catch(e) {}
   }
 

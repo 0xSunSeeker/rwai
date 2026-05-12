@@ -983,7 +983,7 @@
           </div>
           <div class="hero-metric">
             <div class="hero-metric-label">Logged on Mantle</div>
-            <div class="hero-metric-value">4 mins ago</div>
+            <div class="hero-metric-value" id="hero-logged-time">—</div>
           </div>
         </div>
 
@@ -2375,10 +2375,21 @@
       var res  = await fetch('/api/latest-tx');
       var data = await res.json();
       if (!data.found) return;
-      var timeEl = document.getElementById('hero-tx-time');
-      var linkEl = document.getElementById('hero-tx-link');
-      if (timeEl) timeEl.textContent = timeAgo(data.loggedAt);
-      if (linkEl) linkEl.href = 'https://mantlescan.xyz/tx/' + data.txHash;
+
+      var ago = timeAgo(data.loggedAt);
+      var timeEl      = document.getElementById('hero-tx-time');
+      var linkEl      = document.getElementById('hero-tx-link');
+      var loggedEl    = document.getElementById('hero-logged-time');
+      if (timeEl)   timeEl.textContent   = ago;
+      if (linkEl)   linkEl.href          = 'https://mantlescan.xyz/tx/' + data.txHash;
+      if (loggedEl) loggedEl.textContent = ago;
+
+      // Seed the last-scan / next-scan timer from real loggedAt
+      var minsSince = Math.floor((Date.now() - new Date(data.loggedAt).getTime()) / 60000);
+      lastChecked = minsSince;
+      nextCheck   = Math.max(1, 30 - minsSince);
+      if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
+      if (nextEl) nextEl.textContent = nextCheck;
     } catch(e) {
       console.warn('Latest tx fetch failed:', e);
     }

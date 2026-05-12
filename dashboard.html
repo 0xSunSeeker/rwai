@@ -1536,8 +1536,20 @@
   function renderHeroState() {
     var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
     var currentSpread = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
-    var threshold = getSensitivityThreshold();
-    var label = getSensitivityLabel();
+    var alertThreshold = getSensitivityThreshold();
+
+    var tierLabelEl = document.getElementById('tier-label');
+    var userTierText = tierLabelEl ? tierLabelEl.textContent : '';
+    var isTier3 = userTierText.includes('Tier 3');
+
+    var sensitivity = window.USER_SENSITIVITY || localStorage.getItem('rwai_sensitivity') || 'balanced';
+    var actionThresholds = {
+      high:     { proposal: 0.8,  autoExec: 1.2 },
+      balanced: { proposal: 1.65, autoExec: 2.0 },
+      major:    { proposal: 2.5,  autoExec: 3.0 },
+    };
+    var presets = actionThresholds[sensitivity] || actionThresholds.balanced;
+    var actionThreshold = isTier3 ? presets.autoExec : presets.proposal;
 
     var usdyEl  = document.getElementById('usdy-usd');
     var usdyVal = usdyEl ? parseFloat(usdyEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
@@ -1549,15 +1561,19 @@
 
     var title, statusLabel, statusColor;
 
-    if (currentSpread >= threshold && worthwhile) {
-      title       = 'Action recommended';
-      statusLabel = 'Threshold exceeded';
+    if (currentSpread >= actionThreshold && worthwhile) {
+      title       = 'Agent recommends action';
+      statusLabel = isTier3 ? 'Auto-execute armed' : 'Action recommended';
       statusColor = '#1D9E75';
-    } else if (currentSpread >= threshold && !worthwhile) {
+    } else if (currentSpread >= actionThreshold && !worthwhile) {
       title       = 'Threshold exceeded — holding';
+      statusLabel = 'Position size too small';
+      statusColor = '#F59E0B';
+    } else if (currentSpread >= alertThreshold && currentSpread < actionThreshold) {
+      title       = 'Threshold crossed — monitoring';
       statusLabel = 'Below action threshold';
       statusColor = '#F59E0B';
-    } else if (currentSpread >= threshold * 0.85) {
+    } else if (currentSpread >= alertThreshold * 0.85) {
       title       = 'Opportunity emerging';
       statusLabel = 'Approaching threshold';
       statusColor = '#F59E0B';

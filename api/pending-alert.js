@@ -38,6 +38,12 @@ export default async function handler(req, res) {
         ...alert,
         pending: !alert.respondedAt && !alert.approved && !alert.dismissed,
         alreadySent: alert.alreadySent === true,
+        approved: alert.approved === true,
+        executed: alert.executed === true,
+        executionTxHash: alert.executionTxHash || null,
+        approvedAt: alert.approvedAt || null,
+        respondedVia: alert.respondedVia || null,
+        expired: alert.expired === true,
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });

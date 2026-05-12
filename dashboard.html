@@ -1924,16 +1924,7 @@
     });
   });
 
-  /* ── Dismiss button ── */
-  var btnDismiss = document.getElementById('btn-dismiss');
-  var dismissed  = false;
-  btnDismiss.addEventListener('click', function () {
-    if (dismissed) return;
-    dismissed = true;
-    btnDismiss.disabled = true;
-    btnDismiss.style.opacity = '0.3';
-    respondToAlert('dismiss');
-  });
+  /* ── Dismiss button — wired dynamically by renderHeroFromAlert() ── */
 
   /* ── Simulate Rebalance modal ── */
   var btnSimulate = document.querySelector('.btn-simulate');
@@ -2319,10 +2310,7 @@
       btn.addEventListener('click', function() { setSensitivity(btn.dataset.sensitivity); });
     });
 
-    var btnApproveEl = document.getElementById('btn-approve');
-    if (btnApproveEl) btnApproveEl.addEventListener('click', function() {
-      if (!btnApproveEl.disabled) respondToAlert('approve');
-    });
+    // Approve button is wired dynamically by renderHeroFromAlert()
 
     var btnPause = document.getElementById('btn-pause-agent');
     if (btnPause) btnPause.addEventListener('click', togglePauseAgent);
@@ -2372,8 +2360,8 @@
       }
     })();
 
-    fetchPendingAlert();
-    setInterval(fetchPendingAlert, 30000);
+    renderHeroFromAlert();
+    setInterval(renderHeroFromAlert, 30000);
     renderPauseState();
     setInterval(renderPauseState, 15000);
     updateLatestTx();
@@ -2671,54 +2659,255 @@
     }
   }
 
-  /* ── Pending alert polling ── */
-  async function fetchPendingAlert() {
+  /* ── Hero alert state machine ── */
+  var MOE_ROUTER_ADDRESS = '0xeaEE7EE68874218c3558b40063c42B82D3E7232a';
+  var WMNT_ADDRESS       = '0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8';
+  var USDY_TOKEN_T2      = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+  var METH_TOKEN_T2      = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+
+  async function renderHeroFromAlert() {
     try {
       var res = await fetch('/api/pending-alert');
-      if (!res.ok) return;
-      var alert = await res.json();
-      if (alert && alert.explanation && !alert.dismissed && !alert.approved) {
-        showPendingAlert(alert);
+      var data = res.ok ? await res.json() : null;
+
+      var btnApprove = document.getElementById('btn-approve');
+      var btnDismiss = document.getElementById('btn-dismiss');
+      var heroBody   = document.querySelector('.hero-body');
+      var heroTitle  = document.getElementById('hero-title');
+      var approveContent = document.getElementById('approve-content');
+
+      if (!btnApprove || !btnDismiss) return;
+
+      // Always reset styles before applying state
+      btnApprove.style.opacity = '';
+      btnDismiss.style.opacity = '';
+      btnDismiss.style.display = '';
+
+      if (!data || (!data.pending && !data.approved)) {
+        // STATE — No active alert
+        btnApprove.className = 'btn-approve no-action';
+        btnApprove.disabled = true;
+        btnApprove.onclick = null;
+        if (approveContent) approveContent.textContent = 'No action needed';
+        btnDismiss.disabled = true;
+        btnDismiss.onclick = null;
+        btnDismiss.style.opacity = '0.4';
+        return;
       }
-    } catch(e) {}
-  }
 
-  function showPendingAlert(alert) {
-    var heroBody    = document.querySelector('.hero-body');
-    var btnApprove  = document.getElementById('btn-approve');
-    var approveContent = document.getElementById('approve-content');
-    var heroTitle   = document.getElementById('hero-title');
+      // Populate hero body with explanation
+      if (data.explanation && heroBody) heroBody.textContent = data.explanation;
 
-    if (heroTitle) heroTitle.textContent = 'Agent recommends action';
-    if (heroBody && alert.explanation) heroBody.textContent = alert.explanation;
-    if (btnApprove) {
-      btnApprove.disabled = false;
-      btnApprove.classList.remove('no-action');
+      // Stale approval check
+      var staleApproval = false;
+      if (data.approved && !data.executed && data.yieldData) {
+        var spreadAtApproval = Math.abs(data.yieldData.usdyCurrentAPY - data.yieldData.methCurrentAPR);
+        var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
+        var currentSpread = spreadEl
+          ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', '')))
+          : spreadAtApproval;
+        if (spreadAtApproval - currentSpread > 0.4) staleApproval = true;
+      }
+
+      if (data.executed && data.executionTxHash) {
+        // STATE C — Executed
+        if (heroTitle) heroTitle.textContent = '✓ Rebalanced';
+        btnApprove.className = 'btn-approve';
+        btnApprove.disabled = false;
+        if (approveContent) approveContent.textContent = '✓ View transaction';
+        btnApprove.style.background = 'rgba(29,158,117,0.15)';
+        btnApprove.style.color = '#1D9E75';
+        btnApprove.onclick = function() { window.open('https://mantlescan.xyz/tx/' + data.executionTxHash, '_blank'); };
+        btnDismiss.style.display = 'none';
+
+      } else if (data.approved && !data.executed && staleApproval) {
+        // STATE D — Approval stale (spread narrowed)
+        if (heroTitle) heroTitle.textContent = '⚠ Conditions changed';
+        btnApprove.className = 'btn-approve';
+        btnApprove.disabled = false;
+        if (approveContent) approveContent.textContent = '⚠ Force execute anyway';
+        btnApprove.style.background = '#F59E0B';
+        btnApprove.style.color = '#fff';
+        btnApprove.onclick = function() { executeRebalance(data); };
+        btnDismiss.disabled = false;
+        btnDismiss.textContent = 'Discard approval';
+        btnDismiss.onclick = function() { cancelApproval(); };
+
+      } else if (data.approved && !data.executed) {
+        // STATE B — Approved, awaiting wallet signature
+        if (heroTitle) heroTitle.textContent = 'Agent recommends action';
+        btnApprove.className = 'btn-approve';
+        btnApprove.disabled = false;
+        if (approveContent) approveContent.textContent = '⚡ Sign rebalance transaction';
+        btnApprove.style.background = '#1D9E75';
+        btnApprove.style.color = '#fff';
+        btnApprove.onclick = function() { executeRebalance(data); };
+        btnDismiss.disabled = false;
+        btnDismiss.textContent = 'Cancel approval';
+        btnDismiss.onclick = function() { cancelApproval(); };
+
+      } else if (data.pending) {
+        // STATE A — Pending approval
+        if (heroTitle) heroTitle.textContent = 'Agent recommends action';
+        btnApprove.className = 'btn-approve';
+        btnApprove.disabled = false;
+        if (approveContent) approveContent.textContent = '✓ Approve rebalance';
+        btnApprove.style.background = '';
+        btnApprove.style.color = '';
+        btnApprove.onclick = function() { respondToAlert('approve'); };
+        btnDismiss.disabled = false;
+        btnDismiss.textContent = 'Dismiss';
+        btnDismiss.onclick = function() { respondToAlert('dismiss'); };
+      }
+    } catch (err) {
+      console.warn('Hero alert render failed:', err);
     }
-    if (approveContent) approveContent.textContent = 'Approve rebalance';
   }
 
   async function respondToAlert(action) {
-    var btnApprove     = document.getElementById('btn-approve');
-    var btnDismissEl   = document.getElementById('btn-dismiss');
-    var approveContent = document.getElementById('approve-content');
+    var btnApprove = document.getElementById('btn-approve');
+    var btnDismiss = document.getElementById('btn-dismiss');
+    if (btnApprove) { btnApprove.disabled = true; btnApprove.style.opacity = '0.4'; }
+    if (btnDismiss) { btnDismiss.disabled = true; btnDismiss.style.opacity = '0.3'; }
 
-    if (btnApprove)   { btnApprove.disabled   = true; btnApprove.style.opacity   = '0.4'; }
-    if (btnDismissEl) { btnDismissEl.disabled  = true; btnDismissEl.style.opacity = '0.3'; }
+    try {
+      var res = await fetch('/api/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action, source: 'web' })
+      });
+      var data = await res.json();
 
+      if (data.ok && action === 'approve') {
+        var toast = document.createElement('div');
+        toast.className = 'tier-toast';
+        toast.textContent = '✓ Approved — sign tx to complete';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 2400);
+      }
+      await renderHeroFromAlert();
+    } catch (err) {
+      console.error('Response failed:', err);
+      if (btnApprove) { btnApprove.disabled = false; btnApprove.style.opacity = ''; }
+      if (btnDismiss) { btnDismiss.disabled = false; btnDismiss.style.opacity = ''; }
+    }
+  }
+
+  async function cancelApproval() {
     try {
       await fetch('/api/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: action })
+        body: JSON.stringify({ action: 'dismiss', source: 'web' })
       });
-    } catch(e) {}
+      await renderHeroFromAlert();
+    } catch {}
+  }
 
-    if (action === 'approve' && btnApprove) {
-      if (approveContent) approveContent.textContent = '✓ Approved';
-      btnApprove.style.opacity = '1';
-      btnApprove.style.background = 'rgba(29,158,117,0.2)';
-      btnApprove.style.color = '#1D9E75';
+  async function executeRebalance(alertData) {
+    var provider = (typeof dashProvider !== 'undefined' && dashProvider)
+      || window.__rwaiSelectedProvider
+      || window.ethereum;
+
+    if (!provider) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    try {
+      var accounts = await provider.request({ method: 'eth_requestAccounts' });
+      var userAddress = accounts[0];
+
+      var chainId = await provider.request({ method: 'eth_chainId' });
+      if (chainId !== '0x1388') {
+        try {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x1388' }] });
+        } catch (e) {
+          alert('Please switch to Mantle network');
+          return;
+        }
+      }
+
+      var yieldData = alertData.yieldData || {};
+      var usdyYield = yieldData.usdyCurrentAPY || 3.55;
+      var methYield = yieldData.methCurrentAPR || 2.02;
+      var usdyHigher = usdyYield > methYield;
+
+      var usdyText = (document.getElementById('usdy-usd') || {}).textContent || '$0';
+      var methText = (document.getElementById('meth-usd') || {}).textContent || '$0';
+      var usdyUSD  = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
+      var methUSD  = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
+
+      var tokenIn, tokenOut, amountInUSD, fromLabel, toLabel;
+      if (usdyHigher) {
+        tokenIn = METH_TOKEN_T2; tokenOut = USDY_TOKEN_T2;
+        amountInUSD = methUSD * 0.25; fromLabel = 'mETH'; toLabel = 'USDY';
+      } else {
+        tokenIn = USDY_TOKEN_T2; tokenOut = METH_TOKEN_T2;
+        amountInUSD = usdyUSD * 0.25; fromLabel = 'USDY'; toLabel = 'mETH';
+      }
+
+      if (amountInUSD < 5) {
+        alert('Position too small for rebalance — need $5+ to swap');
+        return;
+      }
+
+      var confirmed = confirm('Swap ~$' + amountInUSD.toFixed(2) + ' of ' + fromLabel + ' into ' + toLabel + '?\n\nYour wallet will prompt you to sign the transaction.');
+      if (!confirmed) return;
+
+      // Check allowance
+      var allowanceData = '0xdd62ed3e'
+        + userAddress.slice(2).toLowerCase().padStart(64, '0')
+        + MOE_ROUTER_ADDRESS.slice(2).toLowerCase().padStart(64, '0');
+      var allowanceHex = await provider.request({ method: 'eth_call', params: [{ to: tokenIn, data: allowanceData }, 'latest'] });
+      var allowance = BigInt(allowanceHex || '0x0');
+
+      var pricePerToken = (tokenIn === METH_TOKEN_T2) ? 2500 : 1.013;
+      var tokenAmountWei = BigInt(Math.floor((amountInUSD / pricePerToken) * 1e18));
+
+      if (allowance < tokenAmountWei) {
+        var approveData = '0x095ea7b3'
+          + MOE_ROUTER_ADDRESS.slice(2).toLowerCase().padStart(64, '0')
+          + 'f'.repeat(64);
+        await provider.request({ method: 'eth_sendTransaction', params: [{ from: userAddress, to: tokenIn, data: approveData }] });
+        await new Promise(function(r) { setTimeout(r, 4000); });
+      }
+
+      // swapExactTokensForTokens via Merchant Moe (v1-style, selector 0x38ed1739)
+      var deadline = Math.floor(Date.now() / 1000) + 1200;
+      var amountHex = tokenAmountWei.toString(16).padStart(64, '0');
+      var swapData = '0x38ed1739'
+        + amountHex
+        + '0'.padStart(64, '0')                                       // amountOutMin = 0
+        + 'a0'.padStart(64, '0')                                      // offset to path array
+        + userAddress.slice(2).toLowerCase().padStart(64, '0')        // to
+        + deadline.toString(16).padStart(64, '0')                     // deadline
+        + '3'.padStart(64, '0')                                       // path length = 3
+        + tokenIn.slice(2).toLowerCase().padStart(64, '0')
+        + WMNT_ADDRESS.slice(2).toLowerCase().padStart(64, '0')
+        + tokenOut.slice(2).toLowerCase().padStart(64, '0');
+
+      var swapTx = await provider.request({ method: 'eth_sendTransaction', params: [{ from: userAddress, to: MOE_ROUTER_ADDRESS, data: swapData }] });
+
+      // Record execution in Redis
+      await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash: swapTx, source: 'web' })
+      });
+
+      var toast = document.createElement('div');
+      toast.className = 'tier-toast';
+      toast.style.background = '#1D9E75';
+      toast.textContent = '✓ Rebalance executed on Mantle';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 4000);
+
+      setTimeout(function() { renderHeroFromAlert(); }, 2000);
+
+    } catch (err) {
+      console.error('Swap failed:', err);
+      alert('Swap failed: ' + (err.message || err));
     }
   }
 

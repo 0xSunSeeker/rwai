@@ -739,11 +739,14 @@ bot.action('approve', async (ctx) => {
     });
 
     await ctx.reply(
-      `✅ *Rebalance approved and logged on-chain*\n\n` +
+      `✅ *Rebalance approved*\n\n` +
+      `Approval recorded on-chain via ERC-8004.\n` +
       `Yield spread at decision: ${spread}%\n\n` +
       `${explorerLine}\n\n` +
-      `_(Wallet execution coming in Week 3)_`,
-      { parse_mode: 'Markdown' }
+      `To complete the swap, sign the transaction on the dashboard:\n` +
+      `[Open dashboard →](https://rwai.fyi/dashboard)\n\n` +
+      `_Telegram approvals are consent-only. Wallet signature required to execute the swap._`,
+      { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
   } catch (err) {
     console.error('Approve action error:', err.message);

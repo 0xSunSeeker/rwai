@@ -50,17 +50,21 @@ export default async function handler(req, res) {
       const current = await readAlert();
       if (!current) return res.status(404).json({ error: 'No pending alert' });
 
+      const { source } = req.body;
+      const now = Date.now();
       const updated = {
         ...current,
         sent: true,
-        ...(action === 'approve' ? { approved: true } : { dismissed: true }),
-        respondedAt: Date.now(),
-        respondedVia: 'web',
+        respondedAt: now,
+        respondedVia: source || 'web',
+        ...(action === 'approve'
+          ? { approved: true, approvedAt: now, executed: false }
+          : { approved: false, dismissed: true }),
       };
 
       const ok = await writeAlert(updated);
       if (!ok) return res.status(500).json({ error: 'Could not persist response' });
-      return res.status(200).json(updated);
+      return res.status(200).json({ ok: true, response: action, approved: updated.approved === true });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

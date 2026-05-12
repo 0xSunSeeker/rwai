@@ -1914,10 +1914,13 @@
   var nextEl = document.getElementById('next-check');
   setInterval(function () {
     if (lastChecked === null || nextCheck === null) return;
+    if (typeof nextCheck === 'string') return;
     lastChecked += 1; nextCheck -= 1;
-    if (nextCheck <= 0) { lastChecked = 0; nextCheck = 30; }
+    if (nextCheck <= 0) { lastChecked = 0; nextCheck = 'imminent'; }
     if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
     if (nextEl) nextEl.textContent = nextCheck;
+    var nextUnitTick = document.getElementById('next-check-unit');
+    if (nextUnitTick) nextUnitTick.style.display = (typeof nextCheck === 'string') ? 'none' : '';
   }, 60000);
 
   /* ── Next Action countdown (real seconds) ── */
@@ -2381,13 +2384,13 @@
       // Seed the last-scan / next-scan timer from real loggedAt
       var minsSince = Math.floor((Date.now() - new Date(data.loggedAt).getTime()) / 60000);
       lastChecked = minsSince;
-      nextCheck   = Math.max(1, 30 - minsSince);
+      nextCheck   = minsSince >= 30 ? 'imminent' : 30 - minsSince;
       if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
       if (nextEl) nextEl.textContent = nextCheck;
       var lastUnit = document.getElementById('last-checked-unit');
       var nextUnit = document.getElementById('next-check-unit');
       if (lastUnit) lastUnit.style.display = '';
-      if (nextUnit) nextUnit.style.display = '';
+      if (nextUnit) nextUnit.style.display = (typeof nextCheck === 'string') ? 'none' : '';
     } catch(e) {
       console.warn('Latest tx fetch failed:', e);
     }

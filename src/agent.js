@@ -295,8 +295,20 @@ async function executeTier3Swap(user, yieldData) {
 async function runAgentLoop() {
   console.log(`\n[${new Date().toISOString()}] Agent loop running...`);
 
-  const profile = loadUser();
-  if (profile.agentPaused === true) {
+  let agentPaused = false;
+  try {
+    const res = await fetch('https://rwai.fyi/api/profile');
+    if (res.ok) {
+      const profile = await res.json();
+      agentPaused = profile.agentPaused === true;
+    }
+  } catch (err) {
+    console.warn('Could not reach /api/profile, falling back to local file:', err.message);
+    const local = loadUser();
+    agentPaused = local.agentPaused === true;
+  }
+
+  if (agentPaused) {
     console.log('⏸ Agent is paused — skipping cycle. Resume from dashboard or Telegram to continue.');
     return;
   }

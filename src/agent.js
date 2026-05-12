@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } fr
 import { ethers } from "ethers";
 import { fetchAllYieldData } from "./dataFetcher.js";
 import { generateExplanation, generatePrediction } from "./promptEngine.js";
+import { logDecision } from "./reputation.js";
 dotenv.config();
 
 const VAULT_ADDRESS = process.env.VAULT_ADDRESS;
@@ -124,6 +125,20 @@ function appendPrediction(prediction, yieldData) {
     resolved: false,
   };
   appendFileSync(PREDICTIONS_PATH, JSON.stringify(entry) + "\n");
+  return entry;
+}
+
+function patchLastPredictionTxHash(txHash) {
+  try {
+    const raw   = readFileSync(PREDICTIONS_PATH, 'utf8');
+    const lines = raw.trimEnd().split('\n');
+    const last  = JSON.parse(lines[lines.length - 1]);
+    last.txHash = txHash;
+    lines[lines.length - 1] = JSON.stringify(last);
+    writeFileSync(PREDICTIONS_PATH, lines.join('\n') + '\n');
+  } catch (err) {
+    console.error('Failed to patch txHash into prediction:', err.message);
+  }
 }
 
 // Direction: returns "up", "down", or "stable" given a before/after pair
@@ -292,6 +307,16 @@ async function runAgentLoop() {
     const prediction = await generatePrediction(yieldData);
     appendPrediction(prediction, yieldData);
     console.log("Prediction logged:", JSON.stringify(prediction, null, 2));
+
+    // Anchor prediction on-chain and write txHash back to the entry
+    const anchor = await logDecision(
+      (yieldData.usdyCurrentAPY - yieldData.methCurrentAPR).toFixed(2),
+      JSON.stringify(prediction)
+    );
+    if (anchor?.txHash) {
+      patchLastPredictionTxHash(anchor.txHash);
+      console.log(`🔗 Prediction anchored on Mantle: ${anchor.txHash}`);
+    }
 
     // Step 3b — Check if yield moved enough to alert the user
     const user = loadUser();

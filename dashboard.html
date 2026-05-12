@@ -124,6 +124,36 @@
     .tier-badge:hover { border-color: #383838; color: #999; }
     .tier-badge svg { width: 10px; height: 10px; flex-shrink: 0; transition: transform 0.2s; }
     .tier-badge.open svg { transform: rotate(180deg); }
+    .sensitivity-wrap { position: relative; display: inline-block; }
+    .sensitivity-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 10px 5px 13px; border-radius: 9999px;
+      border: 1px solid #252525; background: transparent;
+      color: #555; font-size: 0.72rem; font-weight: 600;
+    }
+    .sensitivity-label { color: #777; }
+    .sensitivity-current { color: #444; }
+    .sensitivity-edit {
+      padding: 2px 9px; border-radius: 9999px;
+      border: 1px solid #2a2a2a; background: #1a1a1a;
+      color: #555; font-size: 0.68rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .sensitivity-edit:hover { border-color: #1D9E75; color: #1D9E75; }
+    .sensitivity-menu {
+      position: absolute; top: calc(100% + 6px); left: 0;
+      background: #141414; border: 1px solid #252525; border-radius: 12px;
+      padding: 6px; min-width: 200px; z-index: 100;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+    }
+    .sensitivity-menu button {
+      display: block; width: 100%; text-align: left;
+      padding: 8px 12px; border-radius: 8px; border: none;
+      background: transparent; color: #666; font-size: 0.78rem;
+      font-family: inherit; cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .sensitivity-menu button:hover { background: #1a1a1a; color: #1D9E75; }
     .tier-dropdown {
       display: none; position: absolute; top: calc(100% + 6px); left: 0;
       background: #141414; border: 1px solid #252525; border-radius: 12px;
@@ -763,7 +793,7 @@
         <a href="/" class="nav-link">Home</a>
         <a href="https://github.com/0xSunSeeker/rwai" class="nav-link" target="_blank">GitHub</a>
         <a href="https://mantlescan.xyz/address/0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69#code" class="nav-link" target="_blank">Contract</a>
-        <a href="https://t.me/rwaiapp_bot" class="btn-nav-green" target="_blank">Open in Telegram</a>
+        <a href="#" class="btn-nav-green" onclick="openTelegram(); return false;">Open in Telegram</a>
       </div>
       <div class="wallet-badge" id="wallet-badge">
         <span class="wallet-dot"></span>
@@ -843,6 +873,18 @@
         </div>
       </div>
     </div>
+    <div class="sensitivity-wrap">
+      <div class="sensitivity-badge" id="sensitivity-badge">
+        <span class="sensitivity-label">⚖️ Balanced Sensitivity</span>
+        <span class="sensitivity-current">1.5% threshold</span>
+        <button class="sensitivity-edit" onclick="toggleSensitivityMenu()">Adjust</button>
+      </div>
+      <div class="sensitivity-menu" id="sensitivity-menu" style="display:none;">
+        <button onclick="setSensitivity('high')">🔍 High (0.5%)</button>
+        <button onclick="setSensitivity('balanced')">⚖️ Balanced (1.5%)</button>
+        <button onclick="setSensitivity('major')">🎯 Major Only (2.0%)</button>
+      </div>
+    </div>
     <p class="page-header-disclaimer">Tracking your RWA yield positions on Mantle. Other tokens in your wallet are not shown.</p>
   </div>
 
@@ -853,7 +895,7 @@
       <!-- LEFT: insight content + actions -->
       <div class="hero-left">
         <div class="hero-tag"><span class="hero-tag-dot"></span>RWAi Agent</div>
-        <h2 class="hero-headline">Opportunity detected</h2>
+        <h2 class="hero-headline" id="hero-title">Opportunity detected</h2>
         <p class="hero-body">
           USDY is currently yielding <span id="hero-spread-pct">—</span> more than mETH. On your <span id="hero-usdy-val">—</span> USDY position,
           staying put earns you an extra <span id="hero-impact-amt">—</span> per year. Hold current position — no rebalance needed at these levels.
@@ -928,7 +970,7 @@
             <div class="hero-pulse-dot"></div>
           </div>
           <div>
-            <div class="hero-status-title">Monitoring 24/7</div>
+            <div class="hero-status-title" id="hero-status-label">Monitoring 24/7</div>
             <div class="hero-status-sub">Active on Mantle Mainnet</div>
           </div>
         </div>
@@ -1333,7 +1375,7 @@
         <h3>Never miss a yield opportunity</h3>
         <p>RWAi monitors Mantle 24/7 and alerts you the moment yield conditions change.</p>
       </div>
-      <button class="btn-telegram">
+      <button class="btn-telegram" onclick="openTelegram()">
         <svg class="tg-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
         </svg>
@@ -1449,6 +1491,103 @@
   var usdyUSD  = null;
   var methUSD  = null;
   var cmethUSD = null;
+
+  window.CONNECTED_WALLET = '0x9297Cb7E6Dab5E1A8a56F39B1C2D6e3E8A5f56d3';
+
+  /* ── Alert Sensitivity ── */
+  window.USER_SENSITIVITY = localStorage.getItem('rwai_sensitivity') || 'balanced';
+
+  function getSensitivityThreshold() {
+    var map = { high: 0.5, balanced: 1.5, major: 2.0 };
+    return map[window.USER_SENSITIVITY] || 1.5;
+  }
+
+  function getSensitivityLabel() {
+    var map = {
+      high:     { emoji: '🔍', name: 'High Sensitivity',     pct: '0.5%' },
+      balanced: { emoji: '⚖️', name: 'Balanced Sensitivity', pct: '1.5%' },
+      major:    { emoji: '🎯', name: 'Major Opportunities',  pct: '2.0%' },
+    };
+    return map[window.USER_SENSITIVITY] || map.balanced;
+  }
+
+  function setSensitivity(level) {
+    window.USER_SENSITIVITY = level;
+    localStorage.setItem('rwai_sensitivity', level);
+    document.getElementById('sensitivity-menu').style.display = 'none';
+    renderSensitivityBadge();
+    renderHeroState();
+  }
+
+  function toggleSensitivityMenu() {
+    var menu = document.getElementById('sensitivity-menu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function renderSensitivityBadge() {
+    var label = getSensitivityLabel();
+    var badge = document.getElementById('sensitivity-badge');
+    if (!badge) return;
+    badge.querySelector('.sensitivity-label').textContent = label.emoji + ' ' + label.name;
+    badge.querySelector('.sensitivity-current').textContent = label.pct + ' threshold';
+  }
+
+  function renderHeroState() {
+    var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
+    var currentSpread = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
+    var threshold = getSensitivityThreshold();
+    var label = getSensitivityLabel();
+
+    var heroTitle  = document.getElementById('hero-title');
+    var heroBody   = document.querySelector('.hero-body');
+    var heroStatus = document.getElementById('hero-status-label');
+
+    var title, body, statusLabel, statusColor;
+
+    if (currentSpread >= threshold) {
+      title       = 'Action recommended';
+      statusLabel = 'Threshold exceeded';
+      statusColor = '#1D9E75';
+      body        = 'Current spread of ' + currentSpread.toFixed(2) + '% exceeds your ' + label.pct + ' ' + label.name + ' threshold. RWAi recommends reviewing your allocation.';
+    } else if (currentSpread >= threshold * 0.85) {
+      title       = 'Opportunity emerging';
+      statusLabel = 'Approaching threshold';
+      statusColor = '#F59E0B';
+      body        = 'Current spread is ' + currentSpread.toFixed(2) + '% — approaching your ' + label.pct + ' threshold. RWAi is watching closely for the next move.';
+    } else {
+      title       = 'Monitoring conditions';
+      statusLabel = 'Below your threshold';
+      statusColor = '#888';
+      body        = 'Current spread of ' + currentSpread.toFixed(2) + '% is below your ' + label.pct + ' ' + label.name + ' threshold. RWAi is watching and will alert you when conditions change.';
+    }
+
+    if (heroTitle)  heroTitle.textContent  = title;
+    if (heroStatus) { heroStatus.textContent = statusLabel; heroStatus.style.color = statusColor; }
+    if (heroBody) {
+      var spreadSpan = heroBody.querySelector('#hero-spread-pct');
+      var usdySpan   = heroBody.querySelector('#hero-usdy-val');
+      var impactSpan = heroBody.querySelector('#hero-impact-amt');
+      if (spreadSpan || usdySpan || impactSpan) {
+        // Hero body has live spans — update only the static text around them
+        heroBody.firstChild && (heroBody.firstChild.textContent !== undefined)
+          ? null : null; // preserve spans, just set title-driven text via status label
+      } else {
+        heroBody.textContent = body;
+      }
+    }
+  }
+
+  function openTelegram() {
+    var walletEl = document.querySelector('.wallet-addr-full') || document.querySelector('.wallet-addr-short');
+    var rawAddress = walletEl ? walletEl.textContent.replace('· Rabby Wallet', '').trim() : null;
+    var fullAddress = window.CONNECTED_WALLET || rawAddress || null;
+    var botUsername = 'rwaiapp_bot';
+    if (fullAddress && fullAddress.startsWith('0x') && fullAddress.length > 10) {
+      window.open('https://t.me/' + botUsername + '?start=wallet_' + fullAddress, '_blank');
+    } else {
+      window.open('https://t.me/' + botUsername, '_blank');
+    }
+  }
 
   /* ── Helpers ── */
   function fmt(n) { return '$' + n.toFixed(2); }
@@ -1646,8 +1785,10 @@
       if (simLabel) simLabel.textContent = 'New annual yield (mETH at ' + apr.toFixed(2) + '%)';
       updateSpread();
       updateReasoningBullets();
+      renderSensitivityBadge();
+      renderHeroState();
     })
-    .catch(function() { updateSpread(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
+    .catch(function() { updateSpread(); renderSensitivityBadge(); renderHeroState(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
 
   /* ── Agent accuracy from /api/stats ── */
   function setAccuracy(pct, sub, total) {
@@ -2029,7 +2170,7 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() { updateSpread(); updateReasoningBullets(); });
+  document.addEventListener('DOMContentLoaded', function() { updateSpread(); updateReasoningBullets(); renderSensitivityBadge(); renderHeroState(); });
 
 })();
 </script>

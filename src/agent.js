@@ -56,9 +56,19 @@ if (existsSync(LAST_YIELD_PATH)) {
 // How much yield needs to change before the agent triggers an alert (in %).
 const ALERT_THRESHOLD = 0.10;
 
-const SPREAD_ALERT_THRESHOLD    = 1.5;   // Send alert explaining opportunity
-const SPREAD_PROPOSAL_THRESHOLD = 1.65;  // Propose specific rebalance action
-const SPREAD_AUTOEXECUTE_THRESHOLD = 2.0; // Tier 3 auto-execute (future)
+const SPREAD_ALERT_THRESHOLD    = 1.5;   // Fallback defaults
+const SPREAD_PROPOSAL_THRESHOLD = 1.65;
+const SPREAD_AUTOEXECUTE_THRESHOLD = 2.0;
+
+function getUserThresholds(profile) {
+  const sensitivity = profile.alertSensitivity || 'balanced';
+  const presets = {
+    high:     { alert: 0.5, proposal: 0.8,  autoExec: 1.2 },
+    balanced: { alert: 1.5, proposal: 1.65, autoExec: 2.0 },
+    major:    { alert: 2.0, proposal: 2.5,  autoExec: 3.0 },
+  };
+  return presets[sensitivity] || presets.balanced;
+}
 
 // ─── USER PROFILE ─────────────────────────────────────────────────────────────
 const PROFILE_PATH = `${DATA_DIR}/userProfile.json`;
@@ -204,9 +214,9 @@ async function executeTier3Swap(user, yieldData) {
     const tokenOut  = usdyLeads ? USDY_ADDRESS  : mETH_ADDRESS;
     const swapPath  = usdyLeads ? SWAP_PATH_METH_TO_USDY : SWAP_PATH_USDY_TO_METH;
 
-    const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, provider);
-    const userAddress     = user.walletAddress || wallet.address;
-    const userBalance     = await tokenInContract.balanceOf(userAddress);
+    const tokenInContract  = new ethers.Contract(tokenIn, ERC20_ABI, provider);
+    const userWalletAddress = user.walletAddress || '0x9297Cb7E6Dab5E1A8a56F39B1C2D6e3E8A5f56d3';
+    const userBalance       = await tokenInContract.balanceOf(userWalletAddress);
 
     if (userBalance === 0n) {
       console.log('Tier 3: zero balance for tokenIn — skipping');
@@ -237,7 +247,7 @@ async function executeTier3Swap(user, yieldData) {
     console.log(`Tier 3: executing swap — ${ethers.formatUnits(amountIn, 18)} tokenIn via [${swapPath.join(' → ')}]`);
 
     const tx = await vault.executeSwap(
-      wallet.address,
+      userWalletAddress,
       tokenIn,
       tokenOut,
       amountIn,
@@ -291,13 +301,14 @@ async function runAgentLoop() {
 
     const currentSpread  = yieldData.usdyCurrentAPY - yieldData.methCurrentAPR;
     const previousSpread = yieldData.usdyPreviousAPY - yieldData.methPreviousAPR;
-    const spreadCrossedAlert  = currentSpread >= SPREAD_ALERT_THRESHOLD && previousSpread < SPREAD_ALERT_THRESHOLD;
-    const spreadAboveProposal = currentSpread >= SPREAD_PROPOSAL_THRESHOLD;
-    const spreadAboveAlert       = currentSpread >= SPREAD_ALERT_THRESHOLD;
-    const spreadAboveAutoExecute = currentSpread >= SPREAD_AUTOEXECUTE_THRESHOLD;
+    const thresholds = getUserThresholds(user);
+    const spreadCrossedAlert  = currentSpread >= thresholds.alert && previousSpread < thresholds.alert;
+    const spreadAboveProposal    = currentSpread >= thresholds.proposal;
+    const spreadAboveAlert       = currentSpread >= thresholds.alert;
+    const spreadAboveAutoExecute = currentSpread >= thresholds.autoExec;
 
     console.log(`Delegation tier: ${user.userTier}`);
-    console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Alert: ${SPREAD_ALERT_THRESHOLD}% | Proposal: ${SPREAD_PROPOSAL_THRESHOLD}%`);
+    console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Sensitivity: ${user.alertSensitivity || 'balanced'} | Alert: ${thresholds.alert}% | Proposal: ${thresholds.proposal}% | Auto: ${thresholds.autoExec}%`);
 
     const shouldAlert = significantChange || spreadCrossedAlert || spreadAboveProposal || spreadAboveAutoExecute;
 

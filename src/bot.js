@@ -242,7 +242,9 @@ bot.action('tier_3_disabled', async (ctx) => {
 // ─── JOURNEY 1: TIER SELECTION (from dashboard deep-link) ────────────────────
 bot.action('set_tier_1', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Watch Only', tierCode: 1, onboardingComplete: true });
+  const profile = loadProfile();
+  if (!profile.alertSensitivity) profile.alertSensitivity = 'major';
+  saveUser({ ...profile, userTier: 'Watch Only', tierCode: 1, onboardingComplete: true });
   await ctx.reply(
     `✅ Watch Only mode activated.\n\n` +
     `I'll explain every yield change and opportunity — you decide if and when to act.\n\n` +
@@ -252,7 +254,9 @@ bot.action('set_tier_1', async (ctx) => {
 
 bot.action('set_tier_2', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Propose and Confirm', tierCode: 2, onboardingComplete: true });
+  const profile = loadProfile();
+  if (!profile.alertSensitivity) profile.alertSensitivity = 'balanced';
+  saveUser({ ...profile, userTier: 'Propose and Confirm', tierCode: 2, onboardingComplete: true });
   await ctx.reply(
     `✅ Propose and Confirm mode activated.\n\n` +
     `When I detect a meaningful opportunity, I'll send you a one-tap approval request.\n\n` +
@@ -262,12 +266,63 @@ bot.action('set_tier_2', async (ctx) => {
 
 bot.action('set_tier_3', async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
-  saveProfile({ userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
+  const profile = loadProfile();
+  if (!profile.alertSensitivity) profile.alertSensitivity = 'high';
+  saveUser({ ...profile, userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
   await ctx.reply(
     `⚡ Delegated mode activated.\n\n` +
     `I can auto-execute rebalances up to $500 per swap when spread conditions justify it.\n\n` +
     `Every execution is logged permanently on Mantle. Use /status to check your positions.`
   );
+});
+
+// ─── /sensitivity ──────────────────────────────────────────────────────────────
+bot.command('sensitivity', async (ctx) => {
+  const profile = loadProfile();
+  const current = profile.alertSensitivity || 'balanced';
+  const labels = {
+    high:     'High Sensitivity — alerts on small opportunities (0.5% spread)',
+    balanced: 'Balanced — alerts on meaningful opportunities (1.5% spread)',
+    major:    'Major Opportunities Only — alerts only when clearly worthwhile (2.0% spread)',
+  };
+  await ctx.reply(
+    `*Current sensitivity:* ${labels[current]}\n\n` +
+    `Adjust how sensitive RWAi is to yield changes:`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔍 High Sensitivity (0.5%)',  callback_data: 'sens_high' }],
+          [{ text: '⚖️ Balanced (1.5%)',          callback_data: 'sens_balanced' }],
+          [{ text: '🎯 Major Only (2.0%)',         callback_data: 'sens_major' }],
+        ]
+      }
+    }
+  );
+});
+
+bot.action('sens_high', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const profile = loadProfile();
+  profile.alertSensitivity = 'high';
+  saveUser(profile);
+  await ctx.reply(`🔍 High Sensitivity active. I'll alert you whenever spread exceeds 0.5%.`);
+});
+
+bot.action('sens_balanced', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const profile = loadProfile();
+  profile.alertSensitivity = 'balanced';
+  saveUser(profile);
+  await ctx.reply(`⚖️ Balanced sensitivity active. I'll alert you when spread exceeds 1.5%.`);
+});
+
+bot.action('sens_major', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const profile = loadProfile();
+  profile.alertSensitivity = 'major';
+  saveUser(profile);
+  await ctx.reply(`🎯 Major Opportunities Only active. I'll only alert you on spreads above 2.0%.`);
 });
 
 bot.action('request_wallet', async (ctx) => {

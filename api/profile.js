@@ -1,7 +1,10 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const PROFILE_PATH = join(process.cwd(), 'data', 'userProfile.json');
+// On Vercel, /var/task is read-only. Use /tmp for writes (per-instance ephemeral).
+// Reads check /tmp first (recently written this invocation chain), then the committed bundle file.
+const BUNDLE_PATH = join(process.cwd(), 'data', 'userProfile.json');
+const TMP_PATH    = '/tmp/userProfile.json';
 
 const DEFAULT_PROFILE = {
   userPositionUSD: 0,
@@ -19,6 +22,15 @@ const DEFAULT_PROFILE = {
   lastUpdated: null,
 };
 
+function readProfile() {
+  for (const p of [TMP_PATH, BUNDLE_PATH]) {
+    if (existsSync(p)) {
+      try { return JSON.parse(readFileSync(p, 'utf8')); } catch {}
+    }
+  }
+  return null;
+}
+
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -30,12 +42,8 @@ export default function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      if (!existsSync(PROFILE_PATH)) {
-        return res.status(200).json(DEFAULT_PROFILE);
-      }
-      const data = readFileSync(PROFILE_PATH, 'utf8');
-      const profile = JSON.parse(data);
-      return res.status(200).json({ ...DEFAULT_PROFILE, ...profile });
+      const profile = readProfile();
+      return res.status(200).json({ ...DEFAULT_PROFILE, ...(profile || {}) });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -44,12 +52,7 @@ export default function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const updates = req.body;
-      let current = DEFAULT_PROFILE;
-
-      if (existsSync(PROFILE_PATH)) {
-        const data = readFileSync(PROFILE_PATH, 'utf8');
-        current = JSON.parse(data);
-      }
+      const current = readProfile() || DEFAULT_PROFILE;
 
       const merged = {
         ...current,
@@ -58,7 +61,7 @@ export default function handler(req, res) {
         lastUpdated: Date.now(),
       };
 
-      writeFileSync(PROFILE_PATH, JSON.stringify(merged, null, 2));
+      writeFileSync(TMP_PATH, JSON.stringify(merged, null, 2));
       return res.status(200).json(merged);
     } catch (err) {
       return res.status(500).json({ error: err.message });

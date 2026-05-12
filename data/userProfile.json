@@ -1,0 +1,31 @@
+{
+  "userPositionUSD": 100.17279242127948,
+  "userTier": "Propose and Confirm",
+  "tierCode": 2,
+  "alertSensitivity": "balanced",
+  "priorDecisions": "No prior decisions",
+  "agentAccuracy": "63% accurate over 91 predictions (USDY 100%)",
+  "awaitingWallet": false,
+  "telegramId": "796922941",
+  "walletAddress": "0x9297C619fEd4C0E71a922E069cE82121779856D3",
+  "positions": {
+    "USDY": {
+      "balance": 29.910845817932675,
+      "usdValue": 30.299686813565796,
+      "apy": 3.55
+    },
+    "mETH": {
+      "balance": 0.03032739527062696,
+      "usdValue": 69.87310560771368,
+      "apy": 2.06
+    },
+    "cmETH": {
+      "balance": 0,
+      "usdValue": 0,
+      "apy": 2.31
+    }
+  },
+  "lastUpdated": 1778550129205,
+  "source": "telegram",
+  "onboardingComplete": true
+}

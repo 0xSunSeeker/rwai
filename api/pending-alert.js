@@ -25,7 +25,7 @@ async function readAlert() {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -34,6 +34,19 @@ export default async function handler(req, res) {
     try {
       const alert = await readAlert();
       return res.status(200).json(alert);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const alert = req.body;
+      if (!alert || !alert.explanation) {
+        return res.status(400).json({ error: 'explanation field required' });
+      }
+      await redis.set(REDIS_KEY, JSON.stringify(alert));
+      return res.status(200).json({ ok: true });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

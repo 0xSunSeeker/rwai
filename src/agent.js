@@ -100,7 +100,7 @@ function hasPendingUnsentAlert() {
   }
 }
 
-function writePendingAlert(explanation, prediction, yieldData, alertType) {
+async function writePendingAlert(explanation, prediction, yieldData, alertType) {
   const alert = {
     explanation,
     prediction,
@@ -111,6 +111,17 @@ function writePendingAlert(explanation, prediction, yieldData, alertType) {
   };
   writeFileSync(PENDING_ALERT_PATH, JSON.stringify(alert, null, 2));
   console.log("Pending alert written to disk.");
+  try {
+    const res = await fetch('https://rwai.fyi/api/pending-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alert),
+    });
+    if (res.ok) console.log("Pending alert synced to Redis.");
+    else console.warn("Redis alert sync failed:", res.status);
+  } catch (err) {
+    console.warn("Could not sync alert to Redis:", err.message);
+  }
 }
 
 function appendPrediction(prediction, yieldData) {
@@ -295,20 +306,17 @@ async function executeTier3Swap(user, yieldData) {
 async function runAgentLoop() {
   console.log(`\n[${new Date().toISOString()}] Agent loop running...`);
 
-  let agentPaused = false;
+  let apiProfile = null;
   try {
     const res = await fetch('https://rwai.fyi/api/profile');
-    if (res.ok) {
-      const profile = await res.json();
-      agentPaused = profile.agentPaused === true;
-    }
+    if (res.ok) apiProfile = await res.json();
   } catch (err) {
     console.warn('Could not reach /api/profile, falling back to local file:', err.message);
-    const local = loadUser();
-    agentPaused = local.agentPaused === true;
   }
 
-  if (agentPaused) {
+  const liveProfile = apiProfile || loadUser();
+
+  if (liveProfile.agentPaused === true) {
     console.log('⏸ Agent is paused — skipping cycle. Resume from dashboard or Telegram to continue.');
     return;
   }
@@ -337,7 +345,7 @@ async function runAgentLoop() {
     }
 
     // Step 3b — Check if yield moved enough to alert the user
-    const user = loadUser();
+    const user = liveProfile;
     const usdyChange = Math.abs(yieldData.usdyCurrentAPY - yieldData.usdyPreviousAPY);
     const methChange = Math.abs(yieldData.methCurrentAPR - yieldData.methPreviousAPR);
     const significantChange = usdyChange > ALERT_THRESHOLD || methChange > ALERT_THRESHOLD;
@@ -381,17 +389,17 @@ async function runAgentLoop() {
         console.log('Tier 3: spread above auto-execute threshold — attempting execution...');
         const result = await executeTier3Swap(user, yieldData);
         if (result) {
-          writePendingAlert(
+          await writePendingAlert(
             `✅ Auto-rebalance executed.\n\nMoved ${result.amountIn} tokens toward higher yield.\nTx: https://mantlescan.xyz/tx/${result.txHash}\n\nSpread was ${yieldData.currentSpread.toFixed(2)}% — above your 2.0% auto-execute threshold.`,
             prediction,
             yieldData,
             'auto_executed'
           );
         } else if (!hasPendingUnsentAlert()) {
-          writePendingAlert(explanation, prediction, yieldData, alertType);
+          await writePendingAlert(explanation, prediction, yieldData, alertType);
         }
       } else if (!hasPendingUnsentAlert()) {
-        writePendingAlert(explanation, prediction, yieldData, alertType);
+        await writePendingAlert(explanation, prediction, yieldData, alertType);
       } else {
         console.log("Previous alert still unsent — skipping overwrite.");
       }

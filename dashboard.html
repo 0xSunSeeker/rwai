@@ -881,8 +881,19 @@
             <div class="tier-option-name">Tier 3 — Auto-Execute</div>
             <div class="tier-option-desc">Agent executes automatically when spread exceeds your threshold.</div>
           </div>
+          <div class="tier-3-activation" id="tier-3-activation" style="display:none; margin-top:12px; padding:12px; background:#0d1a14; border:1px solid rgba(29,158,117,0.28); border-radius:8px;">
+            <div style="font-size:0.75rem; color:#1D9E75; font-weight:700; margin-bottom:8px;">⚡ Tier 3 requires one-time vault approval</div>
+            <div style="font-size:0.72rem; color:#888; line-height:1.5; margin-bottom:12px;">Sign one transaction to authorize RWAi's vault contract to swap your USDY when conditions are met. Approval is revocable anytime.</div>
+            <button id="btn-activate-tier-3" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Activate auto-execution</button>
+            <div id="activation-status" style="margin-top:8px; font-size:0.7rem; color:#666; text-align:center;"></div>
+          </div>
         </div>
       </div>
+    </div>
+    <div id="tier-3-revoke" style="display:none; margin-top:8px; padding:10px 14px; background:#1a0d0d; border:1px solid rgba(224,82,82,0.25); border-radius:8px; font-size:0.75rem; color:#888;">
+      <span style="color:#e05252; font-weight:700;">Tier 3 active</span> — vault approval granted.
+      <button id="btn-revoke-tier3" style="background:none; border:none; color:#e05252; font-size:0.72rem; cursor:pointer; text-decoration:underline; padding:0; margin-left:4px;">Revoke approval</button>
+      <div id="revoke-status" style="margin-top:4px; color:#666; font-size:0.68rem;"></div>
     </div>
     <div class="sensitivity-wrap">
       <div class="sensitivity-badge" id="sensitivity-badge">
@@ -1010,6 +1021,8 @@
           <div class="hero-verify">✓ &nbsp;Mantle logging active</div>
           <div class="hero-verify">✓ &nbsp;ERC-8004 verified</div>
         </div>
+        <hr class="hero-status-divider" />
+        <button id="btn-pause-agent" style="width:100%; padding:8px; background:rgba(240,180,0,0.08); border:1px solid rgba(240,180,0,0.2); border-radius:6px; color:#F0B400; font-size:0.72rem; font-weight:700; cursor:pointer; letter-spacing:0.04em;">⏸ Pause Agent</button>
       </div>
 
     </div>
@@ -1443,6 +1456,7 @@
       var accounts = await provider.request({ method: 'eth_requestAccounts' });
       if (!accounts || !accounts.length) return;
       dashProvider = provider;
+      window.__rwaiSelectedProvider = provider;
       dashWalletName = name;
       sessionStorage.removeItem('userDisconnected');
       sessionStorage.setItem('rwai_wallet', accounts[0]);
@@ -1528,6 +1542,11 @@
     document.getElementById('sensitivity-menu').style.display = 'none';
     renderSensitivityBadge();
     renderHeroState();
+    fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alertSensitivity: level })
+    }).catch(function() {});
   }
 
   function toggleSensitivityMenu() {
@@ -1874,20 +1893,37 @@
   });
 
   tierDropdown.querySelectorAll('.tier-option').forEach(function (opt) {
-    opt.addEventListener('click', function () {
+    opt.addEventListener('click', function (e) {
+      // Don't bubble to document close-handler when clicking inside Tier 3 panel
+      e.stopPropagation();
       tierDropdown.querySelectorAll('.tier-option').forEach(function (o) { o.classList.remove('selected'); });
       opt.classList.add('selected');
       var label = opt.getAttribute('data-label');
       document.getElementById('tier-label').textContent = label;
-      tierOpen = false;
-      tierDropdown.classList.remove('open');
-      tierBadge.classList.remove('open');
-      // Toast confirmation
-      var toast = document.createElement('div');
-      toast.className = 'tier-toast';
-      toast.textContent = 'Tier updated to ' + opt.querySelector('.tier-option-name').textContent;
-      document.body.appendChild(toast);
-      setTimeout(function () { toast.remove(); }, 2400);
+
+      var activationPanel = document.getElementById('tier-3-activation');
+      if (opt.dataset.tier === '3') {
+        // Keep dropdown open so user can click Activate
+        if (activationPanel) activationPanel.style.display = 'block';
+      } else {
+        if (activationPanel) activationPanel.style.display = 'none';
+        tierOpen = false;
+        tierDropdown.classList.remove('open');
+        tierBadge.classList.remove('open');
+        // Toast confirmation
+        var toast = document.createElement('div');
+        toast.className = 'tier-toast';
+        toast.textContent = 'Tier updated to ' + opt.querySelector('.tier-option-name').textContent;
+        document.body.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 2400);
+        var tierCode = parseInt(opt.dataset.tier, 10);
+        var tierNames = { 1: 'Watch Only', 2: 'Propose and Confirm', 3: 'Delegated' };
+        fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tierCode: tierCode, userTier: tierNames[tierCode] || label })
+        }).catch(function() {});
+      }
     });
   });
 
@@ -1899,6 +1935,7 @@
     dismissed = true;
     btnDismiss.disabled = true;
     btnDismiss.style.opacity = '0.3';
+    respondToAlert('dismiss');
   });
 
   /* ── Simulate Rebalance modal ── */
@@ -2185,7 +2222,301 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() { updateSpread(); updateReasoningBullets(); renderSensitivityBadge(); renderHeroState(); });
+  document.addEventListener('DOMContentLoaded', function() {
+    updateSpread();
+    updateReasoningBullets();
+    renderSensitivityBadge();
+    renderHeroState();
+
+    // Wire Tier 3 activation button
+    var activateBtn = document.getElementById('btn-activate-tier-3');
+    if (activateBtn) activateBtn.addEventListener('click', activateTier3);
+
+    // Wire revoke button
+    var revokeBtn = document.getElementById('btn-revoke-tier3');
+    if (revokeBtn) revokeBtn.addEventListener('click', revokeTier3);
+
+    // Wire approve button
+    var btnApproveEl = document.getElementById('btn-approve');
+    if (btnApproveEl) btnApproveEl.addEventListener('click', function() {
+      if (!btnApproveEl.disabled) respondToAlert('approve');
+    });
+
+    // Wire pause button
+    var btnPause = document.getElementById('btn-pause-agent');
+    if (btnPause) btnPause.addEventListener('click', togglePauseAgent);
+
+    // Restore activated state if user already approved
+    if (localStorage.getItem('rwai_tier3_activated') === 'true') {
+      var btn3 = document.getElementById('btn-activate-tier-3');
+      var statusEl = document.getElementById('activation-status');
+      if (btn3) {
+        btn3.textContent = '✓ Tier 3 Active';
+        btn3.style.background = 'rgba(29,158,117,0.15)';
+        btn3.style.color = '#1D9E75';
+        btn3.disabled = true;
+      }
+      var savedTx = localStorage.getItem('rwai_tier3_tx');
+      if (statusEl && savedTx) {
+        statusEl.innerHTML = '✓ Vault approved. <a href="https://mantlescan.xyz/tx/' + savedTx + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+        statusEl.style.color = '#1D9E75';
+      }
+      var revokePanel = document.getElementById('tier-3-revoke');
+      if (revokePanel) revokePanel.style.display = 'block';
+    }
+
+    // Start pending alert poll and agent pause state restore
+    fetchPendingAlert();
+    setInterval(fetchPendingAlert, 30000);
+    restoreAgentPauseState();
+  });
+
+  /* ── Tier 3 vault approval ── */
+  var VAULT_ADDRESS_T3    = '0x9569F97F70689c573C8FAF0DC1Ba9097d285Ca69';
+  var USDY_TOKEN_ADDRESS  = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+  var MANTLE_CHAIN_ID     = '0x1388';
+  var MAX_UINT256         = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+  function encodeApprove(spender, amount) {
+    var selector      = '0x095ea7b3';
+    var paddedSpender = spender.slice(2).toLowerCase().padStart(64, '0');
+    var paddedAmount  = amount.slice(2).toLowerCase().padStart(64, '0');
+    return selector + paddedSpender + paddedAmount;
+  }
+
+  function getConnectedProvider() {
+    return dashProvider || window.__rwaiSelectedProvider || window.ethereum || null;
+  }
+
+  async function activateTier3() {
+    var statusEl = document.getElementById('activation-status');
+    var btn = document.getElementById('btn-activate-tier-3');
+
+    try {
+      var provider = getConnectedProvider();
+      if (!provider) {
+        statusEl.textContent = '⚠ Connect your wallet first';
+        statusEl.style.color = '#F59E0B';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      statusEl.textContent = 'Requesting accounts...';
+      statusEl.style.color = '#888';
+
+      var accounts = await provider.request({ method: 'eth_requestAccounts' });
+      var userAddress = accounts[0];
+
+      var chainId = await provider.request({ method: 'eth_chainId' });
+      if (chainId !== MANTLE_CHAIN_ID) {
+        statusEl.textContent = 'Switching to Mantle network...';
+        try {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: MANTLE_CHAIN_ID }] });
+        } catch (switchErr) {
+          if (switchErr.code === 4902) {
+            await provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: MANTLE_CHAIN_ID,
+                chainName: 'Mantle',
+                nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
+                rpcUrls: ['https://rpc.mantle.xyz'],
+                blockExplorerUrls: ['https://mantlescan.xyz']
+              }]
+            });
+          } else { throw switchErr; }
+        }
+      }
+
+      statusEl.textContent = 'Confirm in your wallet...';
+
+      var data = encodeApprove(VAULT_ADDRESS_T3, MAX_UINT256);
+      var txHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: userAddress, to: USDY_TOKEN_ADDRESS, data: data, value: '0x0' }]
+      });
+
+      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle Explorer</a>';
+
+      var receipt = null;
+      var attempts = 0;
+      while (!receipt && attempts < 30) {
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+        attempts++;
+      }
+
+      if (receipt && receipt.status === '0x1') {
+        statusEl.innerHTML = '✓ Vault approved. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+        statusEl.style.color = '#1D9E75';
+        btn.textContent = '✓ Tier 3 Active';
+        btn.style.background = 'rgba(29,158,117,0.15)';
+        btn.style.color = '#1D9E75';
+        btn.disabled = true;
+        localStorage.setItem('rwai_tier3_activated', 'true');
+        localStorage.setItem('rwai_tier3_tx', txHash);
+        var revokePanel = document.getElementById('tier-3-revoke');
+        if (revokePanel) revokePanel.style.display = 'block';
+      } else {
+        statusEl.textContent = 'Transaction failed or pending — check Mantle Explorer';
+        statusEl.style.color = '#F59E0B';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+
+    } catch (err) {
+      console.error('Tier 3 activation error:', err);
+      statusEl.textContent = err.message || 'Activation cancelled';
+      statusEl.style.color = '#e05252';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }
+
+
+  /* ── Pending alert polling ── */
+  async function fetchPendingAlert() {
+    try {
+      var res = await fetch('/api/pending-alert');
+      if (!res.ok) return;
+      var alert = await res.json();
+      if (alert && alert.explanation && !alert.dismissed && !alert.approved) {
+        showPendingAlert(alert);
+      }
+    } catch(e) {}
+  }
+
+  function showPendingAlert(alert) {
+    var heroBody    = document.querySelector('.hero-body');
+    var btnApprove  = document.getElementById('btn-approve');
+    var approveContent = document.getElementById('approve-content');
+    var heroTitle   = document.getElementById('hero-title');
+
+    if (heroTitle) heroTitle.textContent = 'Agent recommends action';
+    if (heroBody && alert.explanation) heroBody.textContent = alert.explanation;
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.classList.remove('no-action');
+    }
+    if (approveContent) approveContent.textContent = 'Approve rebalance';
+  }
+
+  async function respondToAlert(action) {
+    var btnApprove     = document.getElementById('btn-approve');
+    var btnDismissEl   = document.getElementById('btn-dismiss');
+    var approveContent = document.getElementById('approve-content');
+
+    if (btnApprove)   { btnApprove.disabled   = true; btnApprove.style.opacity   = '0.4'; }
+    if (btnDismissEl) { btnDismissEl.disabled  = true; btnDismissEl.style.opacity = '0.3'; }
+
+    try {
+      await fetch('/api/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action })
+      });
+    } catch(e) {}
+
+    if (action === 'approve' && btnApprove) {
+      if (approveContent) approveContent.textContent = '✓ Approved';
+      btnApprove.style.opacity = '1';
+      btnApprove.style.background = 'rgba(29,158,117,0.2)';
+      btnApprove.style.color = '#1D9E75';
+    }
+  }
+
+  /* ── Tier 3 revoke ── */
+  async function revokeTier3() {
+    var revokeBtn    = document.getElementById('btn-revoke-tier3');
+    var revokeStatus = document.getElementById('revoke-status');
+
+    try {
+      var provider = getConnectedProvider();
+      if (!provider) {
+        if (revokeStatus) { revokeStatus.textContent = '⚠ Connect your wallet first'; revokeStatus.style.color = '#F59E0B'; }
+        return;
+      }
+
+      if (revokeBtn) revokeBtn.disabled = true;
+      if (revokeStatus) { revokeStatus.textContent = 'Confirm revoke in wallet...'; revokeStatus.style.color = '#888'; }
+
+      var accounts    = await provider.request({ method: 'eth_requestAccounts' });
+      var userAddress = accounts[0];
+      var zeroData    = encodeApprove(VAULT_ADDRESS_T3, '0x' + '0'.repeat(64));
+      var txHash      = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: userAddress, to: USDY_TOKEN_ADDRESS, data: zeroData, value: '0x0' }]
+      });
+
+      if (revokeStatus) revokeStatus.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#e05252;">View tx</a>';
+
+      var receipt = null; var attempts = 0;
+      while (!receipt && attempts < 30) {
+        await new Promise(function(r) { setTimeout(r, 2000); });
+        receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+        attempts++;
+      }
+
+      if (receipt && receipt.status === '0x1') {
+        localStorage.removeItem('rwai_tier3_activated');
+        localStorage.removeItem('rwai_tier3_tx');
+        var revokePanel = document.getElementById('tier-3-revoke');
+        if (revokePanel) revokePanel.style.display = 'none';
+        fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tierCode: 2, userTier: 'Propose and Confirm', tier3Activated: false, tier3ApprovalTx: null })
+        }).catch(function() {});
+        var t = document.createElement('div');
+        t.className = 'tier-toast';
+        t.textContent = 'Tier 3 approval revoked';
+        document.body.appendChild(t);
+        setTimeout(function() { t.remove(); }, 2400);
+      }
+    } catch(err) {
+      if (revokeStatus) { revokeStatus.textContent = err.message || 'Revoke cancelled'; revokeStatus.style.color = '#e05252'; }
+      if (revokeBtn) revokeBtn.disabled = false;
+    }
+  }
+
+  /* ── Pause Agent toggle ── */
+  var agentPaused = false;
+
+  function applyPauseState(paused) {
+    agentPaused = paused;
+    var btn = document.getElementById('btn-pause-agent');
+    if (!btn) return;
+    if (paused) {
+      btn.textContent = '▶ Resume Agent';
+      btn.style.color = '#1D9E75';
+      btn.style.borderColor = 'rgba(29,158,117,0.2)';
+      btn.style.background = 'rgba(29,158,117,0.08)';
+    } else {
+      btn.textContent = '⏸ Pause Agent';
+      btn.style.color = '#F0B400';
+      btn.style.borderColor = 'rgba(240,180,0,0.2)';
+      btn.style.background = 'rgba(240,180,0,0.08)';
+    }
+  }
+
+  async function togglePauseAgent() {
+    applyPauseState(!agentPaused);
+    fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentPaused: agentPaused })
+    }).catch(function() {});
+  }
+
+  async function restoreAgentPauseState() {
+    try {
+      var res = await fetch('/api/profile');
+      if (!res.ok) return;
+      var profile = await res.json();
+      if (profile.agentPaused) applyPauseState(true);
+    } catch(e) {}
+  }
 
 })();
 </script>

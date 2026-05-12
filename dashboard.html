@@ -152,21 +152,32 @@
       transition: border-color 0.2s, color 0.2s;
     }
     .sensitivity-edit:hover { border-color: #1D9E75; color: #1D9E75; }
-    .rwai-tooltip { position: relative; }
+    .rwai-tooltip {
+      position: relative; display: inline-block;
+      font-size: 0.85rem; color: #555; cursor: help;
+      user-select: none; font-weight: 400;
+    }
+    .rwai-tooltip:hover { color: #1D9E75; }
     .rwai-tooltip .rwai-tooltip-content {
       visibility: hidden; opacity: 0;
-      position: absolute; bottom: calc(100% + 8px); left: 50%;
-      transform: translateX(-50%); width: 280px;
-      padding: 10px 12px; background: #1a1a1a;
-      border: 1px solid #2a2a2a; border-radius: 6px;
-      color: #ccc; font-size: 0.72rem; line-height: 1.5;
-      font-weight: 400; text-align: left; z-index: 1000;
+      position: absolute; bottom: calc(100% + 10px); left: 50%;
+      transform: translateX(-50%); width: 300px;
+      padding: 12px 14px; background: #161616;
+      border: 1px solid #2a2a2a; border-radius: 8px;
+      color: #ccc; font-size: 0.72rem; line-height: 1.6;
+      font-weight: 400; text-align: left; z-index: 9999;
       transition: opacity 0.15s, visibility 0.15s;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      pointer-events: none;
     }
-    .rwai-tooltip:hover .rwai-tooltip-content,
-    .rwai-tooltip:focus .rwai-tooltip-content { visibility: visible; opacity: 1; }
-    .rwai-tooltip:hover { color: #1D9E75 !important; }
+    .rwai-tooltip:hover .rwai-tooltip-content { visibility: visible; opacity: 1; }
+    .rwai-tooltip .rwai-tooltip-content::after {
+      content: '';
+      position: absolute; top: 100%; left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #2a2a2a;
+    }
     .sensitivity-menu {
       position: absolute; top: calc(100% + 6px); left: 0;
       background: #141414; border: 1px solid #252525; border-radius: 12px;
@@ -896,36 +907,38 @@
             <div class="tier-option-name">Tier 3 — Auto-Execute</div>
             <div class="tier-option-desc">Agent executes automatically when spread exceeds your threshold.</div>
           </div>
-          <div class="tier-3-activation" id="tier-3-activation" style="display:none; margin-top:12px; padding:14px; background:#0d1a14; border:1px solid rgba(29,158,117,0.28); border-radius:8px;">
-            <div style="font-size:0.78rem; color:#1D9E75; font-weight:700; margin-bottom:10px;">⚡ Tier 3 Auto-Execution Setup</div>
-            <div style="font-size:0.7rem; color:#aaa; line-height:1.6; margin-bottom:12px;">Authorize RWAi's vault to swap both your USDY and mETH when conditions are met. Two signatures, then you're done.</div>
-            <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; margin-bottom:12px;">
-              <div style="font-size:0.68rem; color:#1D9E75; font-weight:600; margin-bottom:6px;">SAFETY LIMITS</div>
-              <div style="font-size:0.7rem; color:#999; line-height:1.7;">
-                • Max swap size: <strong style="color:#ddd;">$500</strong> per transaction<br>
-                • Funds: <strong style="color:#ddd;">never leave your wallet</strong> until execution<br>
-                • Every swap: <strong style="color:#ddd;">logged on Mantle</strong> via ERC-8004<br>
-                • Revocable: <strong style="color:#ddd;">anytime</strong>, one click
-              </div>
-            </div>
-            <div id="approval-step-1" style="margin-bottom:8px;">
-              <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 1 of 2 — Approve USDY</div>
-              <button id="btn-activate-tier-3" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve USDY</button>
-            </div>
-            <div id="approval-step-2" style="margin-bottom:8px; display:none;">
-              <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 2 of 2 — Approve mETH</div>
-              <button id="btn-activate-tier-3-meth" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve mETH</button>
-            </div>
-            <div id="activation-status" style="margin-top:8px; font-size:0.7rem; color:#666; text-align:center; line-height:1.5;"></div>
-            <div class="tier-3-revoke" id="tier-3-revoke" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
-              <button id="btn-revoke-tier-3" style="width:100%; padding:8px; background:transparent; color:#888; border:1px solid #333; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.72rem;">Revoke vault approval</button>
-              <div id="revoke-status" style="margin-top:6px; font-size:0.66rem; color:#666; text-align:center;"></div>
-            </div>
-            <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.03); font-size:0.66rem; color:#555; text-align:center; line-height:1.5;">
-              Need a higher cap or custom limits?<br>
-              <a href="mailto:team@rwai.fyi?subject=Institutional%20Tier%203%20Inquiry" style="color:#888; text-decoration:underline;">Contact our team</a>
-            </div>
+        </div>
+      </div>
+    </div>
+    <div class="tier-3-activation-wrap" style="margin: 16px 0; max-width: 480px;">
+      <div class="tier-3-activation" id="tier-3-activation" style="display:none; padding:14px; background:#0d1a14; border:1px solid rgba(29,158,117,0.28); border-radius:8px;">
+        <div style="font-size:0.78rem; color:#1D9E75; font-weight:700; margin-bottom:10px;">⚡ Tier 3 Auto-Execution Setup</div>
+        <div style="font-size:0.72rem; color:#aaa; line-height:1.6; margin-bottom:12px;">Authorize RWAi's vault to swap both your USDY and mETH when conditions are met. Two signatures, then you're done.</div>
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; margin-bottom:12px;">
+          <div style="font-size:0.68rem; color:#1D9E75; font-weight:600; margin-bottom:6px;">SAFETY LIMITS</div>
+          <div style="font-size:0.7rem; color:#999; line-height:1.7;">
+            • Max swap size: <strong style="color:#ddd;">$500</strong> per transaction<br>
+            • Funds: <strong style="color:#ddd;">never leave your wallet</strong> until execution<br>
+            • Every swap: <strong style="color:#ddd;">logged on Mantle</strong> via ERC-8004<br>
+            • Revocable: <strong style="color:#ddd;">anytime</strong>, one click
           </div>
+        </div>
+        <div id="approval-step-1" style="margin-bottom:8px;">
+          <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 1 of 2 — Approve USDY</div>
+          <button id="btn-activate-tier-3" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve USDY</button>
+        </div>
+        <div id="approval-step-2" style="margin-bottom:8px; display:none;">
+          <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 2 of 2 — Approve mETH</div>
+          <button id="btn-activate-tier-3-meth" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve mETH</button>
+        </div>
+        <div id="activation-status" style="margin-top:8px; font-size:0.7rem; color:#666; text-align:center; line-height:1.5;"></div>
+        <div class="tier-3-revoke" id="tier-3-revoke" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+          <button id="btn-revoke-tier-3" style="width:100%; padding:8px; background:transparent; color:#888; border:1px solid #333; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.72rem;">Revoke vault approval</button>
+          <div id="revoke-status" style="margin-top:6px; font-size:0.66rem; color:#666; text-align:center;"></div>
+        </div>
+        <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.03); font-size:0.66rem; color:#555; text-align:center; line-height:1.5;">
+          Need a higher cap or custom limits?
+          <a href="mailto:team@rwai.fyi?subject=Institutional%20Tier%203%20Inquiry" style="color:#888; text-decoration:underline;">Contact our team</a>
         </div>
       </div>
     </div>
@@ -1077,7 +1090,13 @@
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
-      <p class="summary-card-value green" id="accuracy-val">—<span class="rwai-tooltip" tabindex="0" style="display:inline-block; font-size:0.8rem; color:#666; margin-left:8px; cursor:help; vertical-align:middle; position:relative;">ⓘ<span class="rwai-tooltip-content">USDY predictions: 100% accuracy (91/91). mETH predictions: 26% accuracy — affected by DeFiLlama 7-day rolling average calibration during the agent's first 48 hours of deployment. cmETH excluded because the APY formula was updated mid-stream. New predictions logged on stable data are expected to recover to 80%+ by demo day.</span></span></p>
+      <p class="summary-card-value green" id="accuracy-val" style="position:relative; display:flex; align-items:center; gap:8px;">
+        <span id="accuracy-number">—</span>
+        <span class="rwai-tooltip">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #444; font-size:0.7rem; font-weight:600; line-height:1;">i</span>
+          <span class="rwai-tooltip-content">USDY predictions: 100% accuracy (91/91). mETH predictions: 26% accuracy — affected by DeFiLlama 7-day rolling average calibration during the agent's first 48 hours of deployment. cmETH excluded because the APY formula was updated mid-stream. New predictions logged on stable data are expected to recover to 80%+ by demo day.</span>
+        </span>
+      </p>
       <p class="summary-card-sub" id="accuracy-sub">Loading…</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
@@ -1857,10 +1876,10 @@
 
   /* ── Agent accuracy from /api/stats ── */
   function setAccuracy(pct, sub, total) {
-    var accEl = document.getElementById('accuracy-val');
+    var numEl = document.getElementById('accuracy-number');
     var subEl = document.getElementById('accuracy-sub');
     var totEl = document.getElementById('predictions-total');
-    if (accEl) accEl.textContent = pct;
+    if (numEl) numEl.textContent = pct;
     if (subEl) subEl.textContent = sub;
     if (totEl && total !== undefined) totEl.textContent = total;
   }

@@ -152,6 +152,21 @@
       transition: border-color 0.2s, color 0.2s;
     }
     .sensitivity-edit:hover { border-color: #1D9E75; color: #1D9E75; }
+    .rwai-tooltip { position: relative; }
+    .rwai-tooltip .rwai-tooltip-content {
+      visibility: hidden; opacity: 0;
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%); width: 280px;
+      padding: 10px 12px; background: #1a1a1a;
+      border: 1px solid #2a2a2a; border-radius: 6px;
+      color: #ccc; font-size: 0.72rem; line-height: 1.5;
+      font-weight: 400; text-align: left; z-index: 1000;
+      transition: opacity 0.15s, visibility 0.15s;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .rwai-tooltip:hover .rwai-tooltip-content,
+    .rwai-tooltip:focus .rwai-tooltip-content { visibility: visible; opacity: 1; }
+    .rwai-tooltip:hover { color: #1D9E75 !important; }
     .sensitivity-menu {
       position: absolute; top: calc(100% + 6px); left: 0;
       background: #141414; border: 1px solid #252525; border-radius: 12px;
@@ -881,25 +896,44 @@
             <div class="tier-option-name">Tier 3 — Auto-Execute</div>
             <div class="tier-option-desc">Agent executes automatically when spread exceeds your threshold.</div>
           </div>
-          <div class="tier-3-activation" id="tier-3-activation" style="display:none; margin-top:12px; padding:12px; background:#0d1a14; border:1px solid rgba(29,158,117,0.28); border-radius:8px;">
-            <div style="font-size:0.75rem; color:#1D9E75; font-weight:700; margin-bottom:8px;">⚡ Tier 3 requires one-time vault approval</div>
-            <div style="font-size:0.72rem; color:#888; line-height:1.5; margin-bottom:12px;">Sign one transaction to authorize RWAi's vault contract to swap your USDY when conditions are met. Approval is revocable anytime.</div>
-            <button id="btn-activate-tier-3" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Activate auto-execution</button>
-            <div id="activation-status" style="margin-top:8px; font-size:0.7rem; color:#666; text-align:center;"></div>
+          <div class="tier-3-activation" id="tier-3-activation" style="display:none; margin-top:12px; padding:14px; background:#0d1a14; border:1px solid rgba(29,158,117,0.28); border-radius:8px;">
+            <div style="font-size:0.78rem; color:#1D9E75; font-weight:700; margin-bottom:10px;">⚡ Tier 3 Auto-Execution Setup</div>
+            <div style="font-size:0.7rem; color:#aaa; line-height:1.6; margin-bottom:12px;">Authorize RWAi's vault to swap both your USDY and mETH when conditions are met. Two signatures, then you're done.</div>
+            <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; margin-bottom:12px;">
+              <div style="font-size:0.68rem; color:#1D9E75; font-weight:600; margin-bottom:6px;">SAFETY LIMITS</div>
+              <div style="font-size:0.7rem; color:#999; line-height:1.7;">
+                • Max swap size: <strong style="color:#ddd;">$500</strong> per transaction<br>
+                • Funds: <strong style="color:#ddd;">never leave your wallet</strong> until execution<br>
+                • Every swap: <strong style="color:#ddd;">logged on Mantle</strong> via ERC-8004<br>
+                • Revocable: <strong style="color:#ddd;">anytime</strong>, one click
+              </div>
+            </div>
+            <div id="approval-step-1" style="margin-bottom:8px;">
+              <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 1 of 2 — Approve USDY</div>
+              <button id="btn-activate-tier-3" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve USDY</button>
+            </div>
+            <div id="approval-step-2" style="margin-bottom:8px; display:none;">
+              <div style="font-size:0.7rem; color:#888; margin-bottom:6px;">Step 2 of 2 — Approve mETH</div>
+              <button id="btn-activate-tier-3-meth" style="width:100%; padding:10px; background:#1D9E75; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem;">Approve mETH</button>
+            </div>
+            <div id="activation-status" style="margin-top:8px; font-size:0.7rem; color:#666; text-align:center; line-height:1.5;"></div>
+            <div class="tier-3-revoke" id="tier-3-revoke" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+              <button id="btn-revoke-tier-3" style="width:100%; padding:8px; background:transparent; color:#888; border:1px solid #333; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.72rem;">Revoke vault approval</button>
+              <div id="revoke-status" style="margin-top:6px; font-size:0.66rem; color:#666; text-align:center;"></div>
+            </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.03); font-size:0.66rem; color:#555; text-align:center; line-height:1.5;">
+              Need a higher cap or custom limits?<br>
+              <a href="mailto:team@rwai.fyi?subject=Institutional%20Tier%203%20Inquiry" style="color:#888; text-decoration:underline;">Contact our team</a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div id="tier-3-revoke" style="display:none; margin-top:8px; padding:10px 14px; background:#1a0d0d; border:1px solid rgba(224,82,82,0.25); border-radius:8px; font-size:0.75rem; color:#888;">
-      <span style="color:#e05252; font-weight:700;">Tier 3 active</span> — vault approval granted.
-      <button id="btn-revoke-tier3" style="background:none; border:none; color:#e05252; font-size:0.72rem; cursor:pointer; text-decoration:underline; padding:0; margin-left:4px;">Revoke approval</button>
-      <div id="revoke-status" style="margin-top:4px; color:#666; font-size:0.68rem;"></div>
     </div>
     <div class="sensitivity-wrap">
       <div class="sensitivity-badge" id="sensitivity-badge">
         <span class="sensitivity-label">⚖️ Balanced Sensitivity</span>
         <span class="sensitivity-current">1.5% threshold</span>
-        <button class="sensitivity-edit" onclick="toggleSensitivityMenu()">Adjust</button>
+        <button class="sensitivity-edit" id="btn-sensitivity-adjust">Adjust</button>
       </div>
       <div class="sensitivity-menu" id="sensitivity-menu" style="display:none;">
         <button onclick="setSensitivity('high')">🔍 High (0.5%)</button>
@@ -1043,7 +1077,7 @@
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
-      <p class="summary-card-value green" id="accuracy-val">—<span class="tooltip-icon" title="USDY predictions: 100% accuracy (91/91). mETH predictions: 26% accuracy — affected by DeFiLlama 7-day rolling average calibration during the agent's first 48 hours of deployment. cmETH excluded because the APY formula was updated mid-stream. New predictions logged on stable data are expected to recover to 80%+ by demo day." style="font-size:0.7rem;color:#444;margin-left:5px;cursor:help;vertical-align:middle;">ⓘ</span></p>
+      <p class="summary-card-value green" id="accuracy-val">—<span class="rwai-tooltip" tabindex="0" style="display:inline-block; font-size:0.8rem; color:#666; margin-left:8px; cursor:help; vertical-align:middle; position:relative;">ⓘ<span class="rwai-tooltip-content">USDY predictions: 100% accuracy (91/91). mETH predictions: 26% accuracy — affected by DeFiLlama 7-day rolling average calibration during the agent's first 48 hours of deployment. cmETH excluded because the APY formula was updated mid-stream. New predictions logged on stable data are expected to recover to 80%+ by demo day.</span></span></p>
       <p class="summary-card-sub" id="accuracy-sub">Loading…</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
@@ -2228,44 +2262,55 @@
     renderSensitivityBadge();
     renderHeroState();
 
-    // Wire Tier 3 activation button
     var activateBtn = document.getElementById('btn-activate-tier-3');
     if (activateBtn) activateBtn.addEventListener('click', activateTier3);
 
-    // Wire revoke button
-    var revokeBtn = document.getElementById('btn-revoke-tier3');
+    var methBtn = document.getElementById('btn-activate-tier-3-meth');
+    if (methBtn) { methBtn.dataset.wired = 'true'; methBtn.addEventListener('click', activateTier3Meth); }
+
+    var revokeBtn = document.getElementById('btn-revoke-tier-3');
     if (revokeBtn) revokeBtn.addEventListener('click', revokeTier3);
 
-    // Wire approve button
+    var adjustBtn = document.getElementById('btn-sensitivity-adjust');
+    if (adjustBtn) adjustBtn.addEventListener('click', toggleSensitivityMenu);
+
     var btnApproveEl = document.getElementById('btn-approve');
     if (btnApproveEl) btnApproveEl.addEventListener('click', function() {
       if (!btnApproveEl.disabled) respondToAlert('approve');
     });
 
-    // Wire pause button
     var btnPause = document.getElementById('btn-pause-agent');
     if (btnPause) btnPause.addEventListener('click', togglePauseAgent);
 
-    // Restore activated state if user already approved
-    if (localStorage.getItem('rwai_tier3_activated') === 'true') {
-      var btn3 = document.getElementById('btn-activate-tier-3');
+    // Restore Tier 3 state from localStorage
+    var fullyActivated = localStorage.getItem('rwai_tier3_activated') === 'true';
+    var usdyOnly = localStorage.getItem('rwai_tier3_usdy_approved') === 'true' && !fullyActivated;
+
+    if (fullyActivated) {
+      var step1 = document.getElementById('approval-step-1');
+      var step2 = document.getElementById('approval-step-2');
+      var revokePanel = document.getElementById('tier-3-revoke');
+      if (step1) step1.style.display = 'none';
+      if (step2) step2.style.display = 'none';
+      if (revokePanel) revokePanel.style.display = 'block';
+      var txHash = localStorage.getItem('rwai_tier3_meth_tx') || localStorage.getItem('rwai_tier3_usdy_tx');
       var statusEl = document.getElementById('activation-status');
-      if (btn3) {
-        btn3.textContent = '✓ Tier 3 Active';
-        btn3.style.background = 'rgba(29,158,117,0.15)';
-        btn3.style.color = '#1D9E75';
-        btn3.disabled = true;
-      }
-      var savedTx = localStorage.getItem('rwai_tier3_tx');
-      if (statusEl && savedTx) {
-        statusEl.innerHTML = '✓ Vault approved. <a href="https://mantlescan.xyz/tx/' + savedTx + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+      if (statusEl && txHash) {
+        statusEl.innerHTML = '✓ Tier 3 active. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View approval</a>';
         statusEl.style.color = '#1D9E75';
       }
-      var revokePanel = document.getElementById('tier-3-revoke');
-      if (revokePanel) revokePanel.style.display = 'block';
+    } else if (usdyOnly) {
+      var step1u = document.getElementById('approval-step-1');
+      var step2u = document.getElementById('approval-step-2');
+      if (step1u) step1u.style.display = 'none';
+      if (step2u) step2u.style.display = 'block';
+      var statusElU = document.getElementById('activation-status');
+      if (statusElU) {
+        statusElU.innerHTML = '✓ USDY approved. Now approve mETH to complete activation.';
+        statusElU.style.color = '#1D9E75';
+      }
     }
 
-    // Start pending alert poll and agent pause state restore
     fetchPendingAlert();
     setInterval(fetchPendingAlert, 30000);
     restoreAgentPauseState();
@@ -2348,16 +2393,20 @@
       }
 
       if (receipt && receipt.status === '0x1') {
-        statusEl.innerHTML = '✓ Vault approved. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+        localStorage.setItem('rwai_tier3_usdy_approved', 'true');
+        localStorage.setItem('rwai_tier3_usdy_tx', txHash);
+
+        statusEl.innerHTML = '✓ USDY approved. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
         statusEl.style.color = '#1D9E75';
-        btn.textContent = '✓ Tier 3 Active';
-        btn.style.background = 'rgba(29,158,117,0.15)';
-        btn.style.color = '#1D9E75';
-        btn.disabled = true;
-        localStorage.setItem('rwai_tier3_activated', 'true');
-        localStorage.setItem('rwai_tier3_tx', txHash);
-        var revokePanel = document.getElementById('tier-3-revoke');
-        if (revokePanel) revokePanel.style.display = 'block';
+
+        document.getElementById('approval-step-1').style.display = 'none';
+        document.getElementById('approval-step-2').style.display = 'block';
+
+        var methBtn = document.getElementById('btn-activate-tier-3-meth');
+        if (methBtn && !methBtn.dataset.wired) {
+          methBtn.dataset.wired = 'true';
+          methBtn.addEventListener('click', activateTier3Meth);
+        }
       } else {
         statusEl.textContent = 'Transaction failed or pending — check Mantle Explorer';
         statusEl.style.color = '#F59E0B';
@@ -2374,6 +2423,79 @@
     }
   }
 
+  async function activateTier3Meth() {
+    var statusEl = document.getElementById('activation-status');
+    var btn = document.getElementById('btn-activate-tier-3-meth');
+    var METH_TOKEN_ADDRESS = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+
+    try {
+      var provider = getConnectedProvider();
+      if (!provider) {
+        statusEl.textContent = '⚠ Connect your wallet first';
+        statusEl.style.color = '#F59E0B';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      statusEl.textContent = 'Confirm mETH approval in your wallet...';
+      statusEl.style.color = '#888';
+
+      var accounts = await provider.request({ method: 'eth_requestAccounts' });
+      var userAddress = accounts[0];
+
+      var data = encodeApprove(VAULT_ADDRESS_T3, MAX_UINT256);
+      var txHash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: userAddress, to: METH_TOKEN_ADDRESS, data: data, value: '0x0' }]
+      });
+
+      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+
+      var receipt = null;
+      var attempts = 0;
+      while (!receipt && attempts < 30) {
+        await new Promise(function(r) { setTimeout(r, 2000); });
+        receipt = await provider.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+        attempts++;
+      }
+
+      if (receipt && receipt.status === '0x1') {
+        localStorage.setItem('rwai_tier3_activated', 'true');
+        localStorage.setItem('rwai_tier3_meth_tx', txHash);
+
+        document.getElementById('approval-step-2').style.display = 'none';
+        document.getElementById('tier-3-revoke').style.display = 'block';
+
+        statusEl.innerHTML = '✓ Tier 3 fully activated. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View final tx</a>';
+        statusEl.style.color = '#1D9E75';
+
+        fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier3Activated: true, tier3ApprovalTx: txHash, userTier: 'Delegated', tierCode: 3, lastSyncSource: 'web' })
+        }).catch(function() {});
+
+        var t = document.createElement('div');
+        t.className = 'tier-toast';
+        t.textContent = '⚡ Tier 3 fully activated';
+        document.body.appendChild(t);
+        setTimeout(function() { t.remove(); }, 2400);
+      } else {
+        statusEl.textContent = 'Transaction failed or pending — check Mantle Explorer';
+        statusEl.style.color = '#F59E0B';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+
+    } catch (err) {
+      console.error('mETH approval error:', err);
+      statusEl.textContent = err.message || 'Approval cancelled';
+      statusEl.style.color = '#e05252';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }
 
   /* ── Pending alert polling ── */
   async function fetchPendingAlert() {
@@ -2428,7 +2550,7 @@
 
   /* ── Tier 3 revoke ── */
   async function revokeTier3() {
-    var revokeBtn    = document.getElementById('btn-revoke-tier3');
+    var revokeBtn    = document.getElementById('btn-revoke-tier-3');
     var revokeStatus = document.getElementById('revoke-status');
 
     try {
@@ -2461,13 +2583,31 @@
       if (receipt && receipt.status === '0x1') {
         localStorage.removeItem('rwai_tier3_activated');
         localStorage.removeItem('rwai_tier3_tx');
-        var revokePanel = document.getElementById('tier-3-revoke');
-        if (revokePanel) revokePanel.style.display = 'none';
+        localStorage.removeItem('rwai_tier3_meth_tx');
+        localStorage.removeItem('rwai_tier3_usdy_approved');
+        localStorage.removeItem('rwai_tier3_usdy_tx');
+
+        document.getElementById('approval-step-1').style.display = 'block';
+        document.getElementById('approval-step-2').style.display = 'none';
+        document.getElementById('tier-3-revoke').style.display = 'none';
+
+        var activateBtnR = document.getElementById('btn-activate-tier-3');
+        if (activateBtnR) {
+          activateBtnR.textContent = 'Approve USDY';
+          activateBtnR.style.background = '#1D9E75';
+          activateBtnR.style.color = '#fff';
+          activateBtnR.disabled = false;
+        }
+
+        var methBtnR = document.getElementById('btn-activate-tier-3-meth');
+        if (methBtnR) { methBtnR.disabled = false; methBtnR.style.opacity = '1'; }
+
         fetch('/api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tierCode: 2, userTier: 'Propose and Confirm', tier3Activated: false, tier3ApprovalTx: null })
         }).catch(function() {});
+
         var t = document.createElement('div');
         t.className = 'tier-toast';
         t.textContent = 'Tier 3 approval revoked';

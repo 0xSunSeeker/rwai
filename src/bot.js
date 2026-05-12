@@ -786,17 +786,19 @@ async function launchBot(retries = 5) {
       console.log('Send /start in Telegram to begin');
       console.log('Press Ctrl+C to stop');
       console.log('========================================\n');
-      setInterval(() => checkAndSendPendingAlert(MY_CHAT_ID), 2 * 60 * 1000);
-      console.log('⏱️  Alert polling active — checking every 2 minutes');
-      checkAndSendPendingAlert(MY_CHAT_ID);
       return;
     } catch (err) {
       console.warn(`Bot launch attempt ${i}/${retries} failed: ${err.message}`);
       if (i < retries) await new Promise(r => setTimeout(r, 3000 * i));
-      else console.error('Bot failed to launch after all retries. Agent still running.');
+      else console.error('Bot failed to launch after all retries.');
     }
   }
 }
+
+// Alert polling runs independently — not gated on bot.launch() completing
+console.log('⏱️  Alert polling active — checking every 2 minutes');
+checkAndSendPendingAlert(MY_CHAT_ID);
+setInterval(() => checkAndSendPendingAlert(MY_CHAT_ID), 2 * 60 * 1000);
 
 launchBot();
 

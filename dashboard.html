@@ -25,6 +25,14 @@
     @keyframes fade-up    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
     @keyframes slide-down { from{opacity:0;transform:translateY(-8px);max-height:0} to{opacity:1;transform:translateY(0);max-height:500px} }
     @keyframes tooltip-fade { 0%{opacity:0;transform:translateY(4px)} 20%{opacity:1;transform:translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+    @keyframes toast-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .tier-toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px;
+      padding: 10px 20px; color: #ccc; font-size: 0.8rem; font-weight: 600;
+      z-index: 9999; pointer-events: none;
+      animation: toast-in 0.2s ease, tooltip-fade 2.4s ease forwards;
+    }
     @keyframes tick-pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
 
     .page { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
@@ -126,12 +134,15 @@
     .tier-badge.open svg { transform: rotate(180deg); }
     .sensitivity-wrap { position: relative; display: inline-block; }
     .sensitivity-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 5px 10px 5px 13px; border-radius: 9999px;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 13px; border-radius: 9999px;
       border: 1px solid #252525; background: transparent;
       color: #555; font-size: 0.72rem; font-weight: 600;
+      cursor: default; transition: border-color 0.2s, color 0.2s;
+      font-family: inherit;
     }
-    .sensitivity-label { color: #777; }
+    .sensitivity-badge:hover { border-color: #383838; color: #999; }
+    .sensitivity-label { color: #555; }
     .sensitivity-current { color: #444; }
     .sensitivity-edit {
       padding: 2px 9px; border-radius: 9999px;
@@ -1019,7 +1030,7 @@
     </div>
     <div class="summary-card" style="animation-delay:0.15s">
       <p class="summary-card-label">Prediction Accuracy</p>
-      <p class="summary-card-value green" id="accuracy-val">—</p>
+      <p class="summary-card-value green" id="accuracy-val">—<span class="tooltip-icon" title="USDY predictions: 100% accuracy (91/91). mETH predictions: 26% accuracy — affected by DeFiLlama 7-day rolling average calibration during the agent's first 48 hours of deployment. cmETH excluded because the APY formula was updated mid-stream. New predictions logged on stable data are expected to recover to 80%+ by demo day." style="font-size:0.7rem;color:#444;margin-left:5px;cursor:help;vertical-align:middle;">ⓘ</span></p>
       <p class="summary-card-sub" id="accuracy-sub">Loading…</p>
     </div>
     <div class="summary-card" style="animation-delay:0.2s">
@@ -1521,7 +1532,8 @@
 
   function toggleSensitivityMenu() {
     var menu = document.getElementById('sensitivity-menu');
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (!menu) return;
+    menu.style.display = (menu.style.display === 'block' ? 'none' : 'block');
   }
 
   function renderSensitivityBadge() {
@@ -1863,16 +1875,19 @@
 
   tierDropdown.querySelectorAll('.tier-option').forEach(function (opt) {
     opt.addEventListener('click', function () {
-      // Update selected state
       tierDropdown.querySelectorAll('.tier-option').forEach(function (o) { o.classList.remove('selected'); });
       opt.classList.add('selected');
-      // Update badge label
       var label = opt.getAttribute('data-label');
       document.getElementById('tier-label').textContent = label;
-      // Close
       tierOpen = false;
       tierDropdown.classList.remove('open');
       tierBadge.classList.remove('open');
+      // Toast confirmation
+      var toast = document.createElement('div');
+      toast.className = 'tier-toast';
+      toast.textContent = 'Tier updated to ' + opt.querySelector('.tier-option-name').textContent;
+      document.body.appendChild(toast);
+      setTimeout(function () { toast.remove(); }, 2400);
     });
   });
 

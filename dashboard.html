@@ -1924,26 +1924,73 @@
     var modal = document.getElementById('rebalance-modal');
     if (!modal) return;
 
-    var usdyText = document.getElementById('usdy-usd') ? document.getElementById('usdy-usd').textContent : '$0.00';
-    var methText = document.getElementById('meth-usd') ? document.getElementById('meth-usd').textContent : '$0.00';
+    var usdyAPY = USDY_APY;
+    var methAPR = METH_APR;
 
-    var usdyVal = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
-    var methVal = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
+    var usdyText = (document.getElementById('usdy-usd') || {}).textContent || '$0.00';
+    var methText = (document.getElementById('meth-usd') || {}).textContent || '$0.00';
+    var usdyVal  = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
+    var methVal  = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
 
-    var usdyAfter   = usdyVal / 2;
-    var methAfter   = methVal + usdyAfter;
-    var methAprPct  = (METH_APR * 100).toFixed(2) + '%';
-    var yieldBefore = (usdyVal * 0.0355) + (methVal * METH_APR);
-    var yieldAfter  = (usdyAfter * 0.0355) + (methAfter * METH_APR);
-    var diff        = yieldBefore - yieldAfter;
+    var tierLabel = document.getElementById('tier-label');
+    var isTier3   = tierLabel && tierLabel.textContent.includes('Tier 3');
 
-    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ 3.55%';
-    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ ' + methAprPct;
+    var shiftAmount = usdyVal * 0.5;
+    if (isTier3 && shiftAmount > 500) shiftAmount = 500;
+
+    var usdyAfter   = usdyVal - shiftAmount;
+    var methAfter   = methVal + shiftAmount;
+    var yieldBefore = (usdyVal   * usdyAPY) + (methVal   * methAPR);
+    var yieldAfter  = (usdyAfter * usdyAPY) + (methAfter * methAPR);
+    var diff        = yieldAfter - yieldBefore;  // positive = gain
+
+    var usdyAPYpct = (usdyAPY * 100).toFixed(2) + '%';
+    var methAPRpct = (methAPR * 100).toFixed(2) + '%';
+    var shiftPct   = usdyVal > 0 ? Math.round((shiftAmount / usdyVal) * 100) : 0;
+
+    // Update subtitle
+    var modalSubtitle = document.querySelector('#rebalance-modal p');
+    if (modalSubtitle) {
+      if (isTier3 && usdyVal * 0.5 > 500) {
+        modalSubtitle.textContent = 'What would happen if you moved $500 (the Tier 3 cap) of your USDY into mETH?';
+      } else {
+        modalSubtitle.textContent = 'What would happen if you moved ' + shiftPct + '% of your USDY ($' + shiftAmount.toFixed(2) + ') into mETH?';
+      }
+    }
+
+    // Update "After" section header
+    document.querySelectorAll('#rebalance-modal div').forEach(function(d) {
+      if (d.childElementCount === 0 && d.textContent && d.textContent.trim().startsWith('After')) {
+        d.textContent = (isTier3 && usdyVal * 0.5 > 500) ? 'After ($500 shift)' : 'After (' + shiftPct + '% shift)';
+      }
+    });
+
+    // Populate values
+    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ ' + usdyAPYpct;
+    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ ' + methAPRpct;
     document.getElementById('sim-yield-before').textContent = '$' + yieldBefore.toFixed(2) + ' / yr';
-    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ 3.55%';
-    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ ' + methAprPct;
+    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ ' + usdyAPYpct;
+    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ ' + methAPRpct;
     document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2)  + ' / yr';
-    document.getElementById('sim-verdict').textContent      = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
+
+    // Verdict and recommendation
+    var verdictEl = document.getElementById('sim-verdict');
+    var recEl     = document.getElementById('sim-recommendation');
+    var yieldAfterEl = document.getElementById('sim-yield-after');
+
+    if (Math.abs(diff) < 0.01) {
+      if (verdictEl) verdictEl.textContent = 'No meaningful yield change from rebalancing';
+      if (recEl) { recEl.textContent = '— Either allocation works at these rates'; recEl.style.color = '#888'; }
+      if (yieldAfterEl) yieldAfterEl.style.color = '#555';
+    } else if (diff > 0) {
+      if (verdictEl) verdictEl.textContent = 'Rebalancing increases projected yield by $' + diff.toFixed(2) + '/yr';
+      if (recEl) { recEl.textContent = '⚡ Rebalance recommended — capturing the higher yield'; recEl.style.color = '#1D9E75'; }
+      if (yieldAfterEl) yieldAfterEl.style.color = '#1D9E75';
+    } else {
+      if (verdictEl) verdictEl.textContent = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
+      if (recEl) { recEl.textContent = '✓ Hold recommended — current allocation is optimal'; recEl.style.color = '#1D9E75'; }
+      if (yieldAfterEl) yieldAfterEl.style.color = '#888';
+    }
 
     modal.style.display = 'flex';
   }
@@ -2120,6 +2167,7 @@
     if (!usdyApyEl || !methApyEl) return;
     var usdyApy = parseFloat(usdyApyEl.textContent.replace('%', ''));
     var methApr = parseFloat(methApyEl.textContent.replace('%', ''));
+    if (!isNaN(usdyApy) && usdyApy > 0) USDY_APY = usdyApy / 100;
     if (isNaN(usdyApy) || isNaN(methApr)) return;
     var spread = usdyApy - methApr;
     var spreadStr = (spread >= 0 ? '+' : '') + spread.toFixed(2) + '%';
@@ -2847,11 +2895,11 @@
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">$0.00 @ 1.66%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-before">—</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>
-        <span style="font-size:0.85rem; font-weight:700; color:#1D9E75;" id="sim-yield-before">$2.67 / yr</span>
+        <span style="font-size:0.85rem; font-weight:700; color:#1D9E75;" id="sim-yield-before">—</span>
       </div>
     </div>
 
@@ -2865,17 +2913,17 @@
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">mETH</span>
-        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">$0.00 @ 1.66%</span>
+        <span style="font-size:0.85rem; font-weight:700;" id="sim-meth-after">—</span>
       </div>
       <div style="display:flex; justify-content:space-between; border-top:1px solid #1c1c1c; padding-top:8px; margin-top:8px;">
         <span style="font-size:0.85rem; color:#777;">Projected yield</span>
-        <span style="font-size:0.85rem; font-weight:700; color:#555;" id="sim-yield-after">$2.39 / yr</span>
+        <span style="font-size:0.85rem; font-weight:700; color:#555;" id="sim-yield-after">—</span>
       </div>
     </div>
 
     <div style="background:#0d1f18; border:1px solid rgba(29,158,117,0.2); border-radius:10px; padding:16px; margin-bottom:24px;">
-      <div style="font-size:0.85rem; color:#ccc; margin-bottom:6px;" id="sim-verdict">Rebalancing reduces projected yield by $0.28/yr</div>
-      <div style="font-size:0.8rem; color:#1D9E75; font-weight:600;">✓ Hold recommended — current allocation is optimal</div>
+      <div style="font-size:0.85rem; color:#ccc; margin-bottom:6px;" id="sim-verdict">—</div>
+      <div style="font-size:0.8rem; font-weight:600;" id="sim-recommendation">—</div>
     </div>
 
     <button id="sim-close" style="width:100%; padding:12px; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:8px; color:#777; font-size:0.875rem; cursor:pointer; transition:all 0.2s;">Close simulation</button>

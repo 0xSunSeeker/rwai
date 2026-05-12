@@ -389,12 +389,15 @@ bot.command('status', async (ctx) => {
     const spreadDir = data.usdyCurrentAPY > data.methCurrentAPR ? 'USDY leads' : 'mETH leads';
     const insight = await generateInsight(usdyYield, methYield, Math.abs(Number(spread)).toFixed(2));
     const safeInsight = escapeMarkdown(insight);
-    let anchorLine = '_On-chain anchor unavailable right now_';
-    try {
-      const anchor = await logDecision(Math.abs(Number(spread)).toFixed(2), insight);
-      if (anchor?.explorerUrl) anchorLine = `[View on Explorer](${anchor.explorerUrl})`;
-    } catch (anchorErr) {
-      console.warn('On-chain anchor failed:', anchorErr.message);
+    let anchorLine = '_Agent paused — no on-chain activity_';
+    if (!profile.agentPaused) {
+      anchorLine = '_On-chain anchor unavailable right now_';
+      try {
+        const anchor = await logDecision(Math.abs(Number(spread)).toFixed(2), insight);
+        if (anchor?.explorerUrl) anchorLine = `[View on Explorer](${anchor.explorerUrl})`;
+      } catch (anchorErr) {
+        console.warn('On-chain anchor failed:', anchorErr.message);
+      }
     }
 
     const positions = profile.positions || {};

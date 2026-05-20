@@ -69,7 +69,7 @@ const DEFAULT_PROFILE = {
   userTier: 'Propose and Confirm',
   tierCode: 2,
   priorDecisions: 'Approved 2 similar USDY to mETH shifts in Q1 2026',
-  agentAccuracy: '73% accurate over 24 predictions',
+  agentAccuracy: 'building track record',
 };
 
 async function loadProfile() {
@@ -220,14 +220,14 @@ bot.command('setup', async (ctx) => {
     `Choose how much authority you give the agent:\n\n` +
     `*Tier 1 — Watch Only*\nAlerts only. Agent never proposes actions. You decide everything.\n\n` +
     `*Tier 2 — Propose and Confirm* _(current: ${current === 'Propose and Confirm' ? '✅' : ''})_\nAgent proposes rebalances. You approve with one tap in Telegram.\n\n` +
-    `*Tier 3 — Delegated*\nAgent auto-executes up to a cap you set. Coming soon.\n\n` +
+    `*Tier 3 — Delegated* _(current: ${current === 'Delegated' ? '✅' : ''})_\nAgent auto-executes rebalances up to $500 per swap when conditions justify it. Every execution logged on Mantle.\n\n` +
     `Currently active: *${current}*`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
         [Markup.button.callback('👁 Tier 1 — Watch Only', 'tier_1')],
         [Markup.button.callback('✅ Tier 2 — Propose and Confirm', 'tier_2')],
-        [Markup.button.callback('🤖 Tier 3 — Delegated (coming soon)', 'tier_3_disabled')],
+        [Markup.button.callback('⚡ Tier 3 — Delegated', 'tier_3')],
       ])
     }
   );
@@ -255,8 +255,16 @@ bot.action('tier_2', async (ctx) => {
   );
 });
 
-bot.action('tier_3_disabled', async (ctx) => {
-  await ctx.answerCbQuery('Coming soon — Tier 2 is the live option right now.').catch(() => {});
+bot.action('tier_3', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  await saveProfile({ userTier: 'Delegated', tierCode: 3 });
+  await ctx.reply(
+    `⚡ *Tier 3 — Delegated selected*\n\n` +
+    `I can auto-execute rebalances up to $500 per swap when the USDY/mETH spread crosses 2%. Every execution is logged on Mantle via ERC-8004.\n\n` +
+    `*One more step:* you need to approve the RWAI vault for USDY + mETH on the dashboard so swaps can execute. Funds stay in your wallet until then.\n\n` +
+    `[Activate Tier 3 on dashboard →](https://rwai.fyi/dashboard)`,
+    { parse_mode: 'Markdown', disable_web_page_preview: true }
+  );
 });
 
 // ─── JOURNEY 1: TIER SELECTION (from dashboard deep-link) ────────────────────
@@ -290,9 +298,9 @@ bot.action('set_tier_3', async (ctx) => {
   if (!profile.alertSensitivity) profile.alertSensitivity = 'high';
   await saveUser({ ...profile, userTier: 'Delegated', tierCode: 3, onboardingComplete: true });
   await ctx.reply(
-    `⚡ Delegated mode activated.\n\n` +
-    `I can auto-execute rebalances up to $500 per swap when spread conditions justify it.\n\n` +
-    `Every execution is logged permanently on Mantle. Use /status to check your positions.`
+    `⚡ Delegated mode selected.\n\n` +
+    `I can auto-execute rebalances up to $500 per swap when spread crosses 2%. Every execution is logged on Mantle.\n\n` +
+    `One last step — approve the vault for USDY + mETH on the dashboard so swaps can execute. Use /status to check your positions.`
   );
 });
 
@@ -685,15 +693,22 @@ async function checkAndSendPendingAlert(chatId) {
     if (!data || !data.pending) return;
     if (data.alreadySent) return;
 
-    await bot.telegram.sendMessage(chatId,
-      `🔔 *RWAI Alert*\n\n${data.explanation}`,
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
+    // Tier 3 auto-executed alerts already happened on-chain — no approve flow needed.
+    const isAutoExecuted = data.alertType === 'auto_executed';
+    const keyboard = isAutoExecuted
+      ? Markup.inlineKeyboard([
+          Markup.button.callback('👍 Acknowledge', 'dismiss'),
+        ])
+      : Markup.inlineKeyboard([
           Markup.button.callback('✅ Approve rebalance', 'approve'),
           Markup.button.callback('❌ Not now', 'dismiss'),
-        ])
-      }
+        ]);
+
+    const header = isAutoExecuted ? '⚡ *RWAI Tier 3 — Auto-Executed*' : '🔔 *RWAI Alert*';
+
+    await bot.telegram.sendMessage(chatId,
+      `${header}\n\n${data.explanation}`,
+      { parse_mode: 'Markdown', ...keyboard }
     );
 
     // Mark as sent in Redis so we don't re-send on next poll
@@ -723,10 +738,8 @@ bot.action('approve', async (ctx) => {
       : '0';
 
     // Log the approved decision on-chain via ERC-8004
-    let explorerLine = '_(on-chain anchor unavailable right now)_';
     try {
-      const result = await logDecision(spread, alertData.explanation || '');
-      if (result?.explorerUrl) explorerLine = `[View on Mantle Explorer](${result.explorerUrl})`;
+      await logDecision(spread, alertData.explanation || '');
     } catch (err) {
       console.error('Anchor failed:', err.message);
     }
@@ -740,12 +753,10 @@ bot.action('approve', async (ctx) => {
 
     await ctx.reply(
       `✅ *Rebalance approved*\n\n` +
-      `Approval recorded on-chain via ERC-8004.\n` +
-      `Yield spread at decision: ${spread}%\n\n` +
-      `${explorerLine}\n\n` +
-      `To complete the swap, sign the transaction on the dashboard:\n` +
-      `[Open dashboard →](https://rwai.fyi/dashboard)\n\n` +
-      `_Telegram approvals are consent-only. Wallet signature required to execute the swap._`,
+      `Decision recorded on-chain via ERC-8004.\n\n` +
+      `To execute the swap, sign the transaction on the dashboard. RWAI will route through the best available aggregator on Mantle (LI.FI meta-router → Eisen/OKX/etc).\n\n` +
+      `[Open dashboard to sign →](https://rwai.fyi/dashboard)\n\n` +
+      `_Telegram approvals are consent-only. Wallet signature required to execute on-chain._`,
       { parse_mode: 'Markdown', disable_web_page_preview: true }
     );
   } catch (err) {

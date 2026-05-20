@@ -33,6 +33,61 @@ const WMNT_ADDRESS = '0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8';
 const SWAP_PATH_USDY_TO_METH = [USDY_ADDRESS, WMNT_ADDRESS, mETH_ADDRESS];
 const SWAP_PATH_METH_TO_USDY = [mETH_ADDRESS, WMNT_ADDRESS, USDY_ADDRESS];
 
+// LI.FI swap-economics probe — used to decide if a rebalance is worth proposing.
+// fromAddress is a stable on-chain identity for the agent so quotes don't depend
+// on whether the user has a wallet connected yet.
+const RWAI_AGENT_ADDR = '0xDD3146732D4801b87e1244c51BDE734c8df2BF9f';
+
+async function checkSwapEconomics(positionUSD, spreadPct, direction) {
+  try {
+    const fromToken = direction === 'meth_to_usdy' ? mETH_ADDRESS : USDY_ADDRESS;
+    const toToken   = direction === 'meth_to_usdy' ? USDY_ADDRESS : mETH_ADDRESS;
+    // Rough token-to-USD priors. LI.FI returns authoritative USD values; this is
+    // just to size the wei-amount we ask it to quote.
+    const tokenPriceUSD = direction === 'meth_to_usdy' ? 2300 : 1.01;
+    const tokenAmount = positionUSD / tokenPriceUSD;
+    const tokenAmountWei = BigInt(Math.floor(tokenAmount * 1e18)).toString();
+
+    const params = new URLSearchParams({
+      fromChain: '5000',
+      toChain: '5000',
+      fromToken,
+      toToken,
+      fromAmount: tokenAmountWei,
+      fromAddress: RWAI_AGENT_ADDR,
+      slippage: '0.005',
+    });
+
+    const res = await fetch(`https://li.quest/v1/quote?${params}`);
+    if (!res.ok) return { viable: false, reason: 'LI.FI quote unavailable' };
+
+    const quote = await res.json();
+    const fromUSD = parseFloat(quote.estimate?.fromAmountUSD || '0');
+    const toUSD   = parseFloat(quote.estimate?.toAmountUSD   || '0');
+    const swapCost = fromUSD - toUSD;
+    const swapCostPct = fromUSD > 0 ? (swapCost / fromUSD) * 100 : 100;
+
+    const annualGain = (spreadPct / 100) * fromUSD;
+    const breakevenDays = annualGain > 0 ? (swapCost / annualGain) * 365 : 999;
+
+    const viable = breakevenDays < 90;
+
+    return {
+      viable,
+      swapCost: swapCost.toFixed(2),
+      swapCostPct: swapCostPct.toFixed(2),
+      annualGain: annualGain.toFixed(2),
+      breakevenDays: Math.round(breakevenDays),
+      tool: quote.toolDetails?.name || quote.tool,
+      reason: viable
+        ? `Breakeven in ${Math.round(breakevenDays)} days — proposing rebalance`
+        : `Breakeven would take ${Math.round(breakevenDays)} days — holding (swap cost ${swapCostPct.toFixed(1)}% > yield gain)`,
+    };
+  } catch (err) {
+    return { viable: false, reason: `Economics check failed: ${err.message}` };
+  }
+}
+
 // ─── PATHS ────────────────────────────────────────────────────────────────────
 const DATA_DIR = "./data";
 const LAST_YIELD_PATH = `${DATA_DIR}/lastYield.json`;
@@ -386,6 +441,35 @@ async function runAgentLoop() {
       yieldData.currentSpread        = currentSpread;
       yieldData.alertType            = alertType;
       yieldData.spreadAboveProposal  = spreadAboveProposal;
+
+      // For rebalance proposals, verify the swap actually pays off before alerting
+      if (alertType === "rebalance_proposal" && user.userTier !== "Watch Only") {
+        const usdyUSD = user.positions?.USDY?.usdValue || 0;
+        const methUSD = user.positions?.mETH?.usdValue || 0;
+        const positionToShift = Math.min(usdyUSD, methUSD) * 0.5;
+        const direction = (yieldData.usdyCurrentAPY > yieldData.methCurrentAPR) ? 'meth_to_usdy' : 'usdy_to_meth';
+
+        if (positionToShift < 10) {
+          console.log(`Position too small to rebalance: $${positionToShift.toFixed(2)} < $10 minimum`);
+          // Downgrade to non-actionable alert so the user still hears about the spread
+          alertType = "spread_alert";
+          yieldData.alertType = alertType;
+          yieldData.spreadAboveProposal = false;
+        } else {
+          const economics = await checkSwapEconomics(positionToShift, currentSpread, direction);
+          console.log(`Swap economics: ${economics.reason}`);
+          if (economics.viable) {
+            yieldData.swapEconomics    = economics;
+            yieldData.proposedDirection = direction;
+            yieldData.proposedShiftUSD  = positionToShift;
+          } else {
+            console.log('Skipping proposal — swap cost exceeds yield gain over 90-day horizon');
+            alertType = "spread_alert";
+            yieldData.alertType = alertType;
+            yieldData.spreadAboveProposal = false;
+          }
+        }
+      }
 
       // Step 4 — Generate plain-English explanation
       const explanation = await generateExplanation(yieldData, user);

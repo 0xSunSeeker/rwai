@@ -1832,11 +1832,11 @@
         if (data.usdyAccuracy === 100) sub += ' · USDY 100%';
         setAccuracy(data.accuracy + '%', sub, data.total);
       } else {
-        setAccuracy('73%', 'Across 24 live yield forecasts on Mantle', data.total || 24);
+        setAccuracy('—', 'Building track record — accuracy resolves 24h after each prediction', data.total || 0);
       }
     })
     .catch(function () {
-      setAccuracy('73%', 'Across 24 live yield forecasts on Mantle', 24);
+      setAccuracy('—', 'Building track record — accuracy resolves 24h after each prediction', 0);
     });
 
   /* ── Header minute timer ── */
@@ -2720,6 +2720,24 @@
         btnApprove.onclick = function() { window.open('https://mantlescan.xyz/tx/' + data.executionTxHash, '_blank'); };
         btnDismiss.style.display = 'none';
 
+        // Show execution summary when LI.FI quote metadata is recorded
+        if (data.executionAggregator && data.executionFromUSD) {
+          var execNote = document.getElementById('hero-exec-note');
+          if (!execNote && heroBody) {
+            execNote = document.createElement('p');
+            execNote.id = 'hero-exec-note';
+            execNote.style.cssText = 'font-size:0.75rem; color:#aaa; margin-top:8px; padding:10px 14px; background:rgba(29,158,117,0.08); border:1px solid rgba(29,158,117,0.25); border-radius:6px; line-height:1.5;';
+            heroBody.appendChild(execNote);
+          }
+          if (execNote) {
+            var dateStr = new Date(data.executedAt || Date.now()).toLocaleString();
+            execNote.innerHTML = '✓ Executed ' + dateStr
+              + ' · Routed via <strong>' + data.executionAggregator + '</strong>'
+              + ' · $' + parseFloat(data.executionFromUSD).toFixed(2) + ' → $' + parseFloat(data.executionToUSD).toFixed(2)
+              + ' · Cost: $' + parseFloat(data.executionSwapCost || 0).toFixed(2);
+          }
+        }
+
       } else if (data.approved && !data.executed && staleApproval) {
         // STATE D — Approval stale (spread narrowed)
         if (heroTitle) heroTitle.textContent = '⚠ Conditions changed';
@@ -2735,6 +2753,61 @@
 
       } else if (data.approved && !data.executed) {
         // STATE B — Approved, awaiting wallet signature
+        // Pre-fetch a fresh LI.FI quote so the hero card shows real economics
+        var liveQuote = null;
+        try {
+          var bProvider = (typeof dashProvider !== 'undefined' && dashProvider)
+            || window.__rwaiSelectedProvider
+            || window.ethereum;
+          if (bProvider) {
+            var bAccounts = await bProvider.request({ method: 'eth_accounts' });
+            if (bAccounts && bAccounts[0]) {
+              var bUsdyHigher = (data.yieldData && data.yieldData.usdyCurrentAPY || 0) > (data.yieldData && data.yieldData.methCurrentAPR || 0);
+              var USDY_B = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+              var METH_B = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+              var bTokenIn  = bUsdyHigher ? METH_B : USDY_B;
+              var bTokenOut = bUsdyHigher ? USDY_B : METH_B;
+              var bUsdyUSD = parseFloat(((document.getElementById('usdy-usd') || {}).textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+              var bMethUSD = parseFloat(((document.getElementById('meth-usd') || {}).textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+              var bSourceUSD = bUsdyHigher ? bMethUSD : bUsdyUSD;
+              var bShiftUSD = Math.min(bSourceUSD * 0.5, 50);
+              if (bShiftUSD >= 5) {
+                var bTokenPriceUSD = (bTokenIn === METH_B) ? 2300 : 1.01;
+                var bTokenAmount = bShiftUSD / bTokenPriceUSD;
+                var bTokenAmountWei = BigInt(Math.floor(bTokenAmount * 1e18)).toString();
+                var qRes = await fetch('/api/quote?fromToken=' + bTokenIn
+                  + '&toToken=' + bTokenOut
+                  + '&fromAmount=' + bTokenAmountWei
+                  + '&fromAddress=' + bAccounts[0]);
+                if (qRes.ok) liveQuote = await qRes.json();
+              }
+            }
+          }
+        } catch (e) { console.warn('Quote prefetch failed:', e.message); }
+
+        if (liveQuote && liveQuote.estimate) {
+          var qFromUSD = parseFloat(liveQuote.estimate.fromAmountUSD);
+          var qToUSD   = parseFloat(liveQuote.estimate.toAmountUSD);
+          var qCost = qFromUSD - qToUSD;
+          var heroImpact = document.getElementById('hero-annual-impact');
+          if (heroImpact) {
+            heroImpact.textContent = '$' + qToUSD.toFixed(2) + ' out';
+            heroImpact.style.color = '#1D9E75';
+          }
+          var costNote = document.getElementById('hero-cost-note');
+          if (!costNote && heroBody) {
+            costNote = document.createElement('p');
+            costNote.id = 'hero-cost-note';
+            costNote.style.cssText = 'font-size:0.75rem; color:#888; margin-top:8px; padding:8px 12px; background:rgba(29,158,117,0.06); border:1px solid rgba(29,158,117,0.15); border-radius:6px;';
+            heroBody.appendChild(costNote);
+          }
+          if (costNote) {
+            costNote.innerHTML = '💡 <strong>Route:</strong> ' + liveQuote.toolName
+              + ' · <strong>Cost:</strong> $' + qCost.toFixed(2)
+              + ' (' + ((qCost/qFromUSD)*100).toFixed(2) + '%) · <strong>Slippage floor:</strong> $' + qToUSD.toFixed(2);
+          }
+        }
+
         if (heroTitle) heroTitle.textContent = 'Agent recommends action';
         btnApprove.className = 'btn-approve';
         btnApprove.disabled = false;
@@ -2814,6 +2887,19 @@
       return;
     }
 
+    var btnApprove = document.getElementById('btn-approve');
+    var approveContent = document.getElementById('approve-content');
+    var originalText = approveContent ? approveContent.textContent : '';
+
+    function setBtnText(t) {
+      if (approveContent) approveContent.textContent = t;
+      else if (btnApprove) btnApprove.textContent = t;
+    }
+    function restoreBtn() {
+      if (approveContent) approveContent.textContent = originalText;
+      if (btnApprove) btnApprove.disabled = false;
+    }
+
     try {
       var accounts = await provider.request({ method: 'eth_requestAccounts' });
       var userAddress = accounts[0];
@@ -2828,86 +2914,152 @@
         }
       }
 
+      if (btnApprove) { setBtnText('🔄 Fetching best route...'); btnApprove.disabled = true; }
+
       var yieldData = alertData.yieldData || {};
       var usdyYield = yieldData.usdyCurrentAPY || 3.55;
       var methYield = yieldData.methCurrentAPR || 2.02;
       var usdyHigher = usdyYield > methYield;
+
+      var USDY_ADDR = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+      var METH_ADDR = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+
+      var tokenIn, tokenOut, fromLabel, toLabel;
+      if (usdyHigher) {
+        tokenIn = METH_ADDR; tokenOut = USDY_ADDR;
+        fromLabel = 'mETH'; toLabel = 'USDY';
+      } else {
+        tokenIn = USDY_ADDR; tokenOut = METH_ADDR;
+        fromLabel = 'USDY'; toLabel = 'mETH';
+      }
 
       var usdyText = (document.getElementById('usdy-usd') || {}).textContent || '$0';
       var methText = (document.getElementById('meth-usd') || {}).textContent || '$0';
       var usdyUSD  = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
       var methUSD  = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
 
-      var tokenIn, tokenOut, amountInUSD, fromLabel, toLabel;
-      if (usdyHigher) {
-        tokenIn = METH_TOKEN_T2; tokenOut = USDY_TOKEN_T2;
-        amountInUSD = methUSD * 0.25; fromLabel = 'mETH'; toLabel = 'USDY';
-      } else {
-        tokenIn = USDY_TOKEN_T2; tokenOut = METH_TOKEN_T2;
-        amountInUSD = usdyUSD * 0.25; fromLabel = 'USDY'; toLabel = 'mETH';
-      }
+      // Shift 50% of the lower-yielding asset, capped at $50 for demo safety
+      var sourceUSD = usdyHigher ? methUSD : usdyUSD;
+      var shiftUSD = Math.min(sourceUSD * 0.5, 50);
 
-      if (amountInUSD < 5) {
-        alert('Position too small for rebalance — need $5+ to swap');
+      if (shiftUSD < 5) {
+        alert('Position too small — need $5+ in ' + fromLabel + ' to swap. Currently $' + sourceUSD.toFixed(2) + '.');
+        restoreBtn();
         return;
       }
 
-      var confirmed = confirm('Swap ~$' + amountInUSD.toFixed(2) + ' of ' + fromLabel + ' into ' + toLabel + '?\n\nYour wallet will prompt you to sign the transaction.');
-      if (!confirmed) return;
+      var tokenPriceUSD = (tokenIn === METH_ADDR) ? 2300 : 1.01;
+      var tokenAmount = shiftUSD / tokenPriceUSD;
+      var tokenAmountWei = BigInt(Math.floor(tokenAmount * 1e18)).toString();
 
-      // Check allowance
-      var allowanceData = '0xdd62ed3e'
-        + userAddress.slice(2).toLowerCase().padStart(64, '0')
-        + MOE_ROUTER_ADDRESS.slice(2).toLowerCase().padStart(64, '0');
-      var allowanceHex = await provider.request({ method: 'eth_call', params: [{ to: tokenIn, data: allowanceData }, 'latest'] });
-      var allowance = BigInt(allowanceHex || '0x0');
+      var quoteUrl = '/api/quote?fromToken=' + tokenIn
+        + '&toToken=' + tokenOut
+        + '&fromAmount=' + tokenAmountWei
+        + '&fromAddress=' + userAddress;
+      var quoteRes = await fetch(quoteUrl);
 
-      var pricePerToken = (tokenIn === METH_TOKEN_T2) ? 2500 : 1.013;
-      var tokenAmountWei = BigInt(Math.floor((amountInUSD / pricePerToken) * 1e18));
+      if (!quoteRes.ok) {
+        throw new Error('Could not fetch swap quote from LI.FI');
+      }
+      var quote = await quoteRes.json();
 
-      if (allowance < tokenAmountWei) {
-        var approveData = '0x095ea7b3'
-          + MOE_ROUTER_ADDRESS.slice(2).toLowerCase().padStart(64, '0')
-          + 'f'.repeat(64);
-        await provider.request({ method: 'eth_sendTransaction', params: [{ from: userAddress, to: tokenIn, data: approveData }] });
-        await new Promise(function(r) { setTimeout(r, 4000); });
+      if (!quote.transactionRequest || !quote.transactionRequest.data) {
+        throw new Error('LI.FI returned no transaction data');
       }
 
-      // swapExactTokensForTokens via Merchant Moe (v1-style, selector 0x38ed1739)
-      var deadline = Math.floor(Date.now() / 1000) + 1200;
-      var amountHex = tokenAmountWei.toString(16).padStart(64, '0');
-      var swapData = '0x38ed1739'
-        + amountHex
-        + '0'.padStart(64, '0')                                       // amountOutMin = 0
-        + 'a0'.padStart(64, '0')                                      // offset to path array
-        + userAddress.slice(2).toLowerCase().padStart(64, '0')        // to
-        + deadline.toString(16).padStart(64, '0')                     // deadline
-        + '3'.padStart(64, '0')                                       // path length = 3
-        + tokenIn.slice(2).toLowerCase().padStart(64, '0')
-        + WMNT_ADDRESS.slice(2).toLowerCase().padStart(64, '0')
-        + tokenOut.slice(2).toLowerCase().padStart(64, '0');
+      var fromUSD = parseFloat(quote.estimate.fromAmountUSD);
+      var toUSD   = parseFloat(quote.estimate.toAmountUSD);
+      var swapCost = fromUSD - toUSD;
+      var swapCostPct = (swapCost / fromUSD) * 100;
+      var gasUSD = (quote.estimate.gasCosts || []).reduce(function(s, g) {
+        return s + parseFloat(g.amountUSD || 0);
+      }, 0);
 
-      var swapTx = await provider.request({ method: 'eth_sendTransaction', params: [{ from: userAddress, to: MOE_ROUTER_ADDRESS, data: swapData }] });
+      var confirmMsg =
+        'Swap via ' + quote.toolName + '\n\n' +
+        'You send: $' + fromUSD.toFixed(2) + ' ' + fromLabel + '\n' +
+        'You receive: $' + toUSD.toFixed(2) + ' ' + toLabel + ' (min)\n' +
+        'Swap cost: $' + swapCost.toFixed(2) + ' (' + swapCostPct.toFixed(2) + '%)\n' +
+        'Gas: $' + gasUSD.toFixed(3) + '\n\n' +
+        'Click OK to sign the transaction in your wallet.';
 
-      // Record execution in Redis
+      if (!confirm(confirmMsg)) {
+        restoreBtn();
+        return;
+      }
+
+      setBtnText('🔓 Approving token...');
+
+      // Check + grant allowance to LI.FI's approvalAddress (may differ from router `to`)
+      var approvalTarget = quote.estimate.approvalAddress;
+      var allowanceCallData = '0xdd62ed3e'
+        + userAddress.slice(2).toLowerCase().padStart(64, '0')
+        + approvalTarget.slice(2).toLowerCase().padStart(64, '0');
+
+      var allowanceHex = await provider.request({
+        method: 'eth_call',
+        params: [{ to: tokenIn, data: allowanceCallData }, 'latest']
+      });
+      var allowance = BigInt(allowanceHex || '0x0');
+      var needed = BigInt(tokenAmountWei);
+
+      if (allowance < needed) {
+        var approveData = '0x095ea7b3'
+          + approvalTarget.slice(2).toLowerCase().padStart(64, '0')
+          + 'f'.repeat(64);
+
+        var approveTx = await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{ from: userAddress, to: tokenIn, data: approveData }]
+        });
+        console.log('Approval tx:', approveTx);
+
+        setBtnText('⏳ Waiting for approval to confirm...');
+        await new Promise(function(r) { setTimeout(r, 6000); });
+      }
+
+      setBtnText('⚡ Sign swap transaction...');
+
+      var swapTx = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: userAddress,
+          to: quote.transactionRequest.to,
+          data: quote.transactionRequest.data,
+          value: quote.transactionRequest.value || '0x0',
+        }]
+      });
+      console.log('Swap tx:', swapTx);
+
       await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: swapTx, source: 'web' })
+        body: JSON.stringify({
+          txHash: swapTx,
+          source: 'web',
+          aggregator: quote.toolName,
+          fromAmountUSD: fromUSD,
+          toAmountUSD: toUSD,
+          swapCost: swapCost,
+        })
       });
 
       var toast = document.createElement('div');
       toast.className = 'tier-toast';
       toast.style.background = '#1D9E75';
-      toast.textContent = '✓ Rebalance executed on Mantle';
+      toast.style.maxWidth = '400px';
+      toast.innerHTML = '✓ Rebalance executed via ' + quote.toolName
+        + '<br><span style="font-size:0.75rem;opacity:0.85">$' + fromUSD.toFixed(2)
+        + ' ' + fromLabel + ' → $' + toUSD.toFixed(2) + ' ' + toLabel + '</span>';
       document.body.appendChild(toast);
-      setTimeout(function() { toast.remove(); }, 4000);
+      setTimeout(function() { toast.remove(); }, 6000);
 
       setTimeout(function() { renderHeroFromAlert(); }, 2000);
 
     } catch (err) {
       console.error('Swap failed:', err);
       alert('Swap failed: ' + (err.message || err));
+      restoreBtn();
     }
   }
 

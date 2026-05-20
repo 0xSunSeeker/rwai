@@ -91,6 +91,16 @@ You MUST include a specific rebalance proposal in your message:
 - State the exact dollar amount to move based on userPositionUSD
 - Explain why holding more USDY makes sense given the current spread
 - End with: "I am preparing a one-tap approval for this rebalance."
+` : ''}${yieldData.swapEconomics ? `
+SWAP COST ANALYSIS (from LI.FI aggregator):
+- Proposed shift: $${yieldData.proposedShiftUSD?.toFixed(2)}
+- Direction: ${yieldData.proposedDirection === 'meth_to_usdy' ? 'mETH → USDY' : 'USDY → mETH'}
+- Aggregator: ${yieldData.swapEconomics.tool}
+- Swap cost: $${yieldData.swapEconomics.swapCost} (${yieldData.swapEconomics.swapCostPct}%)
+- Expected annual gain: $${yieldData.swapEconomics.annualGain}
+- Breakeven: ${yieldData.swapEconomics.breakevenDays} days
+
+Reference this in your explanation. Tell the user the swap cost, the expected gain, and how long until breakeven. This is honest economic analysis — they should understand this isn't a free lunch but a math-justified decision.
 ` : ''}
 Write a plain-English Telegram message explaining:
 1. What changed (only reference the data above — do not invent context)

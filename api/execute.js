@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { txHash, source } = req.body;
+    const { txHash, source, aggregator, fromAmountUSD, toAmountUSD, swapCost } = req.body;
     if (!txHash || !txHash.match(/^0x[0-9a-fA-F]{64}$/)) {
       return res.status(400).json({ error: 'Invalid txHash' });
     }
@@ -33,6 +33,10 @@ export default async function handler(req, res) {
     alert.executionTxHash = txHash;
     alert.executedAt = Date.now();
     alert.executionSource = source || 'web';
+    alert.executionAggregator = aggregator || null;
+    alert.executionFromUSD = fromAmountUSD || null;
+    alert.executionToUSD = toAmountUSD || null;
+    alert.executionSwapCost = swapCost || null;
 
     await redis.set(REDIS_KEY, JSON.stringify(alert));
     return res.status(200).json({ ok: true, txHash });

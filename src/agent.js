@@ -59,32 +59,30 @@ async function checkSwapEconomics(positionUSD, spreadPct, direction) {
     });
 
     const res = await fetch(`https://li.quest/v1/quote?${params}`);
-    if (!res.ok) return { viable: false, reason: 'LI.FI quote unavailable' };
+    if (!res.ok) return { available: false, reason: 'LI.FI quote unavailable' };
 
     const quote = await res.json();
     const fromUSD = parseFloat(quote.estimate?.fromAmountUSD || '0');
     const toUSD   = parseFloat(quote.estimate?.toAmountUSD   || '0');
-    const swapCost = fromUSD - toUSD;
-    const swapCostPct = fromUSD > 0 ? (swapCost / fromUSD) * 100 : 100;
+    if (fromUSD <= 0) return { available: false, reason: 'LI.FI returned no usable quote' };
 
+    const swapCost = fromUSD - toUSD;
+    const swapCostPct = (swapCost / fromUSD) * 100;
     const annualGain = (spreadPct / 100) * fromUSD;
     const breakevenDays = annualGain > 0 ? (swapCost / annualGain) * 365 : 999;
 
-    const viable = breakevenDays < 90;
-
+    // No viability verdict here — the caller decides what to do with these
+    // numbers based on the user's delegation tier.
     return {
-      viable,
+      available: true,
       swapCost: swapCost.toFixed(2),
       swapCostPct: swapCostPct.toFixed(2),
       annualGain: annualGain.toFixed(2),
       breakevenDays: Math.round(breakevenDays),
       tool: quote.toolDetails?.name || quote.tool,
-      reason: viable
-        ? `Breakeven in ${Math.round(breakevenDays)} days — proposing rebalance`
-        : `Breakeven would take ${Math.round(breakevenDays)} days — holding (swap cost ${swapCostPct.toFixed(1)}% > yield gain)`,
     };
   } catch (err) {
-    return { viable: false, reason: `Economics check failed: ${err.message}` };
+    return { available: false, reason: `Economics check failed: ${err.message}` };
   }
 }
 
@@ -457,16 +455,32 @@ async function runAgentLoop() {
           yieldData.spreadAboveProposal = false;
         } else {
           const economics = await checkSwapEconomics(positionToShift, currentSpread, direction);
-          console.log(`Swap economics: ${economics.reason}`);
-          if (economics.viable) {
-            yieldData.swapEconomics    = economics;
-            yieldData.proposedDirection = direction;
-            yieldData.proposedShiftUSD  = positionToShift;
+
+          // Always surface the numbers so the dashboard and bot can show the
+          // trade honestly — the user sees the cost regardless of tier.
+          yieldData.swapEconomics     = economics;
+          yieldData.proposedDirection = direction;
+          yieldData.proposedShiftUSD  = positionToShift;
+
+          const bk = economics.available ? `${economics.breakevenDays} days` : 'unknown (quote unavailable)';
+
+          if (user.tierCode === 3) {
+            // Tier 3 (Delegated): strict guardrail — only auto-execute trades that
+            // clearly pay back within a quarter, protecting delegated users from
+            // blind value loss.
+            if (economics.available && economics.breakevenDays < 90) {
+              console.log(`[Tier 3] Breakeven ${bk} — within 90-day auto-execute window`);
+            } else {
+              console.log(`[Tier 3 gate] Refusing auto-execute path — breakeven ${bk} exceeds 90`);
+              alertType = "spread_alert";
+              yieldData.alertType = alertType;
+              yieldData.spreadAboveProposal = false;
+            }
           } else {
-            console.log('Skipping proposal — swap cost exceeds yield gain over 90-day horizon');
-            alertType = "spread_alert";
-            yieldData.alertType = alertType;
-            yieldData.spreadAboveProposal = false;
+            // Tier 2 (Propose and Confirm): always propose. The breakeven is shown
+            // prominently and the user signs the transaction, so they decide whether
+            // the trade fits their thesis.
+            console.log(`[Tier 2] Proposing with breakeven ${bk} — user decides`);
           }
         }
       }

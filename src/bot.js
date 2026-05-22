@@ -706,8 +706,15 @@ async function checkAndSendPendingAlert(chatId) {
 
     const header = isAutoExecuted ? '⚡ *RWAI Tier 3 — Auto-Executed*' : '🔔 *RWAI Alert*';
 
+    // Surface the swap economics so the user sees the cost before approving
+    let economicsLine = '';
+    const econ = data.yieldData?.swapEconomics;
+    if (econ?.available) {
+      economicsLine = `\n\n⚠️ Swap cost: $${econ.swapCost} (${econ.swapCostPct}%) — breakeven in ${econ.breakevenDays} days at current spread.`;
+    }
+
     await bot.telegram.sendMessage(chatId,
-      `${header}\n\n${data.explanation}`,
+      `${header}\n\n${data.explanation}${economicsLine}`,
       { parse_mode: 'Markdown', ...keyboard }
     );
 

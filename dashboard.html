@@ -2831,6 +2831,26 @@
         btnDismiss.disabled = false;
         btnDismiss.textContent = 'Dismiss';
         btnDismiss.onclick = function() { respondToAlert('dismiss'); };
+
+        // Breakeven badge — make the swap math undeniable without hiding the trade
+        var econ = data.yieldData && data.yieldData.swapEconomics;
+        var bkBadge = document.getElementById('hero-breakeven-badge');
+        if (econ && econ.available && heroBody) {
+          if (!bkBadge) {
+            bkBadge = document.createElement('div');
+            bkBadge.id = 'hero-breakeven-badge';
+            bkBadge.style.cssText = 'display:inline-block; font-size:0.78rem; font-weight:600; margin-top:10px; padding:5px 12px; border-radius:999px;';
+            heroBody.appendChild(bkBadge);
+          }
+          var days = econ.breakevenDays;
+          var color = days < 90 ? '#1D9E75' : (days <= 365 ? '#F59E0B' : '#E05252');
+          bkBadge.style.color = color;
+          bkBadge.style.background = 'rgba(0,0,0,0.04)';
+          bkBadge.style.border = '1px solid ' + color;
+          bkBadge.textContent = 'Breakeven: ' + days + ' days';
+        } else if (bkBadge) {
+          bkBadge.remove();
+        }
       }
     } catch (err) {
       console.warn('Hero alert render failed:', err);

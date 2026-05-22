@@ -151,7 +151,17 @@ async function hasPendingUnsentAlert() {
       const data = await res.json();
       // pending:true means unresponded; null means no alert at all
       if (data === null) return false;
-      return data.pending === true;
+      if (data.pending !== true) return false;
+      // Hardening: a proposal left unresponded for >48h is stale. Don't let it
+      // block fresh proposals indefinitely (see stuck-alert incident May 14–22,
+      // where one unresolved alert froze the agent's hero output for 8 days).
+      const generatedAt = data.generatedAt ? new Date(data.generatedAt).getTime() : 0;
+      const ageHours = generatedAt ? (Date.now() - generatedAt) / 3.6e6 : Infinity;
+      if (ageHours > 48) {
+        console.log(`Pending alert is ${Math.round(ageHours)}h old (>48h) — treating as expired, allowing overwrite.`);
+        return false;
+      }
+      return true;
     }
   } catch {}
   // Fallback: local file (in case API is unreachable)
@@ -282,8 +292,50 @@ function resolveOldPredictions(currentYield) {
         } catch {}
       }
     }
+    return resolved;
   } catch (err) {
     console.warn("resolveOldPredictions error:", err.message);
+    return 0;
+  }
+}
+
+// ─── REDIS PREDICTION SYNC ──────────────────────────────────────────────────────
+// Dual-write: the local .jsonl append remains the permanent backup; these mirror
+// the same data into Redis so the dashboard endpoints read it live (not from the
+// stale deploy-time file).
+async function syncPredictionToRedis(entry) {
+  try {
+    const res = await fetch('https://rwai.fyi/api/predictions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    });
+    if (res.ok) console.log('Prediction synced to Redis.');
+    else console.warn('Redis prediction sync failed:', res.status);
+  } catch (err) {
+    console.warn('Could not sync prediction to Redis:', err.message);
+  }
+}
+
+// When resolveOldPredictions rewrites the file (marking 24h-old predictions
+// correct/incorrect), re-sync the full list so Redis reflects those resolutions
+// too. Self-healing: also repairs any drift between file and Redis.
+async function rebuildRedisPredictions() {
+  try {
+    if (!existsSync(PREDICTIONS_PATH)) return;
+    const entries = readFileSync(PREDICTIONS_PATH, 'utf8')
+      .trim().split('\n').filter(Boolean)
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+    const res = await fetch('https://rwai.fyi/api/predictions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+    });
+    if (res.ok) console.log(`Redis predictions re-synced after resolution (${entries.length} entries).`);
+    else console.warn('Redis re-sync failed:', res.status);
+  } catch (err) {
+    console.warn('Could not re-sync predictions to Redis:', err.message);
   }
 }
 
@@ -391,11 +443,12 @@ async function runAgentLoop() {
     console.log(`USDY: ${yieldData.usdyCurrentAPY}% | mETH: ${yieldData.methCurrentAPR}% | cmETH: ${yieldData.cmethCurrentAPY}% | T-bill: ${yieldData.tbillRate}%`);
 
     // Step 2 — Resolve any predictions that are now 24h old
-    resolveOldPredictions(yieldData);
+    const resolvedCount = resolveOldPredictions(yieldData);
+    if (resolvedCount > 0) await rebuildRedisPredictions();
 
     // Step 3a — Always generate and log a new prediction (builds track record)
     const prediction = await generatePrediction(yieldData);
-    appendPrediction(prediction, yieldData);
+    const predictionEntry = appendPrediction(prediction, yieldData);
     console.log("Prediction logged:", JSON.stringify(prediction, null, 2));
 
     // Anchor prediction on-chain and write txHash back to the entry
@@ -405,8 +458,12 @@ async function runAgentLoop() {
     );
     if (anchor?.txHash) {
       patchLastPredictionTxHash(anchor.txHash);
+      predictionEntry.txHash = anchor.txHash;
       console.log(`🔗 Prediction anchored on Mantle: ${anchor.txHash}`);
     }
+
+    // Dual-write the prediction into Redis so the dashboard reads it live
+    await syncPredictionToRedis(predictionEntry);
 
     // Step 3b — Check if yield moved enough to alert the user
     const user = liveProfile;

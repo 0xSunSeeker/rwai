@@ -2282,9 +2282,10 @@
 
     var b3 = document.getElementById('reason-3');
     if (b3) {
-      b3.textContent = spread >= 1.5
-        ? 'Spread of ' + spread.toFixed(2) + '% is above the 1.5% alert threshold — holding USDY is optimal'
-        : 'Spread of ' + spread.toFixed(2) + '% is below the 1.5% alert threshold — rebalance may be worth considering';
+      var alertThreshold = getSensitivityThreshold();
+      b3.textContent = spread >= alertThreshold
+        ? 'Spread of ' + spread.toFixed(2) + '% exceeds the ' + alertThreshold + '% alert threshold — rebalance opportunity flagged'
+        : 'Spread of ' + spread.toFixed(2) + '% is within normal range — holding positions';
     }
   }
 
@@ -3322,17 +3323,29 @@
       return;
     }
     el.innerHTML = predictions.map(function(p) {
-      var resolved = p.resolved;
-      var correct  = p.outcome === 'correct';
-      var badgeHtml = resolved
-        ? '<span class="history-badge ' + (correct ? 'correct' : 'incorrect') + '">' + (correct ? 'Correct' : 'Incorrect') + '</span>'
-        : '<span class="history-badge" style="background:#1a1a1a;color:#555;border:1px solid #2a2a2a;">Pending</span>';
+      // Badge reflects both asset calls (correctness lives in usdyCorrect/methCorrect)
+      var badgeHtml;
+      if (!p.resolved) {
+        badgeHtml = '<span class="history-badge" style="background:#1a1a1a;color:#555;border:1px solid #2a2a2a;">Pending</span>';
+      } else if (p.usdyCorrect === true && p.methCorrect === true) {
+        badgeHtml = '<span class="history-badge correct">Both correct</span>';
+      } else if (p.usdyCorrect === false && p.methCorrect === false) {
+        badgeHtml = '<span class="history-badge incorrect">Both incorrect</span>';
+      } else {
+        badgeHtml = '<span class="history-badge pending">Mixed</span>';
+      }
       var shortHash = p.txHash ? p.txHash.slice(0, 10) + '…' : '';
       var explorerLink = p.txHash
         ? '<a class="history-link" href="https://mantlescan.xyz/tx/' + p.txHash + '" target="_blank" rel="noopener noreferrer">View on Mantle →</a>'
         : '<a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View registry →</a>';
-      var desc = (p.usdyReasoning || p.methReasoning || 'Yield prediction logged on Mantle.').slice(0, 160);
-      if ((p.usdyReasoning || p.methReasoning || '').length > 160) desc += '…';
+
+      var usdyCap = (p.usdyDirection || 'unknown').charAt(0).toUpperCase() + (p.usdyDirection || 'unknown').slice(1);
+      var methCap = (p.methDirection || 'unknown').charAt(0).toUpperCase() + (p.methDirection || 'unknown').slice(1);
+      var usdyR = (p.usdyReasoning || '').slice(0, 100); if ((p.usdyReasoning || '').length > 100) usdyR += '…';
+      var methR = (p.methReasoning || '').slice(0, 100); if ((p.methReasoning || '').length > 100) methR += '…';
+      var usdyLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;margin-bottom:4px;"><strong style="color:#1D9E75;">USDY ' + usdyCap + '</strong> <span style="color:#666;">' + (p.usdyConfidence || 0) + '% conf</span>' + (usdyR ? ' — ' + usdyR : '') + '</div>';
+      var methLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;"><strong style="color:#aaa;">mETH ' + methCap + '</strong> <span style="color:#666;">' + (p.methConfidence || 0) + '% conf</span>' + (methR ? ' — ' + methR : '') + '</div>';
+
       return '<div class="history-card">'
         + '<span class="history-icon">🤖</span>'
         + '<div class="history-body">'
@@ -3340,7 +3353,7 @@
         + '<span class="history-type">Yield Prediction</span>'
         + '<span class="history-time">' + timeAgoShort(p.loggedAt) + '</span>'
         + '</div>'
-        + '<p class="history-desc">' + desc + '</p>'
+        + '<div style="margin-bottom:12px;">' + usdyLine + methLine + '</div>'
         + '<div class="history-footer">'
         + '<div class="history-footer-left">' + badgeHtml + '<span class="history-verify">✓ Mantle anchored' + (shortHash ? ' · ' + shortHash : '') + '</span></div>'
         + explorerLink

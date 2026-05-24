@@ -21,6 +21,8 @@ function toDisplay(entry) {
     methDirection: entry.methPrediction?.direction || 'unknown',
     methConfidence: entry.methPrediction?.confidence || 0,
     methReasoning: entry.methPrediction?.reasoning || '',
+    usdyCorrect: entry.usdyPrediction?.correct ?? null,
+    methCorrect: entry.methPrediction?.correct ?? null,
     yieldAtPrediction: entry.yieldAtPrediction || null,
     resolved: entry.resolved || false,
     outcome: entry.outcome || null,

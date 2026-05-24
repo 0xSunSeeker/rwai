@@ -1505,7 +1505,7 @@
     var menu = document.getElementById('sensitivity-menu');
     if (menu) menu.style.display = 'none';
     renderSensitivityBadge();
-    renderHeroState();
+    refreshHero();
     fetch('/api/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1533,60 +1533,221 @@
     badge.querySelector('.sensitivity-current').textContent = label.pct + ' threshold';
   }
 
-  async function renderHeroState() {
-    var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
-    var currentSpread = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
-    var threshold = getSensitivityThreshold();
+  /* ── HERO STATE MACHINE — single source of truth for the hero card ──
+     One determineHeroState() resolves exactly one state; one applyHeroState()
+     writes ALL six hero elements (headline, pill, body, reasoning bullets,
+     recommendation panel, button). No other function writes these. Alert states
+     read alert.yieldData (snapshot at generation); monitoring reads live DOM. */
+  var HERO_THRESHOLDS = {
+    high:     { alert: 0.5, proposal: 0.8,  autoExec: 1.2 },
+    balanced: { alert: 1.5, proposal: 1.65, autoExec: 2.0 },
+    major:    { alert: 2.0, proposal: 2.5,  autoExec: 3.0 },
+  };
+  function heroThresholds(profile) {
+    var s = (profile && profile.alertSensitivity) || window.USER_SENSITIVITY || 'balanced';
+    return HERO_THRESHOLDS[s] || HERO_THRESHOLDS.balanced;
+  }
 
-    var tierLabelEl = document.getElementById('tier-label');
-    var userTierText = tierLabelEl ? tierLabelEl.textContent : '';
-    var isTier3 = userTierText.includes('Tier 3');
+  function setHeroBullets(usdyApy, methApr, spread, alertThreshold) {
+    var b1 = document.getElementById('reason-1');
+    var b2 = document.getElementById('reason-2');
+    var b3 = document.getElementById('reason-3');
+    if (b1) b1.textContent = usdyApy >= 3.0
+      ? 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — above the 3.0% T-bill baseline'
+      : 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — at or below the T-bill baseline';
+    if (b2) {
+      var diff = usdyApy - methApr;
+      b2.textContent = diff >= 0
+        ? 'mETH APR at ' + methApr.toFixed(2) + '% — ' + diff.toFixed(2) + '% below USDY yield'
+        : 'mETH APR at ' + methApr.toFixed(2) + '% — ' + Math.abs(diff).toFixed(2) + '% above USDY yield';
+    }
+    if (b3) b3.textContent = spread >= alertThreshold
+      ? 'Spread of ' + spread.toFixed(2) + '% exceeds the ' + alertThreshold + '% alert threshold — rebalance opportunity flagged'
+      : 'Spread of ' + spread.toFixed(2) + '% is within normal range — holding positions';
+  }
 
-    var sensitivity = window.USER_SENSITIVITY || localStorage.getItem('rwai_sensitivity') || 'balanced';
-    var actionThresholds = {
-      high:     { proposal: 0.8,  autoExec: 1.2 },
-      balanced: { proposal: 1.65, autoExec: 2.0 },
-      major:    { proposal: 2.5,  autoExec: 3.0 },
-    };
-    var presets = actionThresholds[sensitivity] || actionThresholds.balanced;
-    var actionThreshold = isTier3 ? presets.autoExec : presets.proposal;
+  function clearHeroExtras() {
+    ['hero-breakeven-badge', 'hero-cost-note', 'hero-exec-note', 'hero-stale-warning'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  }
 
-    var hasActiveAlert = false;
-    try {
-      var res = await fetch('/api/pending-alert');
-      var data = await res.json();
-      hasActiveAlert = !!(data && data.pending === true);
-    } catch {}
+  function appendBreakevenBadge(heroBody, econ) {
+    if (!heroBody || !econ || !econ.available) return;
+    var bk = document.createElement('span');
+    bk.id = 'hero-breakeven-badge';
+    var days = econ.breakevenDays;
+    var color = days < 90 ? '#1D9E75' : (days <= 365 ? '#F59E0B' : '#E05252');
+    bk.style.cssText = 'display:inline-block; font-size:0.78rem; font-weight:600; margin-top:10px; padding:5px 12px; border-radius:999px; color:' + color + '; background:rgba(0,0,0,0.04); border:1px solid ' + color + ';';
+    bk.textContent = 'Breakeven: ' + days + ' days';
+    heroBody.appendChild(bk);
+  }
 
-    var heroTitle  = document.getElementById('hero-title');
-    var heroStatus = document.getElementById('hero-status-label');
+  function determineHeroState(alert, profile) {
+    if (profile && profile.agentPaused === true) return 'paused';
+    if (!alert) return 'monitoring';
+    if (alert.executed === true && alert.executionTxHash) return 'executed';
+    if (alert.approved === true) return 'approved';
+    if (alert.pending === true && alert.alertType === 'rebalance_proposal') return 'proposal_pending';
+    if (alert.pending === true && alert.alertType === 'spread_alert') return 'spread_alert';
+    return 'monitoring';
+  }
 
-    var title, statusLabel, statusColor;
+  function applyHeroState(state, alert, profile, liveSpread) {
+    var heroTitle = document.getElementById('hero-title');
+    var heroPill  = document.getElementById('hero-status-label');
+    var heroBody  = document.querySelector('.hero-body');
+    var recContent= document.getElementById('next-action-content');
+    var recSub    = document.getElementById('next-action-spread-txt');
+    var btnApprove= document.getElementById('btn-approve');
+    var approveContent = document.getElementById('approve-content');
+    var btnDismiss= document.getElementById('btn-dismiss');
 
-    if (hasActiveAlert && currentSpread >= actionThreshold) {
-      title       = 'Agent recommends action';
-      statusLabel = isTier3 ? 'Auto-execute armed' : 'Action recommended';
-      statusColor = '#1D9E75';
-    } else if (currentSpread >= actionThreshold) {
-      title       = 'Threshold crossed — already responded';
-      statusLabel = 'Awaiting next cycle';
-      statusColor = '#888';
-    } else if (currentSpread >= threshold) {
-      title       = 'Threshold crossed — monitoring';
-      statusLabel = 'Below action threshold';
-      statusColor = '#F59E0B';
-    } else if (currentSpread >= threshold * 0.85) {
-      title       = 'Opportunity emerging';
-      statusLabel = 'Approaching threshold';
-      statusColor = '#F59E0B';
-    } else {
-      title       = 'Monitoring conditions';
-      statusLabel = 'Below your threshold';
-      statusColor = '#888';
+    var th = heroThresholds(profile);
+
+    function head(t){ if (heroTitle) heroTitle.textContent = t; }
+    function pill(t,c){ if (heroPill){ heroPill.textContent = t; heroPill.style.color = c; } }
+    function body(t){ if (heroBody) heroBody.textContent = t; }
+    function rec(c,s){ if (recContent) recContent.textContent = c; if (recSub) recSub.textContent = s; }
+    function btnIdle(label, dismissLabel, onDismiss){
+      if (btnApprove){ btnApprove.className='btn-approve no-action'; btnApprove.disabled=true; btnApprove.onclick=null; btnApprove.style.background=''; btnApprove.style.color=''; btnApprove.style.opacity=''; }
+      if (approveContent) approveContent.textContent = label;
+      if (btnDismiss){
+        if (dismissLabel){ btnDismiss.style.display=''; btnDismiss.disabled=false; btnDismiss.style.opacity=''; btnDismiss.textContent=dismissLabel; btnDismiss.onclick=onDismiss; }
+        else { btnDismiss.style.display='none'; btnDismiss.onclick=null; }
+      }
+    }
+    function btnActive(label, bg, fg, onApprove, dismissLabel, onDismiss){
+      if (btnApprove){ btnApprove.className='btn-approve'; btnApprove.disabled=false; btnApprove.style.opacity=''; btnApprove.style.background=bg||''; btnApprove.style.color=fg||''; btnApprove.onclick=onApprove; }
+      if (approveContent) approveContent.textContent = label;
+      if (btnDismiss){
+        if (dismissLabel){ btnDismiss.style.display=''; btnDismiss.disabled=false; btnDismiss.style.opacity=''; btnDismiss.textContent=dismissLabel; btnDismiss.onclick=onDismiss; }
+        else { btnDismiss.style.display='none'; btnDismiss.onclick=null; }
+      }
     }
 
-    if (heroTitle)  heroTitle.textContent  = title;
-    if (heroStatus) { heroStatus.textContent = statusLabel; heroStatus.style.color = statusColor; }
+    clearHeroExtras();
+
+    var snap = (alert && alert.yieldData) || {};
+    var snapSpread = snap.currentSpread != null ? Math.abs(snap.currentSpread) : liveSpread;
+    var snapUsdy = snap.usdyCurrentAPY != null ? snap.usdyCurrentAPY : 0;
+    var snapMeth = snap.methCurrentAPR != null ? snap.methCurrentAPR : 0;
+
+    if (state === 'paused') {
+      head('Agent paused');
+      pill('Paused', '#F59E0B');
+      body('Monitoring is paused. Resume from the dashboard or Telegram to continue.');
+      var pb1=document.getElementById('reason-1'); if (pb1) pb1.textContent='Agent paused — monitoring suspended';
+      var pb2=document.getElementById('reason-2'); if (pb2) pb2.textContent='';
+      var pb3=document.getElementById('reason-3'); if (pb3) pb3.textContent='';
+      rec('Agent paused — no recommendation', '');
+      btnIdle('No action needed', null, null);
+      return;
+    }
+
+    if (state === 'executed') {
+      head('✓ Rebalanced');
+      pill('Executed', '#1D9E75');
+      body(alert.explanation || 'Rebalance executed.');
+      setHeroBullets(snapUsdy, snapMeth, snapSpread, th.alert);
+      rec('Executed — view on Mantle', 'Spread of ' + snapSpread.toFixed(2) + '% at execution');
+      btnActive('✓ View transaction', 'rgba(29,158,117,0.15)', '#1D9E75',
+        function(){ window.open('https://mantlescan.xyz/tx/' + alert.executionTxHash, '_blank'); }, null, null);
+      if (alert.executionAggregator && alert.executionFromUSD && heroBody) {
+        var execNote = document.createElement('p');
+        execNote.id = 'hero-exec-note';
+        execNote.style.cssText = 'font-size:0.75rem; color:#aaa; margin-top:8px; padding:10px 14px; background:rgba(29,158,117,0.08); border:1px solid rgba(29,158,117,0.25); border-radius:6px; line-height:1.5;';
+        var dateStr = new Date(alert.executedAt || Date.now()).toLocaleString();
+        execNote.innerHTML = '✓ Executed ' + dateStr + ' · Routed via <strong>' + alert.executionAggregator + '</strong> · $' + parseFloat(alert.executionFromUSD).toFixed(2) + ' → $' + parseFloat(alert.executionToUSD).toFixed(2) + ' · Cost: $' + parseFloat(alert.executionSwapCost || 0).toFixed(2);
+        heroBody.appendChild(execNote);
+      }
+      return;
+    }
+
+    if (state === 'approved') {
+      head('Approved — sign to execute');
+      pill('Awaiting signature', '#1D9E75');
+      body(alert.explanation || 'Approved — sign to execute the rebalance.');
+      // Stale warning: live spread narrowed to < 75% of the snapshot spread
+      if (snapSpread > 0 && liveSpread < snapSpread * 0.75 && heroBody) {
+        var warn = document.createElement('div');
+        warn.id = 'hero-stale-warning';
+        warn.style.cssText = 'font-size:0.8rem; color:#F59E0B; margin-bottom:10px; padding:8px 12px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:6px; line-height:1.5;';
+        warn.textContent = '⚠️ Spread has narrowed since approval (was ' + snapSpread.toFixed(2) + '%, now ' + liveSpread.toFixed(2) + '%). The trade still works but the math has shifted — review before signing.';
+        heroBody.insertBefore(warn, heroBody.firstChild);
+      }
+      setHeroBullets(snapUsdy, snapMeth, snapSpread, th.alert);
+      rec('Approved — sign on dashboard to execute', 'Spread of ' + snapSpread.toFixed(2) + '% at approval');
+      btnActive('⚡ Sign rebalance transaction', '#1D9E75', '#fff',
+        function(){ executeRebalance(alert); }, 'Cancel approval', function(){ cancelApproval(); });
+      appendBreakevenBadge(heroBody, snap.swapEconomics);
+      return;
+    }
+
+    if (state === 'proposal_pending') {
+      head('Agent recommends action');
+      pill('Action recommended', '#1D9E75');
+      body(alert.explanation || 'Rebalance recommended.');
+      setHeroBullets(snapUsdy, snapMeth, snapSpread, th.alert);
+      rec('Rebalance recommended', 'Spread of ' + snapSpread.toFixed(2) + '% exceeds proposal threshold — awaiting your approval');
+      btnActive('✓ Approve rebalance', '', '',
+        function(){ respondToAlert('approve'); }, 'Dismiss', function(){ respondToAlert('dismiss'); });
+      appendBreakevenBadge(heroBody, snap.swapEconomics);
+      return;
+    }
+
+    if (state === 'spread_alert') {
+      head('Spread widening — watching');
+      pill('Above alert threshold', '#F59E0B');
+      body(alert.explanation || 'Spread is widening — monitoring conditions.');
+      setHeroBullets(snapUsdy, snapMeth, snapSpread, th.alert);
+      rec('Monitoring spread', 'Spread of ' + snapSpread.toFixed(2) + '% above alert threshold — no action yet');
+      btnIdle('No action needed', 'Dismiss', function(){ respondToAlert('dismiss'); });
+      return;
+    }
+
+    // monitoring (also: dismissed, no alert) — all six derive from LIVE spread
+    var s = liveSpread;
+    if (s >= th.proposal) {
+      head('Opportunity emerging');
+      pill('Approaching action', '#F59E0B');
+      rec('Rebalance opportunity', 'Spread of ' + s.toFixed(2) + '% above proposal threshold — awaiting next agent cycle');
+    } else if (s >= th.alert) {
+      head('Spread widening — watching');
+      pill('Above alert threshold', '#F59E0B');
+      rec('Monitoring spread', 'Spread of ' + s.toFixed(2) + '% above alert threshold — no action yet');
+    } else {
+      head('Monitoring conditions');
+      pill('Below your threshold', '#888');
+      rec('Hold current positions', 'Spread of ' + s.toFixed(2) + '% is below your alert threshold — holding current allocation');
+    }
+    body("No action needed — the agent is watching the USDY/mETH spread and will alert you when it's worth acting.");
+    var luEl = document.getElementById('usdy-apy-val');
+    var lmEl = document.getElementById('meth-apy-val');
+    var lu = luEl ? parseFloat(luEl.textContent.replace('%','')) : 0;
+    var lm = lmEl ? parseFloat(lmEl.textContent.replace('%','')) : 0;
+    setHeroBullets(lu || 0, lm || 0, s, th.alert);
+    btnIdle('No action needed', null, null);
+  }
+
+  async function refreshHero() {
+    var alert = null, profile = null;
+    try { var aRes = await fetch('/api/pending-alert'); alert = aRes.ok ? await aRes.json() : null; } catch (e) {}
+    try { var pRes = await fetch('/api/profile'); profile = pRes.ok ? await pRes.json() : null; } catch (e) {}
+
+    var state = determineHeroState(alert, profile);
+
+    var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
+    var liveSpread = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%','').replace('+',''))) : 0;
+
+    var tier = profile ? (profile.tierCode != null ? profile.tierCode : profile.userTier) : '?';
+    var logSpread = (state === 'monitoring' || state === 'paused')
+      ? liveSpread
+      : (alert && alert.yieldData && alert.yieldData.currentSpread != null ? Math.abs(alert.yieldData.currentSpread) : liveSpread);
+    console.log('[hero] state=' + state + ' | alertType=' + ((alert && alert.alertType) || 'none') + ' | tier=' + tier + ' | spread=' + (logSpread || 0).toFixed(2) + '%');
+
+    applyHeroState(state, alert, profile, liveSpread);
   }
 
   function openTelegram() {
@@ -1808,11 +1969,10 @@
       var simLabel = document.getElementById('sim-meth-rate-label');
       if (simLabel) simLabel.textContent = 'New annual yield (mETH at ' + apr.toFixed(2) + '%)';
       updateSpread();
-      updateReasoningBullets();
       renderSensitivityBadge();
-      renderHeroState();
+      refreshHero();
     })
-    .catch(function() { updateSpread(); renderSensitivityBadge(); renderHeroState(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
+    .catch(function() { updateSpread(); renderSensitivityBadge(); refreshHero(); /* fallback constants already set: METH_APR=0.0166, CMETH_APY=0.0191 */ });
 
   /* ── Agent accuracy from /api/stats ── */
   function setAccuracy(pct, sub, total) {
@@ -1924,7 +2084,7 @@
     });
   });
 
-  /* ── Dismiss button — wired dynamically by renderHeroFromAlert() ── */
+  /* ── Dismiss button — wired dynamically by applyHeroState() ── */
 
   /* ── Simulate Rebalance modal ── */
   var btnSimulate = document.querySelector('.btn-simulate');
@@ -2211,89 +2371,12 @@
     var simSpreadEl = document.getElementById('sim-spread-pct');
     if (simSpreadEl) simSpreadEl.textContent = Math.abs(spread).toFixed(2) + '%';
 
-    // Next action sub — kick off async recommendation update
-    updateRecommendation(spread);
-  }
-
-  async function updateRecommendation(spread) {
-    var contentEl  = document.getElementById('next-action-content');
-    var subEl      = document.getElementById('next-action-spread-txt');
-    var sensitivity = window.USER_SENSITIVITY || localStorage.getItem('rwai_sensitivity') || 'balanced';
-    var actionThresholds = {
-      high:     { alert: 0.5, proposal: 0.8,  autoExec: 1.2 },
-      balanced: { alert: 1.5, proposal: 1.65, autoExec: 2.0 },
-      major:    { alert: 2.0, proposal: 2.5,  autoExec: 3.0 },
-    };
-    var t = actionThresholds[sensitivity] || actionThresholds.balanced;
-
-    // Check live agent state from Redis
-    var hasActiveAlert = false;
-    var alertType = null;
-    try {
-      var res = await fetch('/api/pending-alert');
-      var data = await res.json();
-      hasActiveAlert = !!(data && data.pending === true);
-      alertType = data && data.alertType;
-    } catch {}
-
-    if (hasActiveAlert && spread >= t.proposal) {
-      if (contentEl) contentEl.textContent = 'Rebalance recommended';
-      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% exceeds proposal threshold — agent awaiting your approval';
-    } else if (spread >= t.autoExec) {
-      if (contentEl) contentEl.textContent = 'Auto-execute may fire';
-      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is above auto-execute threshold of ' + t.autoExec + '%';
-    } else if (spread >= t.proposal) {
-      if (contentEl) contentEl.textContent = 'Rebalance opportunity';
-      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% above proposal threshold — awaiting next agent cycle';
-    } else if (spread >= t.alert) {
-      if (contentEl) contentEl.textContent = 'Monitoring spread';
-      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% above alert threshold — no action yet';
-    } else {
-      if (contentEl) contentEl.textContent = 'Hold current positions';
-      if (subEl) subEl.textContent = 'Spread of ' + spread.toFixed(2) + '% is below your alert threshold — holding current allocation';
-    }
-  }
-
-  /* ── Dynamic reasoning bullets ── */
-  function updateReasoningBullets() {
-    var usdyApyEl = document.getElementById('usdy-apy-val');
-    var methApyEl = document.getElementById('meth-apy-val');
-    var spreadEl  = document.getElementById('yield-spread-val');
-    if (!usdyApyEl || !methApyEl || !spreadEl) return;
-
-    var usdyApy = parseFloat(usdyApyEl.textContent.replace('%', ''));
-    var methApr = parseFloat(methApyEl.textContent.replace('%', ''));
-    var spread  = parseFloat(spreadEl.textContent.replace(/[^0-9.]/g, ''));
-
-    var b1 = document.getElementById('reason-1');
-    if (b1) {
-      b1.textContent = usdyApy >= 3.0
-        ? 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — above the 3.0% T-bill baseline'
-        : 'USDY yielding ' + usdyApy.toFixed(2) + '% APY — at or below the T-bill baseline';
-    }
-
-    var b2 = document.getElementById('reason-2');
-    if (b2) {
-      var diff = usdyApy - methApr;
-      b2.textContent = diff >= 0
-        ? 'mETH APR at ' + methApr.toFixed(2) + '% — ' + diff.toFixed(2) + '% below USDY yield'
-        : 'mETH APR at ' + methApr.toFixed(2) + '% — ' + Math.abs(diff).toFixed(2) + '% above USDY yield';
-    }
-
-    var b3 = document.getElementById('reason-3');
-    if (b3) {
-      var alertThreshold = getSensitivityThreshold();
-      b3.textContent = spread >= alertThreshold
-        ? 'Spread of ' + spread.toFixed(2) + '% exceeds the ' + alertThreshold + '% alert threshold — rebalance opportunity flagged'
-        : 'Spread of ' + spread.toFixed(2) + '% is within normal range — holding positions';
-    }
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     updateSpread();
-    updateReasoningBullets();
     renderSensitivityBadge();
-    renderHeroState();
+    refreshHero();
 
     var activateBtn = document.getElementById('btn-activate-tier-3');
     if (activateBtn) activateBtn.addEventListener('click', activateTier3);
@@ -2311,7 +2394,7 @@
       btn.addEventListener('click', function() { setSensitivity(btn.dataset.sensitivity); });
     });
 
-    // Approve button is wired dynamically by renderHeroFromAlert()
+    // Approve button is wired dynamically by applyHeroState()
 
     var btnPause = document.getElementById('btn-pause-agent');
     if (btnPause) btnPause.addEventListener('click', togglePauseAgent);
@@ -2361,20 +2444,14 @@
       }
     })();
 
-    renderHeroFromAlert();
-    setInterval(renderHeroFromAlert, 30000);
+    refreshHero();
+    setInterval(refreshHero, 30000);
     renderPauseState();
     setInterval(renderPauseState, 15000);
     updateLatestTx();
     setInterval(updateLatestTx, 60000);
     loadPredictionsAndHistory();
     setInterval(loadPredictionsAndHistory, 60000);
-    updateRecommendation(0);
-    setInterval(function() {
-      var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
-      var s = spreadEl ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', ''))) : 0;
-      updateRecommendation(s);
-    }, 30000);
   });
 
   /* ── Latest tx meta-link ── */
@@ -2666,203 +2743,14 @@
   var USDY_TOKEN_T2      = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
   var METH_TOKEN_T2      = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
 
-  async function renderHeroFromAlert() {
-    try {
-      var res = await fetch('/api/pending-alert');
-      var data = res.ok ? await res.json() : null;
-
-      var btnApprove = document.getElementById('btn-approve');
-      var btnDismiss = document.getElementById('btn-dismiss');
-      var heroBody   = document.querySelector('.hero-body');
-      var heroTitle  = document.getElementById('hero-title');
-      var approveContent = document.getElementById('approve-content');
-
-      if (!btnApprove || !btnDismiss) return;
-
-      // Always reset styles before applying state
-      btnApprove.style.opacity = '';
-      btnDismiss.style.opacity = '';
-      btnDismiss.style.display = '';
-
-      if (!data || (!data.pending && !data.approved)) {
-        // STATE — No active alert
-        btnApprove.className = 'btn-approve no-action';
-        btnApprove.disabled = true;
-        btnApprove.onclick = null;
-        if (approveContent) approveContent.textContent = 'No action needed';
-        btnDismiss.disabled = true;
-        btnDismiss.onclick = null;
-        btnDismiss.style.opacity = '0.4';
-        return;
-      }
-
-      // Populate hero body with explanation
-      if (data.explanation && heroBody) heroBody.textContent = data.explanation;
-
-      // Stale approval check
-      var staleApproval = false;
-      if (data.approved && !data.executed && data.yieldData) {
-        var spreadAtApproval = Math.abs(data.yieldData.usdyCurrentAPY - data.yieldData.methCurrentAPR);
-        var spreadEl = document.getElementById('yield-spread-val') || document.querySelector('.spread-pct');
-        var currentSpread = spreadEl
-          ? Math.abs(parseFloat(spreadEl.textContent.replace('%', '').replace('+', '')))
-          : spreadAtApproval;
-        if (spreadAtApproval - currentSpread > 0.4) staleApproval = true;
-      }
-
-      if (data.executed && data.executionTxHash) {
-        // STATE C — Executed
-        if (heroTitle) heroTitle.textContent = '✓ Rebalanced';
-        btnApprove.className = 'btn-approve';
-        btnApprove.disabled = false;
-        if (approveContent) approveContent.textContent = '✓ View transaction';
-        btnApprove.style.background = 'rgba(29,158,117,0.15)';
-        btnApprove.style.color = '#1D9E75';
-        btnApprove.onclick = function() { window.open('https://mantlescan.xyz/tx/' + data.executionTxHash, '_blank'); };
-        btnDismiss.style.display = 'none';
-
-        // Show execution summary when LI.FI quote metadata is recorded
-        if (data.executionAggregator && data.executionFromUSD) {
-          var execNote = document.getElementById('hero-exec-note');
-          if (!execNote && heroBody) {
-            execNote = document.createElement('p');
-            execNote.id = 'hero-exec-note';
-            execNote.style.cssText = 'font-size:0.75rem; color:#aaa; margin-top:8px; padding:10px 14px; background:rgba(29,158,117,0.08); border:1px solid rgba(29,158,117,0.25); border-radius:6px; line-height:1.5;';
-            heroBody.appendChild(execNote);
-          }
-          if (execNote) {
-            var dateStr = new Date(data.executedAt || Date.now()).toLocaleString();
-            execNote.innerHTML = '✓ Executed ' + dateStr
-              + ' · Routed via <strong>' + data.executionAggregator + '</strong>'
-              + ' · $' + parseFloat(data.executionFromUSD).toFixed(2) + ' → $' + parseFloat(data.executionToUSD).toFixed(2)
-              + ' · Cost: $' + parseFloat(data.executionSwapCost || 0).toFixed(2);
-          }
-        }
-
-      } else if (data.approved && !data.executed && staleApproval) {
-        // STATE D — Approval stale (spread narrowed)
-        if (heroTitle) heroTitle.textContent = '⚠ Conditions changed';
-        btnApprove.className = 'btn-approve';
-        btnApprove.disabled = false;
-        if (approveContent) approveContent.textContent = '⚠ Force execute anyway';
-        btnApprove.style.background = '#F59E0B';
-        btnApprove.style.color = '#fff';
-        btnApprove.onclick = function() { executeRebalance(data); };
-        btnDismiss.disabled = false;
-        btnDismiss.textContent = 'Discard approval';
-        btnDismiss.onclick = function() { cancelApproval(); };
-
-      } else if (data.approved && !data.executed) {
-        // STATE B — Approved, awaiting wallet signature
-        // Pre-fetch a fresh LI.FI quote so the hero card shows real economics
-        var liveQuote = null;
-        try {
-          var bProvider = (typeof dashProvider !== 'undefined' && dashProvider)
-            || window.__rwaiSelectedProvider
-            || window.ethereum;
-          if (bProvider) {
-            var bAccounts = await bProvider.request({ method: 'eth_accounts' });
-            if (bAccounts && bAccounts[0]) {
-              var bUsdyHigher = (data.yieldData && data.yieldData.usdyCurrentAPY || 0) > (data.yieldData && data.yieldData.methCurrentAPR || 0);
-              var USDY_B = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
-              var METH_B = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
-              var bTokenIn  = bUsdyHigher ? METH_B : USDY_B;
-              var bTokenOut = bUsdyHigher ? USDY_B : METH_B;
-              var bUsdyUSD = parseFloat(((document.getElementById('usdy-usd') || {}).textContent || '0').replace(/[^0-9.]/g, '')) || 0;
-              var bMethUSD = parseFloat(((document.getElementById('meth-usd') || {}).textContent || '0').replace(/[^0-9.]/g, '')) || 0;
-              var bSourceUSD = bUsdyHigher ? bMethUSD : bUsdyUSD;
-              var bShiftUSD = Math.min(bSourceUSD * 0.5, 50);
-              if (bShiftUSD >= 5) {
-                var bTokenPriceUSD = (bTokenIn === METH_B) ? 2300 : 1.01;
-                var bTokenAmount = bShiftUSD / bTokenPriceUSD;
-                var bTokenAmountWei = BigInt(Math.floor(bTokenAmount * 1e18)).toString();
-                var qRes = await fetch('/api/quote?fromToken=' + bTokenIn
-                  + '&toToken=' + bTokenOut
-                  + '&fromAmount=' + bTokenAmountWei
-                  + '&fromAddress=' + bAccounts[0]);
-                if (qRes.ok) liveQuote = await qRes.json();
-              }
-            }
-          }
-        } catch (e) { console.warn('Quote prefetch failed:', e.message); }
-
-        if (liveQuote && liveQuote.estimate) {
-          var qFromUSD = parseFloat(liveQuote.estimate.fromAmountUSD);
-          var qToUSD   = parseFloat(liveQuote.estimate.toAmountUSD);
-          var qCost = qFromUSD - qToUSD;
-          var heroImpact = document.getElementById('hero-annual-impact');
-          if (heroImpact) {
-            heroImpact.textContent = '$' + qToUSD.toFixed(2) + ' out';
-            heroImpact.style.color = '#1D9E75';
-          }
-          var costNote = document.getElementById('hero-cost-note');
-          if (!costNote && heroBody) {
-            costNote = document.createElement('p');
-            costNote.id = 'hero-cost-note';
-            costNote.style.cssText = 'font-size:0.75rem; color:#888; margin-top:8px; padding:8px 12px; background:rgba(29,158,117,0.06); border:1px solid rgba(29,158,117,0.15); border-radius:6px;';
-            heroBody.appendChild(costNote);
-          }
-          if (costNote) {
-            costNote.innerHTML = '💡 <strong>Route:</strong> ' + liveQuote.toolName
-              + ' · <strong>Cost:</strong> $' + qCost.toFixed(2)
-              + ' (' + ((qCost/qFromUSD)*100).toFixed(2) + '%) · <strong>Slippage floor:</strong> $' + qToUSD.toFixed(2);
-          }
-        }
-
-        if (heroTitle) heroTitle.textContent = 'Agent recommends action';
-        btnApprove.className = 'btn-approve';
-        btnApprove.disabled = false;
-        if (approveContent) approveContent.textContent = '⚡ Sign rebalance transaction';
-        btnApprove.style.background = '#1D9E75';
-        btnApprove.style.color = '#fff';
-        btnApprove.onclick = function() { executeRebalance(data); };
-        btnDismiss.disabled = false;
-        btnDismiss.textContent = 'Cancel approval';
-        btnDismiss.onclick = function() { cancelApproval(); };
-
-      } else if (data.pending) {
-        // STATE A — Pending approval
-        if (heroTitle) heroTitle.textContent = 'Agent recommends action';
-        btnApprove.className = 'btn-approve';
-        btnApprove.disabled = false;
-        if (approveContent) approveContent.textContent = '✓ Approve rebalance';
-        btnApprove.style.background = '';
-        btnApprove.style.color = '';
-        btnApprove.onclick = function() { respondToAlert('approve'); };
-        btnDismiss.disabled = false;
-        btnDismiss.textContent = 'Dismiss';
-        btnDismiss.onclick = function() { respondToAlert('dismiss'); };
-
-        // Breakeven badge — make the swap math undeniable without hiding the trade
-        var econ = data.yieldData && data.yieldData.swapEconomics;
-        var bkBadge = document.getElementById('hero-breakeven-badge');
-        if (econ && econ.available && heroBody) {
-          if (!bkBadge) {
-            bkBadge = document.createElement('div');
-            bkBadge.id = 'hero-breakeven-badge';
-            bkBadge.style.cssText = 'display:inline-block; font-size:0.78rem; font-weight:600; margin-top:10px; padding:5px 12px; border-radius:999px;';
-            heroBody.appendChild(bkBadge);
-          }
-          var days = econ.breakevenDays;
-          var color = days < 90 ? '#1D9E75' : (days <= 365 ? '#F59E0B' : '#E05252');
-          bkBadge.style.color = color;
-          bkBadge.style.background = 'rgba(0,0,0,0.04)';
-          bkBadge.style.border = '1px solid ' + color;
-          bkBadge.textContent = 'Breakeven: ' + days + ' days';
-        } else if (bkBadge) {
-          bkBadge.remove();
-        }
-      }
-    } catch (err) {
-      console.warn('Hero alert render failed:', err);
-    }
-  }
+  // renderHeroFromAlert() was replaced by the hero state machine (determineHeroState
+  // + applyHeroState, orchestrated by refreshHero). All hero rendering flows through there.
 
   async function respondToAlert(action) {
     var btnApprove = document.getElementById('btn-approve');
-    var btnDismiss = document.getElementById('btn-dismiss');
+    // In-flight feedback may ONLY touch the approve button (state-machine contract).
+    // Everything else is reconciled by refreshHero() below.
     if (btnApprove) { btnApprove.disabled = true; btnApprove.style.opacity = '0.4'; }
-    if (btnDismiss) { btnDismiss.disabled = true; btnDismiss.style.opacity = '0.3'; }
 
     try {
       var res = await fetch('/api/respond', {
@@ -2879,11 +2767,10 @@
         document.body.appendChild(toast);
         setTimeout(function() { toast.remove(); }, 2400);
       }
-      await renderHeroFromAlert();
+      await refreshHero();
     } catch (err) {
       console.error('Response failed:', err);
       if (btnApprove) { btnApprove.disabled = false; btnApprove.style.opacity = ''; }
-      if (btnDismiss) { btnDismiss.disabled = false; btnDismiss.style.opacity = ''; }
     }
   }
 
@@ -2894,7 +2781,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'dismiss', source: 'web' })
       });
-      await renderHeroFromAlert();
+      await refreshHero();
     } catch {}
   }
 
@@ -3075,7 +2962,7 @@
       document.body.appendChild(toast);
       setTimeout(function() { toast.remove(); }, 6000);
 
-      setTimeout(function() { renderHeroFromAlert(); }, 2000);
+      setTimeout(function() { refreshHero(); }, 2000);
 
     } catch (err) {
       console.error('Swap failed:', err);
@@ -3195,25 +3082,20 @@
       var profile = await res.json();
       var paused = profile.agentPaused === true;
 
-      var statusLabel   = document.getElementById('hero-status-label');
+      // Hero elements (title/pill/body/recommendation) are owned by the hero state
+      // machine (applyHeroState handles the 'paused' state). renderPauseState manages
+      // only the pause chrome: status sub-line, next-check countdown, pause button, dimming.
       var statusSub     = document.getElementById('hero-status-sub');
-      var heroTitleEl   = document.getElementById('hero-title');
-      var heroBodyEl    = document.querySelector('.hero-body');
       var nextCheckEl   = document.getElementById('next-check');
       var nextCheckUnit = document.getElementById('next-check-unit');
       var pauseBtn      = document.getElementById('btn-pause-agent');
-      var nextActionEl  = document.querySelector('.next-action-content');
       var countdownEl   = document.getElementById('next-action-countdown');
 
       if (paused) {
-        if (statusLabel) { statusLabel.textContent = 'Agent paused'; statusLabel.style.color = '#F59E0B'; }
         if (statusSub)   { statusSub.textContent = 'No active monitoring'; statusSub.style.color = '#888'; }
-        if (heroTitleEl) heroTitleEl.textContent = 'Agent paused';
-        if (heroBodyEl)  heroBodyEl.textContent = 'Monitoring is paused. Yield positions and on-chain data will not be updated until you resume the agent from the dashboard or Telegram.';
         if (nextCheckEl)   nextCheckEl.textContent = '—';
         if (nextCheckUnit) nextCheckUnit.style.display = 'none';
         if (countdownEl)   countdownEl.textContent = '—:——';
-        if (nextActionEl)  nextActionEl.textContent = 'Agent paused — no recommendation';
         if (pauseBtn) {
           pauseBtn.textContent = '▶ Resume Agent';
           pauseBtn.style.color = '#1D9E75';
@@ -3226,7 +3108,6 @@
         });
         document.body.classList.add('rwai-paused');
       } else {
-        if (statusLabel) { statusLabel.style.color = ''; }
         if (statusSub)   { statusSub.textContent = 'Active on Mantle Mainnet'; statusSub.style.color = ''; }
         if (pauseBtn) {
           pauseBtn.textContent = '⏸ Pause Agent';
@@ -3239,8 +3120,9 @@
           if (el) { el.style.opacity = ''; el.style.color = ''; }
         });
         document.body.classList.remove('rwai-paused');
-        if (typeof renderHeroState === 'function') renderHeroState();
       }
+      // Hero card reflects pause via the state machine
+      refreshHero();
     } catch(err) {
       console.warn('renderPauseState failed:', err);
     }

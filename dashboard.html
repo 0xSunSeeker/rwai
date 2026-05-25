@@ -2089,76 +2089,109 @@
   /* ── Simulate Rebalance modal ── */
   var btnSimulate = document.querySelector('.btn-simulate');
 
-  function openSimModal() {
+  async function openSimModal() {
     var modal = document.getElementById('rebalance-modal');
     if (!modal) return;
-
-    var usdyAPY = USDY_APY;
-    var methAPR = METH_APR;
 
     var usdyText = (document.getElementById('usdy-usd') || {}).textContent || '$0.00';
     var methText = (document.getElementById('meth-usd') || {}).textContent || '$0.00';
     var usdyVal  = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
     var methVal  = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
 
-    var tierLabel = document.getElementById('tier-label');
-    var isTier3   = tierLabel && tierLabel.textContent.includes('Tier 3');
+    // Try to mirror the agent's actual proposal (same direction, amount, snapshot rates)
+    var alert = null;
+    try { var r = await fetch('/api/pending-alert'); alert = r.ok ? await r.json() : null; } catch (e) {}
+    var yd = (alert && alert.yieldData) || {};
+    var isProposal = !!(alert && alert.pending === true && alert.alertType === 'rebalance_proposal'
+      && yd.proposedShiftUSD != null && yd.proposedDirection);
 
-    var shiftAmount = usdyVal * 0.5;
-    if (isTier3 && shiftAmount > 500) shiftAmount = 500;
-
-    var usdyAfter   = usdyVal - shiftAmount;
-    var methAfter   = methVal + shiftAmount;
-    var yieldBefore = (usdyVal   * usdyAPY) + (methVal   * methAPR);
-    var yieldAfter  = (usdyAfter * usdyAPY) + (methAfter * methAPR);
-    var diff        = yieldAfter - yieldBefore;  // positive = gain
-
-    var usdyAPYpct = (usdyAPY * 100).toFixed(2) + '%';
-    var methAPRpct = (methAPR * 100).toFixed(2) + '%';
-    var shiftPct   = usdyVal > 0 ? Math.round((shiftAmount / usdyVal) * 100) : 0;
-
-    // Update subtitle
-    var modalSubtitle = document.querySelector('#rebalance-modal p');
-    if (modalSubtitle) {
-      if (isTier3 && usdyVal * 0.5 > 500) {
-        modalSubtitle.textContent = 'What would happen if you moved $500 (the Tier 3 cap) of your USDY into mETH?';
-      } else {
-        modalSubtitle.textContent = 'What would happen if you moved ' + shiftPct + '% of your USDY ($' + shiftAmount.toFixed(2) + ') into mETH?';
-      }
+    var usdyRate, methRate, shift, direction;
+    if (isProposal) {
+      direction = yd.proposedDirection;
+      usdyRate  = (yd.usdyCurrentAPY != null ? yd.usdyCurrentAPY : USDY_APY * 100) / 100;
+      methRate  = (yd.methCurrentAPR != null ? yd.methCurrentAPR : METH_APR * 100) / 100;
+      shift     = yd.proposedShiftUSD;
+    } else {
+      // Fallback hypothetical: 50% of USDY → mETH, live rates
+      direction = 'usdy_to_meth';
+      usdyRate  = USDY_APY;
+      methRate  = METH_APR;
+      shift     = usdyVal * 0.5;
+      var tierLabel = document.getElementById('tier-label');
+      if (tierLabel && tierLabel.textContent.includes('Tier 3') && shift > 500) shift = 500;
     }
 
-    // Update "After" section header
-    document.querySelectorAll('#rebalance-modal div').forEach(function(d) {
-      if (d.childElementCount === 0 && d.textContent && d.textContent.trim().startsWith('After')) {
-        d.textContent = (isTier3 && usdyVal * 0.5 > 500) ? 'After ($500 shift)' : 'After (' + shiftPct + '% shift)';
-      }
-    });
+    // Direction-aware allocation (cap shift at the source balance so it never goes negative)
+    var usdyAfter, methAfter, fromLabel, toLabel;
+    if (direction === 'meth_to_usdy') {
+      shift = Math.min(shift, methVal);
+      usdyAfter = usdyVal + shift;
+      methAfter = methVal - shift;
+      fromLabel = 'mETH'; toLabel = 'USDY';
+    } else {
+      shift = Math.min(shift, usdyVal);
+      usdyAfter = usdyVal - shift;
+      methAfter = methVal + shift;
+      fromLabel = 'USDY'; toLabel = 'mETH';
+    }
 
-    // Populate values
-    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ ' + usdyAPYpct;
-    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ ' + methAPRpct;
+    var yieldBefore = (usdyVal   * usdyRate) + (methVal   * methRate);
+    var yieldAfter  = (usdyAfter * usdyRate) + (methAfter * methRate);
+    var diff        = yieldAfter - yieldBefore;
+    var usdyRatePct = (usdyRate * 100).toFixed(2) + '%';
+    var methRatePct = (methRate * 100).toFixed(2) + '%';
+
+    // Title / subtitle / after-header
+    var titleEl    = document.querySelector('#rebalance-modal h2');
+    var subtitleEl = document.querySelector('#rebalance-modal p');
+    var afterHeaderEl = document.getElementById('sim-after-header');
+    if (titleEl) titleEl.textContent = isProposal ? "Preview Agent's Proposal" : 'Rebalance Simulation (Hypothetical)';
+    if (subtitleEl) {
+      subtitleEl.textContent = isProposal
+        ? 'The agent proposes moving $' + shift.toFixed(2) + ' of your ' + fromLabel + ' into ' + toLabel + '.'
+        : 'No active proposal — showing a hypothetical $' + shift.toFixed(2) + ' ' + fromLabel + ' → ' + toLabel + ' scenario.';
+    }
+    if (afterHeaderEl) afterHeaderEl.textContent = 'After rebalance (' + fromLabel + ' → ' + toLabel + ')';
+
+    // BEFORE / AFTER
+    document.getElementById('sim-usdy-before').textContent  = '$' + usdyVal.toFixed(2)     + ' @ ' + usdyRatePct;
+    document.getElementById('sim-meth-before').textContent  = '$' + methVal.toFixed(2)     + ' @ ' + methRatePct;
     document.getElementById('sim-yield-before').textContent = '$' + yieldBefore.toFixed(2) + ' / yr';
-    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ ' + usdyAPYpct;
-    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ ' + methAPRpct;
+    document.getElementById('sim-usdy-after').textContent   = '$' + usdyAfter.toFixed(2)   + ' @ ' + usdyRatePct;
+    document.getElementById('sim-meth-after').textContent   = '$' + methAfter.toFixed(2)   + ' @ ' + methRatePct;
     document.getElementById('sim-yield-after').textContent  = '$' + yieldAfter.toFixed(2)  + ' / yr';
 
-    // Verdict and recommendation
+    // Verdict — sole source is the agent's swapEconomics; no independent verdict
     var verdictEl = document.getElementById('sim-verdict');
     var recEl     = document.getElementById('sim-recommendation');
     var yieldAfterEl = document.getElementById('sim-yield-after');
+    if (verdictEl) verdictEl.textContent = 'Projected yield: $' + yieldBefore.toFixed(2) + '/yr → $' + yieldAfter.toFixed(2) + '/yr';
 
-    if (Math.abs(diff) < 0.01) {
-      if (verdictEl) verdictEl.textContent = 'No meaningful yield change from rebalancing';
-      if (recEl) { recEl.textContent = '— Either allocation works at these rates'; recEl.style.color = '#888'; }
-      if (yieldAfterEl) yieldAfterEl.style.color = '#555';
-    } else if (diff > 0) {
-      if (verdictEl) verdictEl.textContent = 'Rebalancing increases projected yield by $' + diff.toFixed(2) + '/yr';
-      if (recEl) { recEl.textContent = '⚡ Rebalance recommended — capturing the higher yield'; recEl.style.color = '#1D9E75'; }
-      if (yieldAfterEl) yieldAfterEl.style.color = '#1D9E75';
+    if (isProposal) {
+      var econ = yd.swapEconomics;
+      if (econ && econ.available) {
+        var bk = econ.breakevenDays;
+        var color = bk < 90 ? '#1D9E75' : (bk <= 365 ? '#F59E0B' : '#E05252');
+        if (recEl) {
+          recEl.textContent = "Agent's proposal: +$" + econ.annualGain + '/yr gain · breakeven ' + bk + ' days at current spread';
+          recEl.style.color = color;
+        }
+        if (yieldAfterEl) yieldAfterEl.style.color = color;
+      } else {
+        if (recEl) {
+          recEl.textContent = "Agent's proposal: +$" + ((econ && econ.annualGain) ? econ.annualGain : diff.toFixed(2)) + '/yr gain · swap cost unavailable';
+          recEl.style.color = '#888';
+        }
+        if (yieldAfterEl) yieldAfterEl.style.color = '#888';
+      }
     } else {
-      if (verdictEl) verdictEl.textContent = 'Rebalancing reduces projected yield by $' + Math.abs(diff).toFixed(2) + '/yr';
-      if (recEl) { recEl.textContent = '✓ Hold recommended — current allocation is optimal'; recEl.style.color = '#1D9E75'; }
-      if (yieldAfterEl) yieldAfterEl.style.color = '#888';
+      if (recEl) {
+        recEl.textContent = diff >= 0
+          ? 'Hypothetical: +$' + diff.toFixed(2) + '/yr — no active proposal from the agent'
+          : 'Hypothetical: -$' + Math.abs(diff).toFixed(2) + '/yr — no active proposal from the agent';
+        recEl.style.color = '#888';
+      }
+      if (yieldAfterEl) yieldAfterEl.style.color = '#555';
     }
 
     modal.style.display = 'flex';
@@ -3271,7 +3304,7 @@
 <div id="rebalance-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center;">
   <div style="background:#111; border:1px solid #222; border-radius:16px; padding:40px; max-width:480px; width:90%; position:relative;">
     <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:6px; letter-spacing:-0.03em;">Rebalance Simulation</h2>
-    <p style="font-size:0.85rem; color:#555; margin-bottom:28px;">What would happen if you moved 50% of your USDY into mETH?</p>
+    <p style="font-size:0.85rem; color:#555; margin-bottom:28px;">Comparing your current allocation with the proposed rebalance…</p>
 
     <div style="margin-bottom:16px;">
       <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">Before</div>
@@ -3292,7 +3325,7 @@
     <div style="text-align:center; font-size:1.4rem; color:#333; margin:16px 0; animation: sim-arrow 1s ease-in-out infinite alternate;">↓</div>
 
     <div style="margin-bottom:24px;">
-      <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;">After (50% shift)</div>
+      <div style="font-size:0.63rem; font-weight:700; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.13em; margin-bottom:12px;" id="sim-after-header">After rebalance</div>
       <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
         <span style="font-size:0.85rem; color:#777;">USDY</span>
         <span style="font-size:0.85rem; font-weight:700;" id="sim-usdy-after">$0.00 @ 3.55%</span>

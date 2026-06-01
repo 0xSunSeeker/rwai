@@ -1469,9 +1469,12 @@
   }
 
   /* ── Constants ── */
-  var USDY_BALANCE  = 0;
-  var METH_BALANCE  = 0.0303;
-  var CMETH_BALANCE = 0.00;
+  // Balances start null and are populated by loadPositionsFromAPI() from
+  // /api/profile (the same Redis source the agent updates). Renderers treat
+  // null as "loading / no data" and show — instead of zero.
+  var USDY_BALANCE  = null;
+  var METH_BALANCE  = null;
+  var CMETH_BALANCE = null;
   var USDY_APY      = 0.0355;
   var METH_APR      = 0.0166;
   var CMETH_APY     = 0.0191;
@@ -1867,23 +1870,85 @@
     updateSpread();
   }
 
-  var USDY_FALLBACK_USD = (function () {
-    try { return parseFloat(localStorage.getItem('rwai_usdy_usd')) || 33.80; } catch { return 33.80; }
-  })();
+  // Returns null if either input is null/undefined (so renderers can show —
+  // instead of $0 when balance hasn't loaded yet). Plain multiplication treats
+  // null as 0, which is the bug we just removed.
+  function posUSD(bal, price) {
+    if (bal == null || price == null) return null;
+    return bal * price;
+  }
 
   function renderUSDYPosition(usdVal, change) {
-    // If computed value is zero (no token balance), use last-known position from localStorage
-    if (usdVal === 0) usdVal = USDY_FALLBACK_USD;
-    // Persist for next session
-    try { localStorage.setItem('rwai_usdy_usd', usdVal.toFixed(2)); } catch {}
     var el = document.getElementById('usdy-usd');
-    el.style.color      = '#f0f0f0';
-    el.style.fontSize   = '1.75rem';
-    el.style.fontWeight = '800';
-    el.textContent      = fmt(usdVal);
-    document.getElementById('usdy-est-yield').textContent = fmtYield(usdVal, USDY_APY);
+    if (!el) return;
+    el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
+    if (usdVal == null) {
+      el.textContent = '—';
+      var yEl = document.getElementById('usdy-est-yield'); if (yEl) yEl.textContent = '—';
+    } else {
+      el.textContent = fmt(usdVal);
+      var yEl = document.getElementById('usdy-est-yield'); if (yEl) yEl.textContent = fmtYield(usdVal, USDY_APY);
+    }
     if (change !== undefined) renderChange('usdy-change', change);
     updateTotal();
+  }
+
+  function renderMETHPosition(usdVal) {
+    var el = document.getElementById('meth-usd');
+    if (!el) return;
+    el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
+    if (usdVal == null) {
+      el.textContent = '—';
+      var yEl = document.getElementById('meth-est-yield'); if (yEl) yEl.textContent = '—';
+    } else {
+      el.textContent = '≈ ' + fmt(usdVal);
+      var yEl = document.getElementById('meth-est-yield'); if (yEl) yEl.textContent = fmtYield(usdVal, METH_APR);
+    }
+    var cEl = document.getElementById('meth-change'); if (cEl) cEl.textContent = '';
+    updateTotal();
+  }
+
+  function renderCMETHPosition(usdVal) {
+    var el = document.getElementById('cmeth-usd');
+    if (!el) return;
+    el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
+    if (usdVal == null) {
+      el.textContent = '—';
+      var yEl = document.getElementById('cmeth-est-yield'); if (yEl) yEl.textContent = '—';
+    } else {
+      el.textContent = '≈ ' + fmt(usdVal);
+      var yEl = document.getElementById('cmeth-est-yield'); if (yEl) yEl.textContent = fmtYield(usdVal, CMETH_APY);
+    }
+    var cEl = document.getElementById('cmeth-change'); if (cEl) cEl.textContent = '';
+    updateTotal();
+  }
+
+  function rerenderPositions() {
+    renderUSDYPosition(posUSD(USDY_BALANCE, usdyUSD));
+    renderMETHPosition(posUSD(METH_BALANCE, methUSD));
+    renderCMETHPosition(posUSD(CMETH_BALANCE, cmethUSD));
+  }
+
+  // Single source of truth: /api/profile (the Redis store the agent updates).
+  // Replaces the previous hardcoded globals + localStorage fallback that
+  // caused stale balances to persist across sessions.
+  async function loadPositionsFromAPI() {
+    // One-time cleanup: previous build cached a $33.80 USDY value here that
+    // would re-seed itself on every load. Remove it so any returning user heals.
+    try { localStorage.removeItem('rwai_usdy_usd'); } catch {}
+    try {
+      var r = await fetch('/api/profile?cb=' + Date.now());
+      if (!r.ok) throw new Error('profile fetch ' + r.status);
+      var p = await r.json();
+      var pos = (p && p.positions) || {};
+      USDY_BALANCE  = (pos.USDY  && typeof pos.USDY.balance  === 'number') ? pos.USDY.balance  : null;
+      METH_BALANCE  = (pos.mETH  && typeof pos.mETH.balance  === 'number') ? pos.mETH.balance  : null;
+      CMETH_BALANCE = (pos.cmETH && typeof pos.cmETH.balance === 'number') ? pos.cmETH.balance : null;
+    } catch (err) {
+      console.warn('[positions] load failed — rendering —:', err && err.message);
+      USDY_BALANCE = METH_BALANCE = CMETH_BALANCE = null;
+    }
+    rerenderPositions();
   }
 
   /* ── USDY price + 24h change ── */
@@ -1894,12 +1959,12 @@
       var price = coin.usd;
       if (!price) throw new Error('no price');
       usdyUSD = price;
-      renderUSDYPosition(USDY_BALANCE * price, coin.usd_24h_change);
+      renderUSDYPosition(posUSD(USDY_BALANCE, price), coin.usd_24h_change);
     })
     .catch(function () {
       usdyUSD = 1.013;
-      document.getElementById('usdy-change').textContent = '';
-      renderUSDYPosition(USDY_BALANCE * usdyUSD);
+      var chEl = document.getElementById('usdy-change'); if (chEl) chEl.textContent = '';
+      renderUSDYPosition(posUSD(USDY_BALANCE, usdyUSD));
     });
 
   /* ── mETH + cmETH price (single fetch, ETH as proxy fallback) ── */
@@ -1909,46 +1974,14 @@
       var price = (data['mantle-staked-ether'] && data['mantle-staked-ether'].usd)
                || (data['ethereum'] && data['ethereum'].usd);
       if (!price) throw new Error('no price');
-      methUSD  = price;
-      cmethUSD = price;
-      var methVal  = METH_BALANCE  * price;
-      var cmethVal = CMETH_BALANCE * price;
-      var methEl = document.getElementById('meth-usd');
-      methEl.style.color      = '#f0f0f0';
-      methEl.style.fontSize   = '1.75rem';
-      methEl.style.fontWeight = '800';
-      methEl.textContent      = '≈ ' + fmt(methVal);
-      document.getElementById('meth-est-yield').textContent  = fmtYield(methVal,  METH_APR);
-      document.getElementById('meth-change').textContent     = '';
-      var cmethEl = document.getElementById('cmeth-usd');
-      cmethEl.style.color      = '#f0f0f0';
-      cmethEl.style.fontSize   = '1.75rem';
-      cmethEl.style.fontWeight = '800';
-      cmethEl.textContent      = '≈ ' + fmt(cmethVal);
-      document.getElementById('cmeth-est-yield').textContent = fmtYield(cmethVal, CMETH_APY);
-      document.getElementById('cmeth-change').textContent    = '';
-      updateTotal();
+      methUSD = price; cmethUSD = price;
+      renderMETHPosition(posUSD(METH_BALANCE,  price));
+      renderCMETHPosition(posUSD(CMETH_BALANCE, price));
     })
     .catch(function () {
-      methUSD  = 2450;
-      cmethUSD = 2450;
-      var methVal  = METH_BALANCE  * methUSD;
-      var cmethVal = CMETH_BALANCE * cmethUSD;
-      var methEl = document.getElementById('meth-usd');
-      methEl.style.color      = '#f0f0f0';
-      methEl.style.fontSize   = '1.75rem';
-      methEl.style.fontWeight = '800';
-      methEl.textContent      = '≈ ' + fmt(methVal);
-      document.getElementById('meth-est-yield').textContent  = fmtYield(methVal,  METH_APR);
-      document.getElementById('meth-change').textContent     = '';
-      var cmethEl = document.getElementById('cmeth-usd');
-      cmethEl.style.color      = '#f0f0f0';
-      cmethEl.style.fontSize   = '1.75rem';
-      cmethEl.style.fontWeight = '800';
-      cmethEl.textContent      = '≈ ' + fmt(cmethVal);
-      document.getElementById('cmeth-est-yield').textContent = fmtYield(cmethVal, CMETH_APY);
-      document.getElementById('cmeth-change').textContent    = '';
-      updateTotal();
+      methUSD = 2450; cmethUSD = 2450;
+      renderMETHPosition(posUSD(METH_BALANCE,  methUSD));
+      renderCMETHPosition(posUSD(CMETH_BALANCE, cmethUSD));
     });
 
   /* ── mETH live APR from DeFiLlama (7-day chart, pool b9f2f00a) ── */
@@ -2477,6 +2510,8 @@
       }
     })();
 
+    loadPositionsFromAPI();
+    setInterval(loadPositionsFromAPI, 30000);
     refreshHero();
     setInterval(refreshHero, 30000);
     renderPauseState();
@@ -2997,6 +3032,10 @@
       setTimeout(function() { toast.remove(); }, 6000);
 
       setTimeout(function() { refreshHero(); }, 2000);
+      // Pull fresh on-chain balances after the swap (api/execute also kicks
+      // off a server-side refresh; this client-side call gives the user
+      // immediate visual feedback without waiting for the next 30s poll).
+      setTimeout(function() { loadPositionsFromAPI(); }, 4000);
 
     } catch (err) {
       console.error('Swap failed:', err);

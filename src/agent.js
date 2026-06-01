@@ -26,12 +26,60 @@ const ERC20_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
 ];
 
-const USDY_ADDRESS = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
-const mETH_ADDRESS = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
-const WMNT_ADDRESS = '0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8';
+const USDY_ADDRESS  = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
+const mETH_ADDRESS  = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
+const cmETH_ADDRESS = '0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA';
+const WMNT_ADDRESS  = '0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8';
 
 const SWAP_PATH_USDY_TO_METH = [USDY_ADDRESS, WMNT_ADDRESS, mETH_ADDRESS];
 const SWAP_PATH_METH_TO_USDY = [mETH_ADDRESS, WMNT_ADDRESS, USDY_ADDRESS];
+
+// Defensive net: refresh on-chain balances at the top of every agent loop so
+// drift from any source (executed swaps, deposits, withdrawals) self-heals
+// within 30 min. Complements the execute-time refresh in /api/execute.
+async function refreshAgentPositions(profile) {
+  const wallet = profile && profile.walletAddress;
+  if (!wallet || !/^0x[0-9a-fA-F]{40}$/.test(wallet)) return;
+  try {
+    const provider = new ethers.JsonRpcProvider(MANTLE_RPC);
+    const erc20    = ['function balanceOf(address) view returns (uint256)'];
+    const [usdyRaw, methRaw, cmethRaw] = await Promise.all([
+      new ethers.Contract(USDY_ADDRESS,  erc20, provider).balanceOf(wallet),
+      new ethers.Contract(mETH_ADDRESS,  erc20, provider).balanceOf(wallet),
+      new ethers.Contract(cmETH_ADDRESS, erc20, provider).balanceOf(wallet),
+    ]);
+    let ethPrice = 2500;
+    try {
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+      const d = await r.json();
+      if (d?.ethereum?.usd) ethPrice = d.ethereum.usd;
+    } catch {}
+    const usdyBal  = parseFloat(ethers.formatUnits(usdyRaw,  18));
+    const methBal  = parseFloat(ethers.formatUnits(methRaw,  18));
+    const cmethBal = parseFloat(ethers.formatUnits(cmethRaw, 18));
+    const positions = {
+      USDY:  { balance: usdyBal,  usdValue: usdyBal  * 1.013,    apy: 3.55 },
+      mETH:  { balance: methBal,  usdValue: methBal  * ethPrice, apy: 2.06 },
+      cmETH: { balance: cmethBal, usdValue: cmethBal * ethPrice, apy: 2.31 },
+    };
+    const total = positions.USDY.usdValue + positions.mETH.usdValue + positions.cmETH.usdValue;
+    // Update the in-memory profile so this loop's proposal logic sees fresh positions
+    profile.positions = positions;
+    profile.userPositionUSD = total;
+    try {
+      await fetch('https://rwai.fyi/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ positions, userPositionUSD: total, lastSyncSource: 'agent-loop' }),
+      });
+      console.log(`Positions refreshed from chain: USDY=${usdyBal.toFixed(4)} mETH=${methBal.toFixed(6)} cmETH=${cmethBal.toFixed(6)}`);
+    } catch (err) {
+      console.warn('Position persist to Redis failed (continuing):', err.message);
+    }
+  } catch (err) {
+    console.warn('Position refresh from chain failed (using stored values):', err.message);
+  }
+}
 
 // LI.FI swap-economics probe — used to decide if a rebalance is worth proposing.
 // fromAddress is a stable on-chain identity for the agent so quotes don't depend
@@ -436,6 +484,10 @@ async function runAgentLoop() {
     console.log('⏸ Agent is paused — skipping cycle. Resume from dashboard or Telegram to continue.');
     return;
   }
+
+  // Refresh on-chain positions BEFORE proposal logic so this loop sees post-swap reality.
+  // Safe to fail: stored positions are used as fallback.
+  await refreshAgentPositions(liveProfile);
 
   try {
     // Step 1 — Fetch live yield data

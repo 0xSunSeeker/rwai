@@ -2893,15 +2893,20 @@
       if (btnApprove) { setBtnText('🔄 Fetching best route...'); btnApprove.disabled = true; }
 
       var yieldData = alertData.yieldData || {};
-      var usdyYield = yieldData.usdyCurrentAPY || 3.55;
-      var methYield = yieldData.methCurrentAPR || 2.02;
-      var usdyHigher = usdyYield > methYield;
+
+      // Direction comes from the agent's resolved proposedDirection. Fall back to
+      // comparing snapshot yields only if proposedDirection is missing (legacy alert).
+      var direction = yieldData.proposedDirection;
+      if (direction !== 'meth_to_usdy' && direction !== 'usdy_to_meth') {
+        var usdyYield = yieldData.usdyCurrentAPY || 3.55;
+        var methYield = yieldData.methCurrentAPR || 2.02;
+        direction = (usdyYield > methYield) ? 'meth_to_usdy' : 'usdy_to_meth';
+      }
 
       var USDY_ADDR = '0x5bE26527e817998A7206475496fDE1E68957c5A6';
       var METH_ADDR = '0xcDA86A272531e8640cD7F1a92c01839911B90bb0';
-
       var tokenIn, tokenOut, fromLabel, toLabel;
-      if (usdyHigher) {
+      if (direction === 'meth_to_usdy') {
         tokenIn = METH_ADDR; tokenOut = USDY_ADDR;
         fromLabel = 'mETH'; toLabel = 'USDY';
       } else {
@@ -2909,14 +2914,32 @@
         fromLabel = 'USDY'; toLabel = 'mETH';
       }
 
-      var usdyText = (document.getElementById('usdy-usd') || {}).textContent || '$0';
-      var methText = (document.getElementById('meth-usd') || {}).textContent || '$0';
-      var usdyUSD  = parseFloat(usdyText.replace(/[^0-9.]/g, '')) || 0;
-      var methUSD  = parseFloat(methText.replace(/[^0-9.]/g, '')) || 0;
+      // Sizing: mirror the agent's proposedShiftUSD with a 5% safety headroom against
+      // the on-chain source-asset balance. Single source of truth: the globals
+      // populated by loadPositionsFromAPI() (which reads /api/profile.positions).
+      // No DOM shadow, no hardcoded token-price priors.
+      var sourceBal = (direction === 'meth_to_usdy')
+        ? ((typeof METH_BALANCE === 'number') ? METH_BALANCE : 0)
+        : ((typeof USDY_BALANCE === 'number') ? USDY_BALANCE : 0);
+      var sourcePrice = (direction === 'meth_to_usdy')
+        ? ((typeof methUSD === 'number' && methUSD > 0) ? methUSD : 2300)
+        : ((typeof usdyUSD === 'number' && usdyUSD > 0) ? usdyUSD : 1.013);
+      var sourceUSD = sourceBal * sourcePrice;
+      var capUSD    = sourceUSD * 0.95;
 
-      // Shift 50% of the lower-yielding asset, capped at $50 for demo safety
-      var sourceUSD = usdyHigher ? methUSD : usdyUSD;
-      var shiftUSD = Math.min(sourceUSD * 0.5, 50);
+      var proposed = yieldData.proposedShiftUSD;
+      var shiftUSD;
+      if (typeof proposed === 'number' && proposed > 0) {
+        shiftUSD = Math.min(proposed, capUSD);
+        console.log('[execute] agent proposed $' + proposed.toFixed(2)
+          + ' | sizing $' + shiftUSD.toFixed(2)
+          + ' (capped from $' + sourceUSD.toFixed(2) + ' × 0.95 = $' + capUSD.toFixed(2) + ')'
+          + ' | direction ' + direction);
+      } else {
+        // Fallback only — should never fire in normal flow. Surface loudly so we detect regressions.
+        console.warn('[execute] alert.yieldData.proposedShiftUSD unavailable — falling back to legacy 50% sizing');
+        shiftUSD = Math.min(sourceUSD * 0.5, 50);
+      }
 
       if (shiftUSD < 5) {
         alert('Position too small — need $5+ in ' + fromLabel + ' to swap. Currently $' + sourceUSD.toFixed(2) + '.');
@@ -2924,8 +2947,8 @@
         return;
       }
 
-      var tokenPriceUSD = (tokenIn === METH_ADDR) ? 2300 : 1.01;
-      var tokenAmount = shiftUSD / tokenPriceUSD;
+      // Convert shift USD → token wei using the live CoinGecko price for the source token.
+      var tokenAmount    = shiftUSD / sourcePrice;
       var tokenAmountWei = BigInt(Math.floor(tokenAmount * 1e18)).toString();
 
       var quoteUrl = '/api/quote?fromToken=' + tokenIn

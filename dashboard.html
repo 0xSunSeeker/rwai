@@ -2933,6 +2933,7 @@
         shiftUSD = Math.min(proposed, capUSD);
         console.log('[execute] agent proposed $' + proposed.toFixed(2)
           + ' | sizing $' + shiftUSD.toFixed(2)
+          + ' | ' + (sourcePrice > 0 ? (shiftUSD / sourcePrice).toFixed(6) : '?') + ' tokens @ $' + sourcePrice.toFixed(2)
           + ' (capped from $' + sourceUSD.toFixed(2) + ' × 0.95 = $' + capUSD.toFixed(2) + ')'
           + ' | direction ' + direction);
       } else {
@@ -2973,6 +2974,58 @@
       var gasUSD = (quote.estimate.gasCosts || []).reduce(function(s, g) {
         return s + parseFloat(g.amountUSD || 0);
       }, 0);
+
+      // Quote-feedback resize: the quote tells us the TRUE USD value of the trade.
+      // If that diverges >10% from what we asked for, the local price prior was wrong
+      // (stale CoinGecko cache or fallback). Recompute with the implied price, re-apply
+      // the safety cap, and re-quote ONCE. The confirm dialog then shows corrected numbers.
+      var divergence = shiftUSD > 0 ? Math.abs(fromUSD - shiftUSD) / shiftUSD : 0;
+      if (divergence > 0.10) {
+        var impliedPrice = (tokenAmount > 0) ? (fromUSD / tokenAmount) : sourcePrice;
+        console.log('[execute] price check: quote values trade at $' + fromUSD.toFixed(2)
+          + ', expected $' + shiftUSD.toFixed(2)
+          + ' (implied price $' + impliedPrice.toFixed(2) + ' vs assumed $' + sourcePrice.toFixed(2) + ')'
+          + ' — resizing and re-quoting');
+
+        // Re-apply the safety cap using the implied (corrected) price
+        var capUSD2 = sourceBal * impliedPrice * 0.95;
+        shiftUSD = (typeof proposed === 'number' && proposed > 0)
+          ? Math.min(proposed, capUSD2)
+          : Math.min(sourceBal * impliedPrice * 0.5, 50);
+        tokenAmount    = shiftUSD / impliedPrice;
+        tokenAmountWei = BigInt(Math.floor(tokenAmount * 1e18)).toString();
+        sourcePrice    = impliedPrice;
+
+        // Single retry — never loop
+        var requoteUrl = '/api/quote?fromToken=' + tokenIn
+          + '&toToken=' + tokenOut
+          + '&fromAmount=' + tokenAmountWei
+          + '&fromAddress=' + userAddress;
+        var requoteRes = await fetch(requoteUrl);
+        if (requoteRes.ok) {
+          var requote = await requoteRes.json();
+          if (requote && requote.transactionRequest && requote.transactionRequest.data) {
+            quote = requote;
+            fromUSD = parseFloat(quote.estimate.fromAmountUSD);
+            toUSD   = parseFloat(quote.estimate.toAmountUSD);
+            swapCost    = fromUSD - toUSD;
+            swapCostPct = (swapCost / fromUSD) * 100;
+            gasUSD = (quote.estimate.gasCosts || []).reduce(function(s, g) {
+              return s + parseFloat(g.amountUSD || 0);
+            }, 0);
+            var divergence2 = shiftUSD > 0 ? Math.abs(fromUSD - shiftUSD) / shiftUSD : 0;
+            if (divergence2 > 0.10) {
+              console.warn('[execute] price check: re-quote still off by ' + (divergence2 * 100).toFixed(0) + '% — proceeding with second quote anyway');
+            } else {
+              console.log('[execute] price check: re-quoted trade now within tolerance at $' + fromUSD.toFixed(2));
+            }
+          } else {
+            console.warn('[execute] price check: re-quote returned no transaction data — keeping original quote');
+          }
+        } else {
+          console.warn('[execute] price check: re-quote fetch failed (' + requoteRes.status + ') — keeping original quote');
+        }
+      }
 
       var confirmMsg =
         'Swap via ' + quote.toolName + '\n\n' +

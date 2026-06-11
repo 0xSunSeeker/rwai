@@ -210,8 +210,12 @@
     }
     .info-tip-trigger:hover, .info-tip-trigger[aria-expanded="true"] { color: #1D9E75; }
     .info-tip {
-      display: none; position: absolute;
-      bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      /* position:fixed escapes the .hero-card overflow:hidden that was clipping
+         absolutely-positioned tooltips into invisibility. Inline top/left are
+         set by JS via getBoundingClientRect() on hover/open. The CSS fallback
+         centers the tip in the viewport when JS hasn't positioned yet so
+         the hover preview is still visible without JS engaged. */
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
       max-width: min(260px, 90vw); width: max-content;
       padding: 12px 14px;
       background: rgba(20, 20, 22, 0.85);
@@ -221,12 +225,19 @@
       border-radius: 10px;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 48px rgba(0, 0, 0, 0.55);
       color: #d4d4d4; font-size: 0.75rem; font-weight: 400; line-height: 1.55;
-      text-align: left; z-index: 9999;
-      pointer-events: none; white-space: normal;
+      text-align: left; z-index: 99999;
+      visibility: hidden; opacity: 0; pointer-events: none;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+      white-space: normal;
       text-transform: none; letter-spacing: 0;
     }
+    /* Two paths to visible: CSS hover (sibling selector) and JS-applied .open class.
+       Same property set — visibility + opacity + pointer-events — same specificity. */
     .info-tip-trigger:hover + .info-tip,
-    .info-tip.open { display: block; animation: glass-pop 0.18s ease-out; }
+    .info-tip.open {
+      visibility: visible; opacity: 1; pointer-events: none;
+      animation: glass-pop 0.18s ease-out;
+    }
     @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
       .info-tip { background: rgba(20, 20, 22, 0.96); }
     }
@@ -2576,45 +2587,78 @@
       btn.addEventListener('click', function() { setSensitivity(btn.dataset.sensitivity); });
     });
 
-    // Info-tip triggers: tap toggles .open on the next-sibling tooltip. Hover is
-    // CSS-driven (`.info-tip-trigger:hover + .info-tip`). Outside-click dismisses
-    // any open tip. After opening, clamp horizontal position to keep within viewport.
-    function clampInfoTipToViewport(tip) {
-      tip.style.transform = 'translateX(-50%)'; // reset
-      var r = tip.getBoundingClientRect();
+    // Info-tip — position:fixed (escapes .hero-card overflow:hidden) + event
+    // delegation (one document-level listener; survives any innerHTML rewrite of
+    // the tip content, e.g. updateConfidenceTooltip). On hover OR click, compute
+    // top/left from getBoundingClientRect() so the panel anchors above the
+    // trigger and clamps to the viewport.
+    function positionInfoTip(trig, tip) {
+      // Reset inline transform/position so offsetWidth measures intrinsic size,
+      // not the CSS fallback translate(-50%, -50%).
+      tip.style.transform = 'none';
+      tip.style.left = '0px';
+      tip.style.top = '0px';
+      var tr = trig.getBoundingClientRect();
+      var tipW = tip.offsetWidth || 260;
+      var tipH = tip.offsetHeight || 100;
       var vw = window.innerWidth || document.documentElement.clientWidth;
+      var vh = window.innerHeight || document.documentElement.clientHeight;
       var pad = 8;
-      var nudge = 0;
-      if (r.right > vw - pad) nudge = (vw - pad) - r.right;
-      else if (r.left < pad)  nudge = pad - r.left;
-      if (nudge) tip.style.transform = 'translateX(calc(-50% + ' + nudge + 'px))';
+      var centerX = tr.left + tr.width / 2;
+      var left = Math.max(pad, Math.min(centerX - tipW / 2, vw - pad - tipW));
+      var top = tr.top - tipH - 10;
+      if (top < pad) top = Math.min(tr.bottom + 10, vh - pad - tipH); // flip below if no room above
+      tip.style.left = left + 'px';
+      tip.style.top  = top  + 'px';
     }
-    document.querySelectorAll('.info-tip-trigger').forEach(function(trig) {
-      trig.addEventListener('click', function(e) {
+    function closeInfoTip(tip) {
+      tip.classList.remove('open');
+      var prevTrig = tip.previousElementSibling;
+      if (prevTrig && prevTrig.classList && prevTrig.classList.contains('info-tip-trigger')) {
+        prevTrig.setAttribute('aria-expanded', 'false');
+      }
+    }
+    // Click: delegation — open/close + outside-dismiss
+    document.addEventListener('click', function(e) {
+      var trig = e.target && e.target.closest && e.target.closest('.info-tip-trigger');
+      if (trig) {
         e.stopPropagation();
         var tip = trig.nextElementSibling;
         if (!tip || !tip.classList.contains('info-tip')) return;
         var wasOpen = tip.classList.contains('open');
-        // close any other open tips
-        document.querySelectorAll('.info-tip.open').forEach(function(t) {
-          t.classList.remove('open'); t.style.transform = '';
-          var prevTrig = t.previousElementSibling;
-          if (prevTrig && prevTrig.classList.contains('info-tip-trigger')) prevTrig.setAttribute('aria-expanded', 'false');
-        });
+        document.querySelectorAll('.info-tip.open').forEach(closeInfoTip);
         if (!wasOpen) {
           tip.classList.add('open');
           trig.setAttribute('aria-expanded', 'true');
-          clampInfoTipToViewport(tip);
+          positionInfoTip(trig, tip);
         }
-      });
+        return;
+      }
+      // outside click → close any sticky-open tips
+      if (!e.target.closest || !e.target.closest('.info-tip')) {
+        document.querySelectorAll('.info-tip.open').forEach(closeInfoTip);
+      }
     });
-    document.addEventListener('click', function() {
-      document.querySelectorAll('.info-tip.open').forEach(function(t) {
-        t.classList.remove('open'); t.style.transform = '';
-        var prevTrig = t.previousElementSibling;
-        if (prevTrig && prevTrig.classList.contains('info-tip-trigger')) prevTrig.setAttribute('aria-expanded', 'false');
-      });
+    // Hover: delegated mouseover, position before the CSS :hover reveal repaints.
+    // Uses relatedTarget to dedup re-fires while the cursor moves within the trigger.
+    document.addEventListener('mouseover', function(e) {
+      var trig = e.target && e.target.closest && e.target.closest('.info-tip-trigger');
+      if (!trig) return;
+      var related = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.info-tip-trigger');
+      if (related === trig) return;
+      var tip = trig.nextElementSibling;
+      if (!tip || !tip.classList.contains('info-tip')) return;
+      positionInfoTip(trig, tip);
     });
+    // Reposition any open sticky tip on scroll/resize so it tracks the trigger.
+    function repositionOpenTips() {
+      document.querySelectorAll('.info-tip.open').forEach(function(tip) {
+        var trig = tip.previousElementSibling;
+        if (trig && trig.classList && trig.classList.contains('info-tip-trigger')) positionInfoTip(trig, tip);
+      });
+    }
+    window.addEventListener('scroll', repositionOpenTips, { passive: true });
+    window.addEventListener('resize', repositionOpenTips);
 
     // Approve button is wired dynamically by applyHeroState()
 

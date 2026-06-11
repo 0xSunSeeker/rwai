@@ -27,6 +27,11 @@
     @keyframes slide-down { from{opacity:0;transform:translateY(-8px);max-height:0} to{opacity:1;transform:translateY(0);max-height:500px} }
     @keyframes tooltip-fade { 0%{opacity:0;transform:translateY(4px)} 20%{opacity:1;transform:translateY(0)} 80%{opacity:1} 100%{opacity:0} }
     @keyframes toast-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    /* Animated beam border on .hero-card. @property registers --rwai-beam as an
+       <angle> so it interpolates over the keyframe rotation (without @property,
+       custom-property animation just snaps, no smooth motion). */
+    @property --rwai-beam { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes rwai-beam-rotate { to { --rwai-beam: 360deg; } }
     .tier-toast {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
       background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px;
@@ -324,6 +329,30 @@
       top: -80px; left: -80px; width: 360px; height: 360px;
       background: radial-gradient(circle, rgba(29,158,117,0.07) 0%, transparent 68%);
       pointer-events: none;
+    }
+    /* Beam border: a thin green light segment travels around the hero card.
+       conic-gradient + padding/mask trick confines paint to a 1px ring on the
+       border. Most of the ring is transparent; the head + ~47° tail rotates
+       around once every 9s — slow + ambient, no glow bloom. */
+    .hero-card::after {
+      content: ''; position: absolute; inset: -1px;
+      border-radius: inherit; pointer-events: none; z-index: 1;
+      padding: 1px;
+      background: conic-gradient(from var(--rwai-beam),
+        transparent 0deg, transparent 300deg,
+        rgba(29,158,117,0.0) 310deg, rgba(29,158,117,0.55) 345deg,
+        #1D9E75 357deg, rgba(29,158,117,0.0) 360deg);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+              mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      animation: rwai-beam-rotate 9s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-card::after { animation: none; opacity: 0; }
+    }
+    @supports not (background: conic-gradient(red, blue)) {
+      .hero-card::after { display: none; }
     }
     .hero-left { display: flex; flex-direction: column; }
     .hero-tag {

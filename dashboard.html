@@ -197,6 +197,39 @@
       border: 6px solid transparent;
       border-top-color: #2a2a2a;
     }
+
+    /* Liquid-glass info tooltip (hover OR tap toggle, JS-driven dismiss) */
+    .info-tip-trigger {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; margin-left: 4px; padding: 0;
+      background: none; border: none; cursor: pointer;
+      color: #555; font: inherit; font-size: 0.78rem; font-weight: 400;
+      line-height: 1; vertical-align: middle; position: relative;
+      transition: color 0.15s;
+      text-transform: none; letter-spacing: 0;
+    }
+    .info-tip-trigger:hover, .info-tip-trigger[aria-expanded="true"] { color: #1D9E75; }
+    .info-tip {
+      display: none; position: absolute;
+      bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      max-width: min(260px, 90vw); width: max-content;
+      padding: 12px 14px;
+      background: rgba(20, 20, 22, 0.85);
+      -webkit-backdrop-filter: blur(28px) saturate(1.8);
+      backdrop-filter: blur(28px) saturate(1.8);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 48px rgba(0, 0, 0, 0.55);
+      color: #d4d4d4; font-size: 0.75rem; font-weight: 400; line-height: 1.55;
+      text-align: left; z-index: 9999;
+      pointer-events: none; white-space: normal;
+      text-transform: none; letter-spacing: 0;
+    }
+    .info-tip-trigger:hover + .info-tip,
+    .info-tip.open { display: block; animation: glass-pop 0.18s ease-out; }
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      .info-tip { background: rgba(20, 20, 22, 0.96); }
+    }
     .sensitivity-menu {
       position: absolute; top: calc(100% + 6px); left: 0;
       background: rgba(20, 20, 22, 0.55);
@@ -1056,7 +1089,7 @@
             <div class="hero-metric-value green" id="hero-annual-impact">—</div>
           </div>
           <div class="hero-metric">
-            <div class="hero-metric-label">Confidence Score</div>
+            <div class="hero-metric-label">Confidence Score<button type="button" class="info-tip-trigger" aria-label="What does confidence score mean?" aria-expanded="false" data-tip="confidence">ⓘ</button><span class="info-tip" id="info-tip-confidence" role="tooltip">How certain the agent is about this specific recommendation, based on data quality and trend stability across timeframes. This is separate from the agent's historical accuracy, which is tracked on-chain.</span></div>
             <div class="hero-metric-value" id="hero-confidence">—</div>
           </div>
           <div class="hero-metric">
@@ -1627,7 +1660,9 @@
     bk.id = 'hero-breakeven-badge';
     var days = econ.breakevenDays;
     var color = days < 90 ? '#1D9E75' : (days <= 365 ? '#F59E0B' : '#E05252');
-    bk.style.cssText = 'display:inline-block; font-size:0.78rem; font-weight:600; margin-top:10px; padding:5px 12px; border-radius:999px; color:' + color + '; background:rgba(0,0,0,0.04); border:1px solid ' + color + ';';
+    // display:block + width:fit-content keeps the pill shape but puts the badge
+    // on its own line under the paragraph (instead of inline with the final period).
+    bk.style.cssText = 'display:block; width:fit-content; font-size:0.78rem; font-weight:600; margin-top:14px; padding:5px 12px; border-radius:999px; color:' + color + '; background:rgba(0,0,0,0.04); border:1px solid ' + color + ';';
     bk.textContent = 'Breakeven: ' + days + ' days';
     heroBody.appendChild(bk);
   }
@@ -2519,6 +2554,46 @@
 
     document.querySelectorAll('#sensitivity-menu button[data-sensitivity]').forEach(function(btn) {
       btn.addEventListener('click', function() { setSensitivity(btn.dataset.sensitivity); });
+    });
+
+    // Info-tip triggers: tap toggles .open on the next-sibling tooltip. Hover is
+    // CSS-driven (`.info-tip-trigger:hover + .info-tip`). Outside-click dismisses
+    // any open tip. After opening, clamp horizontal position to keep within viewport.
+    function clampInfoTipToViewport(tip) {
+      tip.style.transform = 'translateX(-50%)'; // reset
+      var r = tip.getBoundingClientRect();
+      var vw = window.innerWidth || document.documentElement.clientWidth;
+      var pad = 8;
+      var nudge = 0;
+      if (r.right > vw - pad) nudge = (vw - pad) - r.right;
+      else if (r.left < pad)  nudge = pad - r.left;
+      if (nudge) tip.style.transform = 'translateX(calc(-50% + ' + nudge + 'px))';
+    }
+    document.querySelectorAll('.info-tip-trigger').forEach(function(trig) {
+      trig.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var tip = trig.nextElementSibling;
+        if (!tip || !tip.classList.contains('info-tip')) return;
+        var wasOpen = tip.classList.contains('open');
+        // close any other open tips
+        document.querySelectorAll('.info-tip.open').forEach(function(t) {
+          t.classList.remove('open'); t.style.transform = '';
+          var prevTrig = t.previousElementSibling;
+          if (prevTrig && prevTrig.classList.contains('info-tip-trigger')) prevTrig.setAttribute('aria-expanded', 'false');
+        });
+        if (!wasOpen) {
+          tip.classList.add('open');
+          trig.setAttribute('aria-expanded', 'true');
+          clampInfoTipToViewport(tip);
+        }
+      });
+    });
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.info-tip.open').forEach(function(t) {
+        t.classList.remove('open'); t.style.transform = '';
+        var prevTrig = t.previousElementSibling;
+        if (prevTrig && prevTrig.classList.contains('info-tip-trigger')) prevTrig.setAttribute('aria-expanded', 'false');
+      });
     });
 
     // Approve button is wired dynamically by applyHeroState()

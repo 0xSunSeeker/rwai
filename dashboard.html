@@ -331,11 +331,13 @@
       pointer-events: none;
     }
     /* Beam border: a thin green light segment travels around the hero card.
-       conic-gradient + padding/mask trick confines paint to a 1px ring on the
-       border. Most of the ring is transparent; the head + ~47° tail rotates
-       around once every 9s — slow + ambient, no glow bloom. */
+       conic-gradient + padding/mask trick confines paint to a 1px ring just
+       inside the card edge. Most of the ring is transparent; the head + ~47°
+       tail rotates around once every 9s — slow + ambient, no glow bloom.
+       inset:0 (not -1px) because .hero-card has overflow:hidden — anything
+       past the padding-box would be clipped to invisibility. */
     .hero-card::after {
-      content: ''; position: absolute; inset: -1px;
+      content: ''; position: absolute; inset: 0;
       border-radius: inherit; pointer-events: none; z-index: 1;
       padding: 1px;
       background: conic-gradient(from var(--rwai-beam),

@@ -526,6 +526,11 @@ async function runAgentLoop() {
 
     // Step 3a — Always generate and log a new prediction (builds track record)
     const prediction = await generatePrediction(yieldData);
+    // Carry Claude's per-proposal confidence reasoning onto yieldData so the
+    // dashboard tooltip can surface it. Defensive: null on missing/malformed.
+    yieldData.confidenceReason = (prediction && typeof prediction.confidenceReason === 'string' && prediction.confidenceReason.trim())
+      ? prediction.confidenceReason.trim()
+      : null;
     const predictionEntry = appendPrediction(prediction, yieldData);
     console.log("Prediction logged:", JSON.stringify(prediction, null, 2));
 

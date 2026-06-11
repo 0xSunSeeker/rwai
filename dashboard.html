@@ -1814,6 +1814,25 @@
     btnIdle('No action needed', null, null);
   }
 
+  // Tooltip update: always rewrites the confidence tooltip so it tracks the
+  // current alert. Static definition first (preserved verbatim); if the alert
+  // carries confidenceReason, append a thin divider + "This score: <reason>".
+  // Old alerts without the field render exactly the static copy — never breaks.
+  var CONFIDENCE_TIP_STATIC = "How certain the agent is about this specific recommendation, based on data quality and trend stability across timeframes. This is separate from the agent's historical accuracy, which is tracked on-chain.";
+  function updateConfidenceTooltip(alert) {
+    var tip = document.getElementById('info-tip-confidence');
+    if (!tip) return;
+    var reason = alert && alert.yieldData && alert.yieldData.confidenceReason;
+    if (reason && typeof reason === 'string' && reason.trim()) {
+      tip.innerHTML = CONFIDENCE_TIP_STATIC
+        + '<div style="border-top:1px solid rgba(255,255,255,0.10); margin:10px 0 8px;"></div>'
+        + '<strong style="color:#1D9E75;">This score:</strong> '
+        + formatAgentText(reason);
+    } else {
+      tip.textContent = CONFIDENCE_TIP_STATIC;
+    }
+  }
+
   async function refreshHero() {
     var alert = null, profile = null;
     try { var aRes = await fetch('/api/pending-alert'); alert = aRes.ok ? await aRes.json() : null; } catch (e) {}
@@ -1831,6 +1850,7 @@
     console.log('[hero] state=' + state + ' | alertType=' + ((alert && alert.alertType) || 'none') + ' | tier=' + tier + ' | spread=' + (logSpread || 0).toFixed(2) + '%');
 
     applyHeroState(state, alert, profile, liveSpread);
+    updateConfidenceTooltip(alert);
   }
 
   function openTelegram() {

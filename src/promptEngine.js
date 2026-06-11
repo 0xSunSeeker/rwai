@@ -180,6 +180,7 @@ Return ONLY valid JSON, no other text:
 
 {
   "timestamp": "<ISO 8601 UTC string>",
+  "confidenceReason": "<one sentence, max 25 words, plain English, naming the main factor(s) that raised or lowered the confidence score (e.g. data quality, trend stability, missing historical averages). No jargon. No mention of news or external events.>",
   "usdyPrediction": {
     "direction": "<up|down|stable>",
     "confidence": <0-${confidenceCeiling}>,

@@ -172,6 +172,36 @@ function getUserThresholds(profile) {
   return presets[sensitivity] || presets.balanced;
 }
 
+// Pure: given user + yield context, returns the spread-based alertType the agent
+// would emit, plus the trade parameters (direction, positionToShift). Caller
+// still wraps with significantChange / economics / Tier-3 gating.
+//
+// Sizing uses the SOURCE asset balance (the side being sold), not Math.min(both).
+// Math.min broke imbalanced wallets — e.g. mETH-overweight (USDY=$13, mETH=$70)
+// with USDY leading on yield would compute Math.min*0.5 = $6.50 and downgrade,
+// even though half the actual source (mETH) is $35, well above the $10 floor.
+function decideRebalance({ usdyUSD, methUSD, currentSpread, usdyCurrentAPY, methCurrentAPR, sensitivity, tierCode }) {
+  const thresholds = getUserThresholds({ alertSensitivity: sensitivity });
+  const usdyLeads  = usdyCurrentAPY > methCurrentAPR;
+  const direction  = usdyLeads ? 'meth_to_usdy' : 'usdy_to_meth';
+  const sourceUSD  = (direction === 'meth_to_usdy') ? methUSD : usdyUSD;
+  const positionToShift = sourceUSD * 0.5;
+
+  if (currentSpread < thresholds.alert) {
+    return { alertType: null, positionToShift, direction, sourceUSD, thresholds };
+  }
+  if (currentSpread < thresholds.proposal) {
+    return { alertType: 'spread_alert', positionToShift, direction, sourceUSD, thresholds, reason: 'below_proposal_threshold' };
+  }
+  if (tierCode === 1) {
+    return { alertType: 'spread_alert', positionToShift, direction, sourceUSD, thresholds, reason: 'watch_only_tier' };
+  }
+  if (positionToShift < 10) {
+    return { alertType: 'spread_alert', positionToShift, direction, sourceUSD, thresholds, reason: 'position_too_small' };
+  }
+  return { alertType: 'rebalance_proposal', positionToShift, direction, sourceUSD, thresholds };
+}
+
 // ─── USER PROFILE ─────────────────────────────────────────────────────────────
 const PROFILE_PATH = `${DATA_DIR}/userProfile.json`;
 
@@ -524,73 +554,61 @@ async function runAgentLoop() {
     const significantChange = usdyChange > ALERT_THRESHOLD || methChange > ALERT_THRESHOLD;
 
     const currentSpread  = yieldData.usdyCurrentAPY - yieldData.methCurrentAPR;
-    const previousSpread = yieldData.usdyPreviousAPY - yieldData.methPreviousAPR;
-    const thresholds = getUserThresholds(user);
-    const spreadCrossedAlert  = currentSpread >= thresholds.alert && previousSpread < thresholds.alert;
-    const spreadAboveProposal    = currentSpread >= thresholds.proposal;
-    const spreadAboveAlert       = currentSpread >= thresholds.alert;
+    const decision = decideRebalance({
+      usdyUSD: user.positions?.USDY?.usdValue || 0,
+      methUSD: user.positions?.mETH?.usdValue || 0,
+      currentSpread,
+      usdyCurrentAPY: yieldData.usdyCurrentAPY,
+      methCurrentAPR: yieldData.methCurrentAPR,
+      sensitivity: user.alertSensitivity,
+      tierCode: user.tierCode,
+    });
+    const thresholds = decision.thresholds;
     const spreadAboveAutoExecute = currentSpread >= thresholds.autoExec;
 
     console.log(`Delegation tier: ${user.userTier}`);
     console.log(`Spread (USDY - mETH): ${currentSpread.toFixed(2)}% | Sensitivity: ${user.alertSensitivity || 'balanced'} | Alert: ${thresholds.alert}% | Proposal: ${thresholds.proposal}% | Auto: ${thresholds.autoExec}%`);
 
-    const shouldAlert = significantChange || spreadCrossedAlert || spreadAboveProposal || spreadAboveAutoExecute;
+    // yield_change still fires from significantChange when no spread-based alert
+    let alertType = decision.alertType;
+    if (!alertType && significantChange) alertType = 'yield_change';
+    const shouldAlert = !!alertType;
 
     if (shouldAlert) {
-      // Determine alert type
-      let alertType = "yield_change";
-      if (spreadAboveProposal) alertType = "rebalance_proposal";
-      else if (spreadAboveAlert) alertType = "spread_alert";
-
       console.log(`Alert triggered — type: ${alertType} | spread: ${currentSpread.toFixed(2)}%`);
+      if (decision.reason === 'position_too_small') {
+        console.log(`Position too small to rebalance: $${decision.positionToShift.toFixed(2)} < $10 minimum (source: ${decision.direction === 'meth_to_usdy' ? 'mETH' : 'USDY'} $${decision.sourceUSD.toFixed(2)})`);
+      } else if (decision.reason === 'watch_only_tier') {
+        console.log(`Watch Only tier — proposal downgraded to spread_alert`);
+      }
 
       // Add spread context to yieldData so generateExplanation can use it
       yieldData.currentSpread        = currentSpread;
       yieldData.alertType            = alertType;
-      yieldData.spreadAboveProposal  = spreadAboveProposal;
+      yieldData.spreadAboveProposal  = (alertType === 'rebalance_proposal');
 
-      // For rebalance proposals, verify the swap actually pays off before alerting
-      if (alertType === "rebalance_proposal" && user.userTier !== "Watch Only") {
-        const usdyUSD = user.positions?.USDY?.usdValue || 0;
-        const methUSD = user.positions?.mETH?.usdValue || 0;
-        const positionToShift = Math.min(usdyUSD, methUSD) * 0.5;
-        const direction = (yieldData.usdyCurrentAPY > yieldData.methCurrentAPR) ? 'meth_to_usdy' : 'usdy_to_meth';
+      // Economics gate (rebalance proposals only): surface the numbers, then
+      // strict Tier 3 breakeven cap. Tier 2 always proposes regardless of breakeven.
+      if (alertType === 'rebalance_proposal') {
+        const positionToShift = decision.positionToShift;
+        const direction       = decision.direction;
+        const economics = await checkSwapEconomics(positionToShift, currentSpread, direction);
+        yieldData.swapEconomics     = economics;
+        yieldData.proposedDirection = direction;
+        yieldData.proposedShiftUSD  = positionToShift;
 
-        if (positionToShift < 10) {
-          console.log(`Position too small to rebalance: $${positionToShift.toFixed(2)} < $10 minimum`);
-          // Downgrade to non-actionable alert so the user still hears about the spread
-          alertType = "spread_alert";
-          yieldData.alertType = alertType;
-          yieldData.spreadAboveProposal = false;
-        } else {
-          const economics = await checkSwapEconomics(positionToShift, currentSpread, direction);
-
-          // Always surface the numbers so the dashboard and bot can show the
-          // trade honestly — the user sees the cost regardless of tier.
-          yieldData.swapEconomics     = economics;
-          yieldData.proposedDirection = direction;
-          yieldData.proposedShiftUSD  = positionToShift;
-
-          const bk = economics.available ? `${economics.breakevenDays} days` : 'unknown (quote unavailable)';
-
-          if (user.tierCode === 3) {
-            // Tier 3 (Delegated): strict guardrail — only auto-execute trades that
-            // clearly pay back within a quarter, protecting delegated users from
-            // blind value loss.
-            if (economics.available && economics.breakevenDays < 90) {
-              console.log(`[Tier 3] Breakeven ${bk} — within 90-day auto-execute window`);
-            } else {
-              console.log(`[Tier 3 gate] Refusing auto-execute path — breakeven ${bk} exceeds 90`);
-              alertType = "spread_alert";
-              yieldData.alertType = alertType;
-              yieldData.spreadAboveProposal = false;
-            }
+        const bk = economics.available ? `${economics.breakevenDays} days` : 'unknown (quote unavailable)';
+        if (user.tierCode === 3) {
+          if (economics.available && economics.breakevenDays < 90) {
+            console.log(`[Tier 3] Breakeven ${bk} — within 90-day auto-execute window`);
           } else {
-            // Tier 2 (Propose and Confirm): always propose. The breakeven is shown
-            // prominently and the user signs the transaction, so they decide whether
-            // the trade fits their thesis.
-            console.log(`[Tier 2] Proposing with breakeven ${bk} — user decides`);
+            console.log(`[Tier 3 gate] Refusing auto-execute path — breakeven ${bk} exceeds 90`);
+            alertType = 'spread_alert';
+            yieldData.alertType = alertType;
+            yieldData.spreadAboveProposal = false;
           }
+        } else {
+          console.log(`[Tier 2] Proposing with breakeven ${bk} — user decides`);
         }
       }
 

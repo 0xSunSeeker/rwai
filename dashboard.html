@@ -1656,7 +1656,7 @@
 
     function head(t){ if (heroTitle) heroTitle.textContent = t; }
     function pill(t,c){ if (heroPill){ heroPill.textContent = t; heroPill.style.color = c; } }
-    function body(t){ if (heroBody) heroBody.textContent = t; }
+    function body(t){ if (heroBody) heroBody.innerHTML = formatAgentText(t); }
     function rec(c,s){ if (recContent) recContent.textContent = c; if (recSub) recSub.textContent = s; }
     function btnIdle(label, dismissLabel, onDismiss){
       if (btnApprove){ btnApprove.className='btn-approve no-action'; btnApprove.disabled=true; btnApprove.onclick=null; btnApprove.style.background=''; btnApprove.style.color=''; btnApprove.style.opacity=''; }
@@ -1813,6 +1813,22 @@
   /* ── Helpers ── */
   function fmt(n) { return '$' + n.toFixed(2); }
   function fmtYield(usd, rate) { return 'Est. ' + fmt(usd * rate) + ' / year'; }
+  // Agent-text formatter: escape HTML FIRST (text originates from an LLM and
+  // must never reach innerHTML unescaped), then convert **bold** and *italic*.
+  // Unmatched/odd asterisks stay literal — non-greedy regex requires a closing
+  // counterpart, so no broken tags are ever produced. No other markdown.
+  function formatAgentText(raw) {
+    if (raw == null) return '';
+    var s = String(raw)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    return s;
+  }
 
   /* ── 24h change renderer ── */
   function renderChange(id, pct) {
@@ -3381,7 +3397,7 @@
         + '<div class="pred-body">'
         + '<div class="pred-asset">USDY ' + usdyCap + ' <span style="font-size:0.7rem;color:#666;">' + (p.usdyConfidence || 0) + '% conf</span></div>'
         + '<div class="pred-asset" style="margin-top:4px;">mETH ' + methCap + ' <span style="font-size:0.7rem;color:#666;">' + (p.methConfidence || 0) + '% conf</span></div>'
-        + (reasonTrunc ? '<div class="pred-desc" style="margin-top:8px;color:#888;font-size:0.75rem;">' + reasonTrunc + '</div>' : '')
+        + (reasonTrunc ? '<div class="pred-desc" style="margin-top:8px;color:#888;font-size:0.75rem;">' + formatAgentText(reasonTrunc) + '</div>' : '')
         + '</div>'
         + '<div class="pred-meta">'
         + '<a href="' + explorerUrl + '" target="_blank" rel="noopener noreferrer" class="pred-time" style="color:#888;text-decoration:none;">' + timeAgoShort(p.loggedAt) + '</a>'
@@ -3419,8 +3435,8 @@
       var methCap = (p.methDirection || 'unknown').charAt(0).toUpperCase() + (p.methDirection || 'unknown').slice(1);
       var usdyR = (p.usdyReasoning || '').slice(0, 100); if ((p.usdyReasoning || '').length > 100) usdyR += '…';
       var methR = (p.methReasoning || '').slice(0, 100); if ((p.methReasoning || '').length > 100) methR += '…';
-      var usdyLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;margin-bottom:4px;"><strong style="color:#1D9E75;">USDY ' + usdyCap + '</strong> <span style="color:#666;">' + (p.usdyConfidence || 0) + '% conf</span>' + (usdyR ? ' — ' + usdyR : '') + '</div>';
-      var methLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;"><strong style="color:#aaa;">mETH ' + methCap + '</strong> <span style="color:#666;">' + (p.methConfidence || 0) + '% conf</span>' + (methR ? ' — ' + methR : '') + '</div>';
+      var usdyLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;margin-bottom:4px;"><strong style="color:#1D9E75;">USDY ' + usdyCap + '</strong> <span style="color:#666;">' + (p.usdyConfidence || 0) + '% conf</span>' + (usdyR ? ' — ' + formatAgentText(usdyR) : '') + '</div>';
+      var methLine = '<div style="font-size:0.8rem;color:#555;line-height:1.55;"><strong style="color:#aaa;">mETH ' + methCap + '</strong> <span style="color:#666;">' + (p.methConfidence || 0) + '% conf</span>' + (methR ? ' — ' + formatAgentText(methR) : '') + '</div>';
 
       return '<div class="history-card">'
         + '<span class="history-icon">🤖</span>'

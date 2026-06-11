@@ -23,6 +23,7 @@
     @keyframes pulse-ring { 0%{transform:scale(0.85);opacity:0.6} 100%{transform:scale(2.2);opacity:0} }
     @keyframes spin       { to{transform:rotate(360deg)} }
     @keyframes fade-up    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes glass-pop  { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
     @keyframes slide-down { from{opacity:0;transform:translateY(-8px);max-height:0} to{opacity:1;transform:translateY(0);max-height:500px} }
     @keyframes tooltip-fade { 0%{opacity:0;transform:translateY(4px)} 20%{opacity:1;transform:translateY(0)} 80%{opacity:1} 100%{opacity:0} }
     @keyframes toast-in { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
@@ -123,25 +124,43 @@
     .tier-wrap { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 20px; }
     .tier-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 13px; border-radius: 9999px;
-      border: 1px solid #252525; background: transparent;
+      padding: 5px 13px; border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.07);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 16px rgba(0, 0, 0, 0.35);
       color: #555; font-size: 0.72rem; font-weight: 600;
-      cursor: pointer; transition: border-color 0.2s, color 0.2s;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
       font-family: inherit; height: 32px; box-sizing: border-box;
     }
-    .tier-badge:hover { border-color: #383838; color: #999; }
+    .tier-badge:hover {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(255, 255, 255, 0.20);
+      color: #999;
+    }
     .tier-badge svg { width: 10px; height: 10px; flex-shrink: 0; transition: transform 0.2s; }
     .tier-badge.open svg { transform: rotate(180deg); }
     .sensitivity-wrap { position: relative; display: inline-block; }
     .sensitivity-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 13px; border-radius: 9999px;
-      border: 1px solid #252525; background: transparent;
+      padding: 5px 13px; border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.07);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 16px rgba(0, 0, 0, 0.35);
       color: #555; font-size: 0.72rem; font-weight: 600;
-      cursor: default; transition: border-color 0.2s, color 0.2s;
+      cursor: default;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
       font-family: inherit; height: 32px; line-height: 1; box-sizing: border-box;
     }
-    .sensitivity-badge:hover { border-color: #383838; color: #999; }
+    .sensitivity-badge:hover {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(255, 255, 255, 0.20);
+      color: #999;
+    }
     .sensitivity-label { color: #555; }
     .sensitivity-current { color: #444; }
     .sensitivity-edit {
@@ -180,31 +199,45 @@
     }
     .sensitivity-menu {
       position: absolute; top: calc(100% + 6px); left: 0;
-      background: #141414; border: 1px solid #252525; border-radius: 12px;
+      background: rgba(20, 20, 22, 0.55);
+      -webkit-backdrop-filter: blur(28px) saturate(1.8);
+      backdrop-filter: blur(28px) saturate(1.8);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 48px rgba(0, 0, 0, 0.55);
       padding: 6px; min-width: 200px; z-index: 100;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      overflow: hidden;
+      animation: glass-pop 0.18s ease-out;
     }
     .sensitivity-menu button {
       display: block; width: 100%; text-align: left;
-      padding: 8px 12px; border-radius: 8px; border: none;
+      padding: 8px 12px; border-radius: 10px; border: none;
       background: transparent; color: #666; font-size: 0.78rem;
       font-family: inherit; cursor: pointer; transition: background 0.15s, color 0.15s;
     }
-    .sensitivity-menu button:hover { background: #1a1a1a; color: #1D9E75; }
+    .sensitivity-menu button:hover { background: rgba(255, 255, 255, 0.07); color: #1D9E75; }
     .tier-dropdown {
       display: none; position: absolute; top: calc(100% + 6px); left: 0;
-      background: #141414; border: 1px solid #252525; border-radius: 12px;
+      background: rgba(20, 20, 22, 0.55);
+      -webkit-backdrop-filter: blur(28px) saturate(1.8);
+      backdrop-filter: blur(28px) saturate(1.8);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 48px rgba(0, 0, 0, 0.55);
       padding: 6px; min-width: 240px; z-index: 100;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      overflow: hidden;
     }
-    .tier-dropdown.open { display: block; animation: fade-up 0.15s ease; }
+    .tier-dropdown.open { display: block; animation: glass-pop 0.18s ease-out; }
     .tier-option {
       display: flex; align-items: flex-start; gap: 10px;
-      padding: 11px 13px; border-radius: 8px; cursor: pointer;
-      transition: background 0.15s;
+      padding: 11px 13px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
     }
-    .tier-option:hover { background: #1d1d1d; }
-    .tier-option.selected { background: rgba(29,158,117,0.08); }
+    .tier-option:hover { background: rgba(255, 255, 255, 0.07); }
+    .tier-option.selected {
+      background: rgba(29, 158, 117, 0.14);
+      box-shadow: inset 3px 0 0 rgba(29, 158, 117, 0.35);
+    }
     .tier-option-dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: #2e2e2e; margin-top: 5px; flex-shrink: 0;
@@ -212,6 +245,18 @@
     .tier-option.selected .tier-option-dot { background: #1D9E75; }
     .tier-option-name { font-size: 0.8rem; font-weight: 600; color: #ccc; }
     .tier-option-desc { font-size: 0.7rem; color: #555; margin-top: 2px; line-height: 1.45; }
+
+    /* Liquid-glass fallback: browsers without backdrop-filter get a solid panel/pill
+       so readability is preserved (Firefox <103, some embedded webviews). */
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      .tier-badge, .sensitivity-badge {
+        background: rgba(40, 40, 42, 0.92);
+        border-color: rgba(255, 255, 255, 0.10);
+      }
+      .tier-dropdown, .sensitivity-menu {
+        background: rgba(20, 20, 22, 0.92);
+      }
+    }
 
     /* ── Section label ── */
     .section-label {

@@ -9,6 +9,7 @@ import { ethers } from 'ethers';
 import { generateExplanation, generateInsight, generateStrategy } from './promptEngine.js';
 import { logDecision } from './reputation.js';
 import { fetchYieldData, shouldAlert, RISK_PROFILES } from './dataFetcher.js';
+import { fetchTokenPrices } from './prices.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -30,16 +31,10 @@ async function fetchWalletBalances(walletAddress) {
   const methBalance  = parseFloat(ethers.formatUnits(methRaw,  18));
   const cmethBalance = parseFloat(ethers.formatUnits(cmethRaw, 18));
 
-  let ethPrice = 2500;
-  try {
-    const res  = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-    const data = await res.json();
-    ethPrice = data?.ethereum?.usd || 2500;
-  } catch {}
-
-  const usdyUSD  = usdyBalance  * 1.013;
-  const methUSD  = methBalance  * ethPrice;
-  const cmethUSD = cmethBalance * ethPrice;
+  const { usdy: usdyPrice, meth: methPrice, cmeth: cmethPrice } = await fetchTokenPrices();
+  const usdyUSD  = usdyBalance  * usdyPrice;
+  const methUSD  = methBalance  * methPrice;
+  const cmethUSD = cmethBalance * cmethPrice;
   const totalUSD = usdyUSD + methUSD + cmethUSD;
 
   return {

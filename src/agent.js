@@ -9,6 +9,7 @@ import { ethers } from "ethers";
 import { fetchAllYieldData } from "./dataFetcher.js";
 import { generateExplanation, generatePrediction } from "./promptEngine.js";
 import { logDecision } from "./reputation.js";
+import { fetchTokenPrices } from "./prices.js";
 dotenv.config();
 
 const VAULT_ADDRESS = process.env.VAULT_ADDRESS;
@@ -48,19 +49,14 @@ async function refreshAgentPositions(profile) {
       new ethers.Contract(mETH_ADDRESS,  erc20, provider).balanceOf(wallet),
       new ethers.Contract(cmETH_ADDRESS, erc20, provider).balanceOf(wallet),
     ]);
-    let ethPrice = 2500;
-    try {
-      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-      const d = await r.json();
-      if (d?.ethereum?.usd) ethPrice = d.ethereum.usd;
-    } catch {}
+    const { usdy: usdyPrice, meth: methPrice, cmeth: cmethPrice } = await fetchTokenPrices();
     const usdyBal  = parseFloat(ethers.formatUnits(usdyRaw,  18));
     const methBal  = parseFloat(ethers.formatUnits(methRaw,  18));
     const cmethBal = parseFloat(ethers.formatUnits(cmethRaw, 18));
     const positions = {
-      USDY:  { balance: usdyBal,  usdValue: usdyBal  * 1.013,    apy: 3.55 },
-      mETH:  { balance: methBal,  usdValue: methBal  * ethPrice, apy: 2.06 },
-      cmETH: { balance: cmethBal, usdValue: cmethBal * ethPrice, apy: 2.31 },
+      USDY:  { balance: usdyBal,  usdValue: usdyBal  * usdyPrice, apy: 3.55 },
+      mETH:  { balance: methBal,  usdValue: methBal  * methPrice, apy: 2.06 },
+      cmETH: { balance: cmethBal, usdValue: cmethBal * cmethPrice, apy: 2.31 },
     };
     const total = positions.USDY.usdValue + positions.mETH.usdValue + positions.cmETH.usdValue;
     // Update the in-memory profile so this loop's proposal logic sees fresh positions

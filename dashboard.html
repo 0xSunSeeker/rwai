@@ -1171,6 +1171,12 @@
         </div>
 
         <div class="hero-actions">
+          <div id="hero-tier-autoexec-note" style="display:none; flex-basis:100%; color:#1D9E75; font-size:0.78rem; padding:8px 12px; background:rgba(29,158,117,0.06); border:1px solid rgba(29,158,117,0.18); border-radius:6px; line-height:1.5;">
+            ⚡ Auto-Execute is active — trades within guardrails will execute automatically. You can still approve manually.
+          </div>
+          <div id="hero-tier-monitor-note" style="display:none; flex-basis:100%; color:#888; font-size:0.8rem; font-style:italic; padding:14px 0; text-align:center; line-height:1.5;">
+            Monitor Only — upgrade to Propose and Confirm to act on this recommendation.
+          </div>
           <button class="btn-approve no-action" id="btn-approve" disabled>
             <span id="approve-content">No action needed</span>
           </button>
@@ -1892,7 +1898,46 @@
     console.log('[hero] state=' + state + ' | alertType=' + ((alert && alert.alertType) || 'none') + ' | tier=' + tier + ' | spread=' + (logSpread || 0).toFixed(2) + '%');
 
     applyHeroState(state, alert, profile, liveSpread);
+    applyTierUI(state, profile);
     updateConfidenceTooltip(alert);
+  }
+
+  // Tier overlay on top of the state machine's render. Tier 1 hides
+  // Approve/Dismiss and shows a "Monitor Only" note in actionable states;
+  // Tier 3 shows an "Auto-Execute active" info note. Simulate always stays.
+  // Runs AFTER applyHeroState so it overrides state-machine defaults; resets
+  // any prior overrides at the top so tier switches don't leave stale state.
+  function applyTierUI(state, profile) {
+    var tierCode      = (profile && typeof profile.tierCode === 'number') ? profile.tierCode : null;
+    var btnApprove    = document.getElementById('btn-approve');
+    var btnDismiss    = document.getElementById('btn-dismiss');
+    var heroPill      = document.getElementById('hero-status-label');
+    var heroTitle     = document.getElementById('hero-title');
+    var monitorNote   = document.getElementById('hero-tier-monitor-note');
+    var autoExecNote  = document.getElementById('hero-tier-autoexec-note');
+
+    // Reset overlays so a tier switch never strands a button hidden or a note visible.
+    if (btnApprove)   btnApprove.style.display = '';
+    if (monitorNote)  monitorNote.style.display = 'none';
+    if (autoExecNote) autoExecNote.style.display = 'none';
+
+    var actionable = (state === 'proposal_pending' || state === 'spread_alert' ||
+                      state === 'approved' || state === 'executed');
+
+    if (tierCode === 1 && actionable) {
+      // Tier 1 — Monitor Only: hide action buttons, show muted note, restate panel
+      if (btnApprove) btnApprove.style.display = 'none';
+      if (btnDismiss) btnDismiss.style.display = 'none';
+      if (monitorNote) monitorNote.style.display = '';
+      if (heroPill)  { heroPill.textContent = 'Monitoring'; heroPill.style.color = '#888'; }
+      if (heroTitle && (state === 'proposal_pending' || state === 'spread_alert')) {
+        heroTitle.textContent = 'Monitoring conditions';
+      }
+    } else if (tierCode === 3 && (state === 'proposal_pending' || state === 'approved')) {
+      // Tier 3 — Auto-Execute: keep buttons, surface the guardrail-active note
+      if (autoExecNote) autoExecNote.style.display = '';
+    }
+    // Tier 2 (or unset): nothing further — state machine's render is the default.
   }
 
   function openTelegram() {
@@ -2274,7 +2319,14 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tierCode: tierCode, userTier: tierNames[tierCode] || label })
-        }).catch(function() {});
+        })
+          // Refresh the hero card so the new tier's UI (buttons/notes/pill)
+          // applies immediately. refreshHero re-fetches /api/profile (it does
+          // not trust the in-flight POST's body), so the server's merged state
+          // is the source of truth. Failure path still refreshes — the hero
+          // shouldn't get stuck mid-state if the POST was rejected.
+          .then(function () { refreshHero(); })
+          .catch(function ()  { refreshHero(); });
       }
     });
   });

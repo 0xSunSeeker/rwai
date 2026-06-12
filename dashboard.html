@@ -1906,6 +1906,10 @@
       window.open('https://t.me/' + botUsername, '_blank');
     }
   }
+  // The entire script is wrapped in an IIFE, so function declarations are NOT
+  // global. Inline onclick="openTelegram()" runs in the document's global scope
+  // and would throw ReferenceError silently. Expose this one explicitly.
+  window.openTelegram = openTelegram;
 
   /* ── Helpers ── */
   function fmt(n) { return '$' + n.toFixed(2); }

@@ -211,7 +211,7 @@ Return ONLY valid JSON, no other text:
 
 
 // FUNCTION 4: GENERATE STRATEGY
-export async function generateStrategy(yieldData, user) {
+export async function generateStrategy(yieldData, user, proposal) {
   const {
     usdyCurrentAPY, methCurrentAPR, cmethCurrentAPY, tbillRate,
   } = yieldData;
@@ -220,6 +220,22 @@ export async function generateStrategy(yieldData, user) {
   const annual = (pct) => (userPositionUSD * pct / 100).toFixed(0);
   const spread = (usdyCurrentAPY - methCurrentAPR).toFixed(2);
   const usdyLeads = usdyCurrentAPY >= methCurrentAPR;
+
+  // Optional active-proposal block. When the caller passes a valid proposal,
+  // /strategy must echo the same recommendation the dashboard shows — same
+  // direction, same dollar amount, same honest economics. Backwards-compatible:
+  // callers that don't pass `proposal` get the unchanged prompt and behaviour.
+  const hasProposal = proposal && typeof proposal.proposedShiftUSD === 'number' && proposal.proposedShiftUSD > 0
+    && (proposal.proposedDirection === 'meth_to_usdy' || proposal.proposedDirection === 'usdy_to_meth');
+  const proposalBlock = hasProposal ? `
+
+ACTIVE REBALANCE PROPOSAL (the dashboard is showing this right now):
+- Move $${proposal.proposedShiftUSD.toFixed(2)} from ${proposal.proposedDirection === 'meth_to_usdy' ? 'mETH into USDY' : 'USDY into mETH'}.
+- Swap cost: $${proposal.swapCost ?? '?'} (${proposal.swapCostPct ?? '?'}%) via ${proposal.tool ?? 'LI.FI aggregator'}.
+- Breakeven: ${proposal.breakevenDays ?? '?'} days at the current spread.
+- Annual gain after breakeven: ~$${proposal.annualGain ?? '?'} on the shifted amount.
+
+IMPORTANT: Your recommendation MUST be consistent with this proposal. Recommend the rebalance, restate the honest economics (cost, breakeven, hold-period caveat — only proceed if the user plans to hold the new position for at least that long, or believes the spread will widen), and remind the user they can approve it from the dashboard or ignore it if the holding period doesn't suit them. Do not suggest a different direction or amount than the proposal above.` : '';
 
   const userPrompt = `
 CURRENT YIELD SNAPSHOT:
@@ -232,7 +248,7 @@ CURRENT YIELD SNAPSHOT:
 USER PROFILE:
 - Position size: $${userPositionUSD.toLocaleString()}
 - Delegation tier: ${userTier}
-- Agent track record: ${agentAccuracy}
+- Agent track record: ${agentAccuracy}${proposalBlock}
 
 STRATEGY RULES (follow these strictly):
 - If USDY APY is higher than mETH APR, recommend holding USDY. Do not suggest moving to mETH.

@@ -483,7 +483,37 @@ bot.command('strategy', async (ctx) => {
   try {
     const profile = await loadProfile();
     const data = await getYieldSnapshot();
-    const recommendation = await generateStrategy(data, profile);
+
+    // Read the current pending alert so /strategy mirrors the dashboard. If a
+    // valid rebalance_proposal is active, hand its parameters to generateStrategy
+    // so Claude's recommendation echoes the same direction/amount/economics.
+    // Failure to fetch the alert never breaks /strategy — falls back to the
+    // alert-blind behaviour we shipped before this fix.
+    let proposal = null;
+    try {
+      const aRes = await fetch('https://rwai.fyi/api/pending-alert');
+      if (aRes.ok) {
+        const alert = await aRes.json();
+        const yd = (alert && alert.yieldData) || {};
+        const econ = yd.swapEconomics || {};
+        if (alert && alert.pending === true
+            && alert.alertType === 'rebalance_proposal'
+            && typeof yd.proposedShiftUSD === 'number' && yd.proposedShiftUSD > 0
+            && (yd.proposedDirection === 'meth_to_usdy' || yd.proposedDirection === 'usdy_to_meth')) {
+          proposal = {
+            proposedShiftUSD:  yd.proposedShiftUSD,
+            proposedDirection: yd.proposedDirection,
+            swapCost:          econ.swapCost,
+            swapCostPct:       econ.swapCostPct,
+            breakevenDays:     econ.breakevenDays,
+            annualGain:        econ.annualGain,
+            tool:              econ.tool,
+          };
+        }
+      }
+    } catch (_) { /* fall through with proposal = null */ }
+
+    const recommendation = await generateStrategy(data, profile, proposal);
     await ctx.reply(`📈 *RWAI Strategy Recommendation*\n\n${recommendation}`, { parse_mode: 'Markdown' });
   } catch (err) {
     await ctx.reply('⚠️ Could not generate strategy right now. Try again in a moment.');

@@ -1343,7 +1343,6 @@
           </div>
           <div class="pos-badge-stack">
             <span class="risk-badge low">Risk 1/5</span>
-            <span class="pos-label-pill">Largest</span>
           </div>
         </div>
         <div class="pos-balance" id="usdy-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:4px">Loading...</div>
@@ -1374,7 +1373,9 @@
               <div class="pos-protocol">Mantle Staking</div>
             </div>
           </div>
-          <span class="risk-badge amber-badge">Risk 3/5</span>
+          <div class="pos-badge-stack">
+            <span class="risk-badge amber-badge">Risk 3/5</span>
+          </div>
         </div>
         <div class="pos-balance" id="meth-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:2px">Loading...</div>
         <div class="pos-token-sub">0.0303 mETH</div>
@@ -1405,7 +1406,9 @@
               <div class="pos-protocol">Auto-Compound</div>
             </div>
           </div>
-          <span class="risk-badge amber-badge">Risk 3/5</span>
+          <div class="pos-badge-stack">
+            <span class="risk-badge amber-badge">Risk 3/5</span>
+          </div>
         </div>
         <div class="pos-balance" id="cmeth-usd" style="font-size:1rem;color:#444;font-weight:500;margin-bottom:2px">Loading...</div>
         <div class="pos-token-sub">0.00 cmETH</div>
@@ -2134,6 +2137,40 @@
     renderUSDYPosition(posUSD(USDY_BALANCE, usdyUSD));
     renderMETHPosition(posUSD(METH_BALANCE, methUSD));
     renderCMETHPosition(posUSD(CMETH_BALANCE, cmethUSD));
+    updateLargestBadge();
+  }
+
+  // The LARGEST pill belongs to whichever position currently holds the most
+  // USD. Re-evaluated on every balance OR price change — rerenderPositions is
+  // already called from loadPositionsFromAPI (initial + 30s interval) and from
+  // both CoinGecko price callbacks, so this single hook covers every path.
+  // Approach: remove any existing instance, then append one to the winner's
+  // .pos-badge-stack. No badge if everything is null/zero.
+  function updateLargestBadge() {
+    var u = posUSD(USDY_BALANCE,  usdyUSD)  || 0;
+    var m = posUSD(METH_BALANCE,  methUSD)  || 0;
+    var c = posUSD(CMETH_BALANCE, cmethUSD) || 0;
+
+    // Wipe any previous badge first (handles tier switches, balance changes,
+    // and the legacy hardcoded badge if it ever reappears via cache).
+    document.querySelectorAll('.pos-label-pill[data-largest]').forEach(function (el) { el.remove(); });
+
+    var max = Math.max(u, m, c);
+    if (max <= 0) return; // all balances null/zero → no badge
+
+    var winnerId = (max === u) ? 'usdy-usd' : (max === m) ? 'meth-usd' : 'cmeth-usd';
+    var card = document.getElementById(winnerId);
+    if (!card) return;
+    card = card.closest('.position-card');
+    if (!card) return;
+    var stack = card.querySelector('.pos-badge-stack');
+    if (!stack) return;
+
+    var pill = document.createElement('span');
+    pill.className = 'pos-label-pill';
+    pill.setAttribute('data-largest', 'true');
+    pill.textContent = 'Largest';
+    stack.appendChild(pill);
   }
 
   // Single source of truth: /api/profile (the Redis store the agent updates).

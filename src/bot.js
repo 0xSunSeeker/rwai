@@ -117,6 +117,31 @@ async function getYieldSnapshot() {
   return data;
 }
 
+// Onboarding-only retry wrapper. Uses Promise.race for a hard per-attempt
+// timeout so we never depend on ethers' provider default. 3 attempts max, 8s
+// per attempt, 2s between tries. Throws on final failure; the /start handler's
+// existing try/catch then renders the fallback message. NOT used by /status
+// or free-text wallet entry — those are out of scope per the bug-fix spec.
+async function fetchWalletBalancesForOnboarding(walletAddress) {
+  const ATTEMPTS = 3;
+  const TIMEOUT_MS = 8000;
+  const GAP_MS = 2000;
+  let lastErr = null;
+  for (let i = 1; i <= ATTEMPTS; i++) {
+    try {
+      return await Promise.race([
+        fetchWalletBalances(walletAddress),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('balance fetch timed out after ' + TIMEOUT_MS + 'ms')), TIMEOUT_MS)),
+      ]);
+    } catch (err) {
+      lastErr = err;
+      console.warn('[onboarding] balance fetch attempt ' + i + '/' + ATTEMPTS + ' failed: ' + (err && err.message ? err.message : err));
+      if (i < ATTEMPTS) await new Promise(r => setTimeout(r, GAP_MS));
+    }
+  }
+  throw lastErr || new Error('balance fetch failed after ' + ATTEMPTS + ' attempts');
+}
+
 // ─── /start ──────────────────────────────────────────────────────────────────
 bot.start(async (ctx) => {
   const payload = ctx.startPayload;
@@ -132,7 +157,13 @@ bot.start(async (ctx) => {
     await ctx.reply('🔍 Found your wallet. Fetching your Mantle positions...');
 
     try {
-      const balances = await fetchWalletBalances(walletAddress);
+      // Onboarding is the worst place to look broken. Mantle RPC is frequently
+      // slow on a cold first call (3-4s) then fast, so a single timeout makes
+      // the very first user experience say "I had trouble fetching..." for no
+      // good reason. Retry up to 3× with an 8s per-attempt cap and a 2s gap.
+      // Other callers (/status, free-text wallet entry) keep their single-attempt
+      // behaviour — they already run on a cadence and retry naturally.
+      const balances = await fetchWalletBalancesForOnboarding(walletAddress);
 
       const profile = await loadProfile();
       profile.walletAddress = walletAddress;

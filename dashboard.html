@@ -1220,6 +1220,10 @@
           <span class="hero-status-row-val">3</span>
         </div>
         <div class="hero-status-row">
+          <span class="hero-status-row-label">Portfolio value</span>
+          <span class="hero-status-row-val green" id="hero-portfolio-value">—</span>
+        </div>
+        <div class="hero-status-row">
           <span class="hero-status-row-label">Predictions logged</span>
           <span class="hero-status-row-val green" id="predictions-total">—</span>
         </div>
@@ -1903,6 +1907,14 @@
     applyHeroState(state, alert, profile, liveSpread);
     applyTierUI(state, profile);
     updateConfidenceTooltip(alert);
+
+    // Status panel: portfolio value (server-side total from /api/profile).
+    // Empty dash when profile is missing or userPositionUSD isn't numeric.
+    var pvEl = document.getElementById('hero-portfolio-value');
+    if (pvEl) {
+      var pv = profile && typeof profile.userPositionUSD === 'number' ? profile.userPositionUSD : null;
+      pvEl.textContent = (pv != null && pv >= 0) ? fmt(pv) : '—';
+    }
   }
 
   // Tier overlay on top of the state machine's render. Tier 1 hides

@@ -857,6 +857,59 @@
       .hero-metrics { flex-direction: column; gap: 16px; }
     }
 
+    /* ── First-time onboarding overlay ── */
+    #onboarding-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75); z-index: 200;
+      align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.22s ease;
+    }
+    #onboarding-overlay.open { display: flex; opacity: 1; }
+    .onboarding-card {
+      position: relative; max-width: 480px; width: 90%; padding: 36px;
+      background: rgba(20, 20, 22, 0.85);
+      -webkit-backdrop-filter: blur(28px) saturate(1.8);
+              backdrop-filter: blur(28px) saturate(1.8);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 48px rgba(0, 0, 0, 0.55);
+      color: #f0f0f0;
+      animation: glass-pop 0.22s ease-out;
+    }
+    .onboarding-top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px;
+    }
+    .onboarding-step-num {
+      font-size: 0.68rem; font-weight: 700; color: #1D9E75;
+      text-transform: uppercase; letter-spacing: 0.14em;
+    }
+    .onboarding-skip {
+      background: none; border: none; color: #777; font-size: 0.78rem;
+      cursor: pointer; padding: 4px 8px; font-family: inherit;
+      transition: color 0.15s;
+    }
+    .onboarding-skip:hover { color: #aaa; }
+    .onboarding-heading {
+      font-size: 1.4rem; font-weight: 800; margin-bottom: 14px;
+      letter-spacing: -0.02em; line-height: 1.25; color: #f0f0f0;
+    }
+    .onboarding-body {
+      font-size: 0.92rem; color: #bbb; line-height: 1.65; margin-bottom: 28px;
+    }
+    .onboarding-next {
+      display: block; width: 100%; padding: 14px 0;
+      background: #1D9E75; border: none; border-radius: 10px;
+      color: #fff; font-size: 0.92rem; font-weight: 700; cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .onboarding-next:hover  { background: #178a64; }
+    .onboarding-next:active { transform: translateY(1px); }
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      .onboarding-card { background: rgba(20, 20, 22, 0.96); }
+    }
+
     /* ── Rebalance simulation modal ── */
     #rebalance-modal {
       display: none; position: fixed; inset: 0;
@@ -1558,6 +1611,9 @@
       sessionStorage.setItem('rwai_wallet', accounts[0]);
       updateNavWallet(accounts[0], name);
       showDashboard();
+      // First-time greeting — gated by localStorage rwai_onboarded_<wallet>,
+      // so returning users (and auto-reconnects) silently skip.
+      maybeShowOnboardingOverlay(accounts[0]);
     } catch (e) {
       if (e.code !== 4001) console.warn('Connect error:', e);
       err.style.display = 'block';
@@ -2702,10 +2758,72 @@
 
   }
 
+  // ── First-time onboarding overlay ──────────────────────────────────────────
+  // Shown ONLY when (a) a wallet has just been authorized via cwConnect, AND
+  // (b) localStorage 'rwai_onboarded_<lowercase_wallet>' is unset. Auto-reconnect
+  // paths bypass this because they don't run through cwConnect's success branch.
+  var ONBOARDING_STEPS = [
+    { heading: "I'm RWAi. Nice to meet you.",
+      body: "I'm your AI yield analyst. I just read your wallet on Mantle and I'll watch your RWA positions 24/7 so you don't have to. I explain everything in plain English, and I never move your funds without your permission.",
+      btn: "Next" },
+    { heading: "Here's what I'm doing right now.",
+      body: "Above this overlay, you'll see my current take on your positions: what you hold, what each asset yields, and whether the math says you should rebalance. I show you the cost of any move upfront, including how long it takes to break even. Most of the time, I'll tell you to do nothing — that's the point.",
+      btn: "Next" },
+    { heading: "How we'll work together.",
+      body: "By default I propose, you approve. You can change this anytime under the tier selector. I'll also send updates to Telegram if you connect there, so you hear from me wherever you are. That's it. Let's start.",
+      btn: "Got it, let's go" },
+  ];
+  function onboardingKey(wallet) { return 'rwai_onboarded_' + String(wallet || '').toLowerCase(); }
+  function maybeShowOnboardingOverlay(walletAddress) {
+    if (!walletAddress) return;
+    try { if (localStorage.getItem(onboardingKey(walletAddress)) === '1') return; }
+    catch (_) { return; } // private mode etc. — fail closed, don't surprise the user
+    showOnboardingOverlay(walletAddress);
+  }
+  function showOnboardingOverlay(walletAddress) {
+    var overlay = document.getElementById('onboarding-overlay');
+    if (!overlay) return;
+    overlay.dataset.wallet = walletAddress;
+    setOnboardingStep(1);
+    // Add .open on next frame so the CSS opacity transition catches the change
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function () { overlay.classList.add('open'); });
+  }
+  function setOnboardingStep(n) {
+    var step = ONBOARDING_STEPS[n - 1];
+    if (!step) return;
+    var numEl = document.getElementById('onboarding-step-num');
+    var hEl   = document.getElementById('onboarding-heading');
+    var bEl   = document.getElementById('onboarding-body');
+    var nxtEl = document.getElementById('onboarding-next');
+    if (numEl) numEl.textContent = 'Step ' + n + ' of ' + ONBOARDING_STEPS.length;
+    if (hEl)   hEl.textContent   = step.heading;
+    if (bEl)   bEl.textContent   = step.body;
+    if (nxtEl) { nxtEl.textContent = step.btn; nxtEl.dataset.step = String(n); }
+  }
+  function dismissOnboarding() {
+    var overlay = document.getElementById('onboarding-overlay');
+    if (!overlay) return;
+    var wallet = overlay.dataset.wallet;
+    if (wallet) { try { localStorage.setItem(onboardingKey(wallet), '1'); } catch (_) {} }
+    overlay.classList.remove('open'); // triggers opacity 1 → 0
+    setTimeout(function () { overlay.style.display = 'none'; }, 240); // > CSS 0.22s
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     updateSpread();
     renderSensitivityBadge();
     refreshHero();
+
+    // Onboarding overlay — Next advances, Skip / final-step Got-it dismiss
+    var oNext = document.getElementById('onboarding-next');
+    var oSkip = document.getElementById('onboarding-skip');
+    if (oNext) oNext.addEventListener('click', function () {
+      var n = parseInt(oNext.dataset.step, 10) || 1;
+      if (n < ONBOARDING_STEPS.length) setOnboardingStep(n + 1);
+      else dismissOnboarding();
+    });
+    if (oSkip) oSkip.addEventListener('click', dismissOnboarding);
 
     var activateBtn = document.getElementById('btn-activate-tier-3');
     if (activateBtn) activateBtn.addEventListener('click', activateTier3);
@@ -3751,6 +3869,19 @@
 
 })();
 </script>
+
+<!-- ── FIRST-TIME ONBOARDING OVERLAY (gated by localStorage rwai_onboarded_<wallet>) ── -->
+<div id="onboarding-overlay" role="dialog" aria-labelledby="onboarding-heading">
+  <div class="onboarding-card">
+    <div class="onboarding-top">
+      <span class="onboarding-step-num" id="onboarding-step-num">Step 1 of 3</span>
+      <button type="button" class="onboarding-skip" id="onboarding-skip" aria-label="Skip onboarding">Skip</button>
+    </div>
+    <h2 class="onboarding-heading" id="onboarding-heading">—</h2>
+    <p class="onboarding-body" id="onboarding-body">—</p>
+    <button type="button" class="onboarding-next" id="onboarding-next" data-step="1">Next</button>
+  </div>
+</div>
 
 <!-- ── REBALANCE SIMULATION MODAL ── -->
 <div id="rebalance-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center;">

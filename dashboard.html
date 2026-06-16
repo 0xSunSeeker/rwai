@@ -2825,6 +2825,13 @@
     });
     if (oSkip) oSkip.addEventListener('click', dismissOnboarding);
 
+    // Auto-reconnect path: the initial-state block at script-parse time runs
+    // BEFORE the overlay markup (it lives later in the document, after this
+    // script tag). Re-fire the check here so returning visitors who have
+    // never seen the intro still get it.
+    var autoWallet = sessionStorage.getItem('rwai_wallet');
+    if (autoWallet) maybeShowOnboardingOverlay(autoWallet);
+
     var activateBtn = document.getElementById('btn-activate-tier-3');
     if (activateBtn) activateBtn.addEventListener('click', activateTier3);
 

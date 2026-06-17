@@ -871,13 +871,14 @@
        hard divider above the buttons are removed. ── */
     .introjs-tooltip {
       position: relative !important;
+      box-sizing: border-box !important;
       background: rgba(20, 20, 22, 0.97) !important;
       border: 1px solid rgba(29, 158, 117, 0.25) !important;
       border-radius: 14px !important;
       color: #e8e8e8 !important;
       max-width: 300px !important;
       min-width: 280px !important;
-      padding: 20px 20px 16px !important;
+      padding: 20px 20px 18px !important;
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
     }
@@ -930,30 +931,36 @@
     /* Redundant progress bar removed — bullets carry progress */
     .introjs-progress, .introjs-progressbar { display: none !important; }
 
-    /* Button row: no divider, equal-height pills. Skip (moved here by the
-       tour's onafterchange callback) sits left as a text link; Back +
-       Next/Done sit right as a pair. margin-right:auto on Skip pushes the
-       button pair to the right edge without depending on space-between. */
+    /* Button row: contained inside the tooltip padding (border-box + full
+       width) so Back can never overflow the left edge. Flex with gap;
+       a custom .rwai-skip is injected as the first child and pushes the
+       Back/Next pair to the right via margin-right:auto. */
     .introjs-tooltipbuttons {
+      width: 100% !important;
+      box-sizing: border-box !important;
       border-top: none !important;
-      padding: 0 !important;
+      padding: 12px 0 0 !important;
       margin: 0 !important;
       min-height: 38px !important;
       display: flex !important;
       align-items: center !important;
-      justify-content: flex-end !important;
       gap: 10px !important;
     }
     /* Base: matches .btn-approve language — pill, 10x22 padding, 0.82rem/600.
        Equal-height Back and Next: both include a 1px border in their box
-       (Next's border is the same colour as its fill) so heights align. */
+       (Next's border is the same colour as its fill) so heights align.
+       float:none + margin:0 prevent Intro.js defaults from pushing a
+       button past the tooltip's left padding. Pill shape comes from
+       padding + 9999px radius — no min-width, so the Skip link + Back +
+       Next fit comfortably inside the 300px tooltip without overflow. */
     .introjs-button {
+      float: none !important;
+      margin: 0 !important;
       padding: 10px 22px !important;
       border-radius: 9999px !important;
       font-size: 0.82rem !important;
       font-weight: 600 !important;
       line-height: 1 !important;
-      min-width: 120px !important;
       text-align: center !important;
       background: transparent !important;
       background-image: none !important;
@@ -989,28 +996,35 @@
       display: none !important;
     }
 
-    /* Skip lives INSIDE the button row (relocated at runtime — see
-       relocateTourSkip in JS). margin-right:auto pushes Back + Next to
-       the far right while Skip stays on the left. No absolute positioning,
-       no floats — purely flex flow, so it can never escape the tooltip. */
-    .introjs-skipbutton {
+    /* The native Intro.js skip button refused to stay inside the tooltip
+       (its default position is the header; absolute-positioning into the
+       buttons row leaked, flex-relocating into the row inherited the
+       base .introjs-button pill chrome that won't reset cleanly). We hide
+       it entirely and inject our own .rwai-skip link in JS instead. */
+    .introjs-skipbutton { display: none !important; }
+
+    /* Custom skip link — injected as the first child of the buttons row
+       on every step (see ensureRwaiSkip in JS). margin-right:auto pushes
+       the Back + Next pair to the far right. Quiet text link by default,
+       brand-green on hover. No padding/border/min-width so it can never
+       widen the row. */
+    .rwai-skip {
       margin: 0 auto 0 0 !important;
       padding: 0 !important;
-      background: transparent !important;
-      background-image: none !important;
+      background: none !important;
       border: none !important;
       color: #888 !important;
       font-size: 0.78rem !important;
       font-weight: 500 !important;
       line-height: 1 !important;
+      cursor: pointer !important;
+      text-decoration: none !important;
       text-shadow: none !important;
       box-shadow: none !important;
-      min-width: 0 !important;        /* override the 120px from .introjs-button */
-      cursor: pointer !important;
       transition: color 0.15s ease;
     }
-    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; border-color: transparent !important; }
-    .introjs-skipbutton:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; border-radius: 3px !important; }
+    .rwai-skip:hover  { color: #1D9E75 !important; text-decoration: none !important; }
+    .rwai-skip:focus  { outline: none !important; color: #1D9E75 !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; border-radius: 3px !important; }
 
     /* Helper layer: subtle green outline + the dim itself */
     .introjs-helperLayer {
@@ -2976,25 +2990,24 @@
     // Step 6 points at the nav 'Open in Telegram' (top of page) so the
     // tour ends back at the top, not after a deep scroll to the footer CTA.
     var telegramBtn = document.querySelector('.btn-nav-green');
+    // Placement is driven globally by tooltipPosition:'auto' +
+    // positionPrecedence in setOptions, so each step is free to land
+    // wherever Intro.js finds room. Removing the per-step 'bottom' hint
+    // is what stops the tooltip covering small targets like the
+    // confidence-score metric.
     var steps = [
       { element: heroTitle,   title: 'This is your agent',
-        intro: 'It checks your positions around the clock and tells you, in plain English, what is happening and whether you should act. Right now it is just watching.',
-        position: 'bottom' },
+        intro: 'It checks your positions around the clock and tells you, in plain English, what is happening and whether you should act. Right now it is just watching.' },
       { element: confRow,     title: 'It tells you how sure it is',
-        intro: 'Every read comes with a confidence score and the reasoning behind it. When the data is thin, the score drops. No black box.',
-        position: 'bottom' },
+        intro: 'Every read comes with a confidence score and the reasoning behind it. When the data is thin, the score drops. No black box.' },
       { element: tierPill,    title: 'You stay in control',
-        intro: 'This sets how much the agent can do. Right now it can suggest moves, but nothing happens without your approval. It never touches your funds on its own.',
-        position: 'bottom' },
+        intro: 'This sets how much the agent can do. Right now it can suggest moves, but nothing happens without your approval. It never touches your funds on its own.' },
       { element: positions,   title: 'Here is what it is watching',
-        intro: 'Your real holdings on Mantle. The agent compares their yields and only speaks up when the gap is worth acting on.',
-        position: 'bottom' },
+        intro: 'Your real holdings on Mantle. The agent compares their yields and only speaks up when the gap is worth acting on.' },
       { element: history,     title: 'Every call is on the record',
-        intro: 'Each prediction is saved on Mantle, where anyone can check it. You do not have to take the agent’s word, you can verify it.',
-        position: 'bottom' },
+        intro: 'Each prediction is saved on Mantle, where anyone can check it. You do not have to take the agent’s word, you can verify it.' },
       { element: telegramBtn, title: 'Take it with you',
-        intro: 'Connect Telegram and the agent reaches you wherever you are. That is the tour, you are all set.',
-        position: 'bottom' },
+        intro: 'Connect Telegram and the agent reaches you wherever you are. That is the tour, you are all set.' },
     ];
     // Drop any step whose target vanished (defensive — selectors are checked
     // at audit time, but the markup may evolve).
@@ -3029,37 +3042,55 @@
       // with their tooltip below the fold.
       scrollTo:             reduceMotion ? 'off' : 'tooltip',
       disableInteraction:   true,
+      // 'auto' + this precedence lets Intro.js pick a side that doesn't
+      // cover the highlighted target. The smaller 300px tooltip width
+      // makes this work for narrow elements like the confidence score.
+      tooltipPosition:      'auto',
+      positionPrecedence:   ['bottom', 'top', 'right', 'left'],
       doneLabel:            'Done',
       nextLabel:            'Next',
       prevLabel:            'Back',
+      // The native skip is hidden via CSS — see .introjs-skipbutton above.
+      // skipLabel is still set so Intro.js's internal logic stays happy.
       skipLabel:            'Skip tour',
       overlayOpacity:       0.6,
     });
-    // Skip lives in the tooltip header by default in Intro.js v7 — relocate
-    // it into the button row on every step so it sits as a quiet left-aligned
-    // text link beside Back/Next, never floating outside the tooltip.
-    function relocateTourSkip() {
+    // Inject a custom Skip link as the FIRST child of .introjs-tooltipbuttons
+    // on every step. The native skipbutton refused to stay inside the
+    // tooltip; this custom .rwai-skip is a plain anchor in the flex row so
+    // it can never escape. Idempotent — only creates the node once per
+    // tooltip render.
+    function ensureRwaiSkip() {
       try {
-        var skip = document.querySelector('.introjs-skipbutton');
-        var row  = document.querySelector('.introjs-tooltipbuttons');
-        if (!skip || !row) return;
-        if (skip.parentNode === row && row.firstChild === skip) return; // already in place
-        row.insertBefore(skip, row.firstChild);
+        var row = document.querySelector('.introjs-tooltipbuttons');
+        if (!row) return;
+        if (row.querySelector('.rwai-skip')) return; // already in place this render
+        var a = document.createElement('a');
+        a.className = 'rwai-skip';
+        a.href = '#';
+        a.textContent = 'Skip tour';
+        a.setAttribute('role', 'button');
+        a.setAttribute('aria-label', 'Skip tour');
+        a.addEventListener('click', function (e) {
+          e.preventDefault();
+          try { tour.exit(); } catch (_) {}
+        });
+        row.insertBefore(a, row.firstChild);
       } catch (_) {}
     }
     function persist() { markTourSeen(resolveTourWallet()); }
     tour.oncomplete(persist);
     tour.onexit(persist);
-    tour.onafterchange(relocateTourSkip);
+    tour.onafterchange(ensureRwaiSkip);
     try {
       tour.start();
       // Recompute the helper-layer geometry one frame after start —
       // known Intro.js issue where the first paint can mis-size the
       // helper layer and leave the dashboard undimmed. Same frame is a
-      // good time to relocate the step-1 skip into the button row.
+      // good time to inject the step-1 skip link into the button row.
       requestAnimationFrame(function () {
         try { if (tour && typeof tour.refresh === 'function') tour.refresh(true); } catch (_) {}
-        relocateTourSkip();
+        ensureRwaiSkip();
       });
     } catch (e) { console.warn('[tour] start failed:', e && e.message); }
   }

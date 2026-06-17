@@ -1243,7 +1243,7 @@
           </button>
         </div>
         <div class="hero-meta-link" id="hero-meta-link">
-          <span id="hero-tx-time">Loading…</span> · <a id="hero-tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Mantle Explorer</a>
+          <span id="hero-tx-time">Loading…</span> · <a id="hero-tx-link" href="#" target="_blank" rel="noopener noreferrer">View on Mantle</a>
         </div>
       </div>
 
@@ -1505,7 +1505,7 @@
       </div>
       <div class="next-action-footer">
         <a href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63"
-           target="_blank" rel="noopener noreferrer">View agent history on Mantle Explorer →</a>
+           target="_blank" rel="noopener noreferrer">View full history on Mantle →</a>
       </div>
     </div>
   </div>
@@ -1537,7 +1537,7 @@
     </div>
 
     <div class="history-view-all">
-      <a href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View full history on Mantle Explorer →</a>
+      <a href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View full history on Mantle →</a>
     </div>
   </div>
 
@@ -2033,6 +2033,11 @@
   /* ── Helpers ── */
   function fmt(n) { return '$' + n.toFixed(2); }
   function fmtYield(usd, rate) { return 'Est. ' + fmt(usd * rate) + ' / year'; }
+  // Single semantic colour scale for per-decision confidence percentages.
+  // < 60 -> amber (low certainty); >= 60 -> brand green (acceptable certainty).
+  // KPI accuracy keeps its own (always-green) treatment because it is a
+  // different metric (historical truth, not per-decision confidence).
+  function confidenceColour(pct) { return pct >= 60 ? '#1D9E75' : '#F0A500'; }
   // Agent-text formatter: escape HTML FIRST (text originates from an LLM and
   // must never reach innerHTML unescaped), then convert **bold** and *italic*.
   // Unmatched/odd asterisks stay literal — non-greedy regex requires a closing
@@ -2187,7 +2192,7 @@
       el.textContent = '—';
       var yEl = document.getElementById('meth-est-yield'); if (yEl) yEl.textContent = '—';
     } else {
-      el.textContent = '≈ ' + fmt(usdVal);
+      el.textContent = fmt(usdVal);
       var yEl = document.getElementById('meth-est-yield'); if (yEl) yEl.textContent = fmtYield(usdVal, METH_APR);
     }
     var cEl = document.getElementById('meth-change'); if (cEl) cEl.textContent = '';
@@ -2197,13 +2202,22 @@
   function renderCMETHPosition(usdVal) {
     var el = document.getElementById('cmeth-usd');
     if (!el) return;
-    el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
+    var yEl = document.getElementById('cmeth-est-yield');
     if (usdVal == null) {
+      el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
       el.textContent = '—';
-      var yEl = document.getElementById('cmeth-est-yield'); if (yEl) yEl.textContent = '—';
+      if (yEl) yEl.textContent = '—';
+    } else if (usdVal === 0) {
+      // Empty-state styling so it reads as intentional rather than a $0.00 bug.
+      // Card stays mounted (preserves layout) but the value steps down in
+      // weight and the yield line is suppressed.
+      el.style.color = '#666'; el.style.fontSize = '1.05rem'; el.style.fontWeight = '600';
+      el.textContent = 'Not held';
+      if (yEl) yEl.textContent = '';
     } else {
-      el.textContent = '≈ ' + fmt(usdVal);
-      var yEl = document.getElementById('cmeth-est-yield'); if (yEl) yEl.textContent = fmtYield(usdVal, CMETH_APY);
+      el.style.color = '#f0f0f0'; el.style.fontSize = '1.75rem'; el.style.fontWeight = '800';
+      el.textContent = fmt(usdVal);
+      if (yEl) yEl.textContent = fmtYield(usdVal, CMETH_APY);
     }
     var cEl = document.getElementById('cmeth-change'); if (cEl) cEl.textContent = '';
     updateTotal();
@@ -2384,7 +2398,7 @@
       if (nextUnit) nextUnit.style.display = 'none';
       return;
     }
-    if (lastEl) lastEl.textContent = s.minsSince === 0 ? 'just now' : String(s.minsSince);
+    if (lastEl) lastEl.textContent = timeAgoShort(scanLoggedAtMs);
     if (s.secsTillNext <= 0) {
       if (nextEl) nextEl.textContent = 'Scanning…';
       if (nextUnit) nextUnit.style.display = 'none';
@@ -3018,17 +3032,6 @@
   });
 
   /* ── Latest tx meta-link ── */
-  function timeAgo(ts) {
-    var then = new Date(ts).getTime();
-    var diff = Date.now() - then;
-    var mins  = Math.floor(diff / 60000);
-    var hours = Math.floor(mins / 60);
-    var days  = Math.floor(hours / 24);
-    if (days  > 0) return days  + (days  === 1 ? ' day ago'  : ' days ago');
-    if (hours > 0) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
-    if (mins  > 0) return mins  + (mins  === 1 ? ' min ago'  : ' mins ago');
-    return 'just now';
-  }
 
   async function updateLatestTx() {
     try {
@@ -3036,7 +3039,7 @@
       var data = await res.json();
       if (!data.found) return;
 
-      var ago = timeAgo(data.loggedAt);
+      var ago = timeAgoShort(data.loggedAt);
       var timeEl      = document.getElementById('hero-tx-time');
       var linkEl      = document.getElementById('hero-tx-link');
       var loggedEl    = document.getElementById('hero-logged-time');
@@ -3048,8 +3051,10 @@
       // rows and the hero MM:SS countdown derive from this one value, so
       // they can never disagree.
       scanLoggedAtMs = new Date(data.loggedAt).getTime();
+      // The static "min ago" unit is now redundant — timeAgoShort renders
+      // the unit inline ("5m ago", "8h ago"). Keep it hidden.
       var lastUnit = document.getElementById('last-checked-unit');
-      if (lastUnit) lastUnit.style.display = '';
+      if (lastUnit) lastUnit.style.display = 'none';
       renderScanRows();
       renderScanCountdown();
     } catch(e) {
@@ -3123,7 +3128,7 @@
         params: [{ from: userAddress, to: USDY_TOKEN_ADDRESS, data: data, value: '0x0' }]
       });
 
-      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle Explorer</a>';
+      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle</a>';
 
       var receipt = null;
       var attempts = 0;
@@ -3137,7 +3142,7 @@
         localStorage.setItem('rwai_tier3_usdy_approved', 'true');
         localStorage.setItem('rwai_tier3_usdy_tx', txHash);
 
-        statusEl.innerHTML = '✓ USDY approved. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+        statusEl.innerHTML = '✓ USDY approved. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle</a>';
         statusEl.style.color = '#1D9E75';
 
         document.getElementById('approval-step-1').style.display = 'none';
@@ -3189,7 +3194,7 @@
     if (step2) step2.style.display = 'none';
     if (revoke) revoke.style.display = 'block';
     if (statusEl && txHash) {
-      statusEl.innerHTML = '✓ Tier 3 active. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View approval</a>';
+      statusEl.innerHTML = '✓ Tier 3 active. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle</a>';
       statusEl.style.color = '#1D9E75';
     }
   }
@@ -3251,7 +3256,7 @@
         params: [{ from: userAddress, to: METH_TOKEN_ADDRESS, data: data, value: '0x0' }]
       });
 
-      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View tx</a>';
+      statusEl.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle</a>';
 
       var receipt = null;
       var attempts = 0;
@@ -3268,7 +3273,7 @@
         document.getElementById('approval-step-2').style.display = 'none';
         document.getElementById('tier-3-revoke').style.display = 'block';
 
-        statusEl.innerHTML = '✓ Tier 3 fully activated. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View final tx</a>';
+        statusEl.innerHTML = '✓ Tier 3 fully activated. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#1D9E75;">View on Mantle</a>';
         statusEl.style.color = '#1D9E75';
 
         fetch('/api/profile', {
@@ -3636,7 +3641,7 @@
         params: [{ from: userAddress, to: USDY_TOKEN_ADDRESS, data: zeroData, value: '0x0' }]
       });
 
-      if (revokeStatus) revokeStatus.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#e05252;">View tx</a>';
+      if (revokeStatus) revokeStatus.innerHTML = 'Submitted. <a href="https://mantlescan.xyz/tx/' + txHash + '" target="_blank" style="color:#e05252;">View on Mantle</a>';
 
       var receipt = null; var attempts = 0;
       while (!receipt && attempts < 30) {
@@ -3861,7 +3866,7 @@
       var shortHash = p.txHash ? p.txHash.slice(0, 10) + '…' : '';
       var explorerLink = p.txHash
         ? '<a class="history-link" href="https://mantlescan.xyz/tx/' + p.txHash + '" target="_blank" rel="noopener noreferrer">View on Mantle →</a>'
-        : '<a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View registry →</a>';
+        : '<a class="history-link" href="https://mantlescan.xyz/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63" target="_blank" rel="noopener noreferrer">View full history on Mantle →</a>';
 
       var usdyCap = (p.usdyDirection || 'unknown').charAt(0).toUpperCase() + (p.usdyDirection || 'unknown').slice(1);
       var methCap = (p.methDirection || 'unknown').charAt(0).toUpperCase() + (p.methDirection || 'unknown').slice(1);
@@ -3900,7 +3905,7 @@
         var confEl  = document.getElementById('hero-confidence');
         if (confEl) {
           confEl.textContent = avgConf + '%';
-          confEl.style.color = avgConf >= 70 ? '#1D9E75' : '#F59E0B';
+          confEl.style.color = confidenceColour(avgConf);
         }
       }
     } catch(e) {}

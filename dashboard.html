@@ -863,59 +863,114 @@
     }
 
     /* ── Spotlight onboarding tour (Intro.js) ──
-       The Intro.js default skin is light and would clash with the dashboard.
-       These rules dark-theme the tooltip, helper-layer outline, and buttons
-       so the tour reads as part of the product. ── */
+       Dark glass tooltip, brand-green helper-layer outline, ghost Back +
+       solid Next/Done buttons, bullet dots as the sole progress indicator.
+       Skip is muted top-right. Default Intro.js gradients, outlines, and
+       the hard divider above the buttons are explicitly overridden. ── */
     .introjs-tooltip {
+      position: relative !important;
       background: rgba(20, 20, 22, 0.97) !important;
       border: 1px solid rgba(29, 158, 117, 0.25) !important;
       border-radius: 14px !important;
       color: #e8e8e8 !important;
-      max-width: 340px !important;
+      max-width: 330px !important;
       min-width: 280px !important;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+      padding: 20px 22px !important;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    .introjs-tooltip-header {
+      padding: 0 !important;
+      margin-bottom: 8px !important;
+      min-height: 0 !important;
     }
     .introjs-tooltip-title {
       font-size: 1.05rem !important;
       font-weight: 800 !important;
       color: #ffffff !important;
       letter-spacing: -0.01em;
-      margin-bottom: 6px !important;
+      line-height: 1.3 !important;
+      padding-right: 56px !important;  /* room so the title can't collide with Skip */
+      margin: 0 !important;
     }
     .introjs-tooltiptext {
+      padding: 0 !important;
       font-size: 0.9rem !important;
       line-height: 1.6 !important;
       color: #c8d6cf !important;
     }
+    /* Arrows match the tooltip background exactly */
     .introjs-tooltip .introjs-arrow.top,    .introjs-tooltip .introjs-arrow.top-right,    .introjs-tooltip .introjs-arrow.top-middle    { border-bottom-color: rgba(20, 20, 22, 0.97) !important; }
     .introjs-tooltip .introjs-arrow.bottom, .introjs-tooltip .introjs-arrow.bottom-right, .introjs-tooltip .introjs-arrow.bottom-middle { border-top-color:    rgba(20, 20, 22, 0.97) !important; }
     .introjs-tooltip .introjs-arrow.left,   .introjs-tooltip .introjs-arrow.left-bottom                                                  { border-right-color:  rgba(20, 20, 22, 0.97) !important; }
     .introjs-tooltip .introjs-arrow.right,  .introjs-tooltip .introjs-arrow.right-bottom                                                 { border-left-color:   rgba(20, 20, 22, 0.97) !important; }
 
+    /* Skip: muted compact, top-right, never competing with the title */
+    .introjs-skipbutton {
+      position: absolute !important;
+      top: 12px !important;
+      right: 14px !important;
+      padding: 4px 8px !important;
+      background: transparent !important;
+      background-image: none !important;
+      border: none !important;
+      color: #888 !important;
+      font-size: 0.78rem !important;
+      font-weight: 500 !important;
+      line-height: 1 !important;
+      text-shadow: none !important;
+      box-shadow: none !important;
+      border-radius: 6px !important;
+      cursor: pointer !important;
+      transition: color 0.15s ease;
+    }
+    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; }
+    .introjs-skipbutton:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
+
+    /* Button row: no hard divider, comfortable spacing above */
+    .introjs-tooltipbuttons {
+      border-top: none !important;
+      padding: 16px 0 0 0 !important;
+      margin-top: 4px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 8px !important;
+    }
     .introjs-button {
       background: transparent !important;
       background-image: none !important;
-      color: #888 !important;
-      border: 1px solid rgba(255, 255, 255, 0.10) !important;
+      color: #ccc !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
       border-radius: 9999px !important;
-      padding: 7px 16px !important;
+      padding: 8px 18px !important;
+      min-height: 34px !important;
+      line-height: 1 !important;
       font-size: 0.78rem !important;
       font-weight: 600 !important;
       text-shadow: none !important;
       box-shadow: none !important;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
     }
-    .introjs-button:hover { color: #c8d6cf !important; border-color: rgba(255, 255, 255, 0.22) !important; }
+    .introjs-button:hover { color: #ffffff !important; border-color: rgba(255, 255, 255, 0.22) !important; background: transparent !important; }
     .introjs-button:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
+    .introjs-prevbutton {
+      /* Ghost / text style */
+      color: #ccc !important;
+    }
     .introjs-nextbutton, .introjs-donebutton {
       background: #1D9E75 !important;
+      background-image: none !important;
       color: #ffffff !important;
       border-color: #1D9E75 !important;
+      font-weight: 700 !important;
     }
-    .introjs-nextbutton:hover, .introjs-donebutton:hover { background: #178a64 !important; border-color: #178a64 !important; color: #ffffff !important; }
+    .introjs-nextbutton:hover, .introjs-donebutton:hover {
+      background: #178a64 !important; border-color: #178a64 !important; color: #ffffff !important;
+    }
     .introjs-disabled, .introjs-disabled:hover { opacity: 0.4 !important; cursor: not-allowed !important; }
 
+    /* Helper layer: subtle green outline + the dim itself */
     .introjs-helperLayer {
       border-radius: 12px !important;
       border: 2px solid rgba(29, 158, 117, 0.4) !important;
@@ -923,18 +978,29 @@
     }
     .introjs-overlay { background: transparent !important; }
 
+    /* Bullets are the ONLY progress indicator. Inactive #444, active brand green. */
+    .introjs-bullets {
+      padding: 14px 0 4px 0 !important;
+      text-align: center !important;
+    }
+    .introjs-bullets ul          { display: inline-flex !important; gap: 7px !important; padding: 0 !important; margin: 0 !important; }
+    .introjs-bullets ul li       { display: inline-block !important; margin: 0 !important; }
     .introjs-bullets ul li a {
-      background: rgba(255, 255, 255, 0.18) !important;
-      width: 7px !important; height: 7px !important;
+      background: #444 !important;
+      width: 6px !important; height: 6px !important;
+      border-radius: 50% !important;
+      transition: background 0.2s ease;
     }
     .introjs-bullets ul li a.active { background: #1D9E75 !important; }
-    .introjs-bullets ul li a:hover  { background: rgba(255, 255, 255, 0.32) !important; }
+    .introjs-bullets ul li a:hover  { background: #666 !important; }
+    .introjs-bullets ul li a.active:hover { background: #1D9E75 !important; }
 
-    .introjs-progress { background: rgba(255, 255, 255, 0.08) !important; }
-    .introjs-progressbar { background: #1D9E75 !important; }
+    /* Redundant progress bar removed entirely — bullets carry progress */
+    .introjs-progress, .introjs-progressbar { display: none !important; }
 
     @media (prefers-reduced-motion: reduce) {
       .introjs-helperLayer, .introjs-tooltipReferenceLayer { transition: none !important; }
+      .introjs-bullets ul li a { transition: none !important; }
     }
 
     /* ── Take a tour button in page header ── */
@@ -2871,26 +2937,42 @@
     try { return sessionStorage.getItem('rwai_wallet') || null; } catch (_) { return null; }
   }
   function buildTourSteps() {
-    var hero        = document.querySelector('.hero-card');
+    // Step 1 anchors to the hero headline (small element), not the whole
+    // hero card. A small spotlight cutout lets the surrounding dashboard
+    // dim visibly — anchoring to the whole card covers most of the
+    // viewport and the dim disappears.
+    var heroTitle   = document.getElementById('hero-title');
     var confValue   = document.getElementById('hero-confidence');
     var confRow     = confValue && confValue.closest ? confValue.closest('.hero-metric') : null;
     var tierPill    = document.getElementById('tier-badge');
-    var positions   = document.querySelector('.positions-section');
-    var history     = document.querySelector('.history-section');
-    var telegramBtn = document.querySelector('.tg-section .btn-telegram');
+    // Section labels at the top of each section are short, scroll into
+    // view easily, and keep the tooltip on-screen even on narrower windows.
+    var positions   = document.querySelector('.positions-section .section-label')
+                   || document.querySelector('.positions-section');
+    var history     = document.querySelector('.history-section .section-label')
+                   || document.querySelector('.history-section');
+    // Step 6 points at the nav 'Open in Telegram' (top of page) so the
+    // tour ends back at the top, not after a deep scroll to the footer CTA.
+    var telegramBtn = document.querySelector('.btn-nav-green');
     var steps = [
-      { element: hero,        title: 'This is your agent',
-        intro: 'It checks your positions around the clock and tells you, in plain English, what is happening and whether you should act. Right now it is just watching.' },
+      { element: heroTitle,   title: 'This is your agent',
+        intro: 'It checks your positions around the clock and tells you, in plain English, what is happening and whether you should act. Right now it is just watching.',
+        position: 'bottom' },
       { element: confRow,     title: 'It tells you how sure it is',
-        intro: 'Every read comes with a confidence score and the reasoning behind it. When the data is thin, the score drops. No black box.' },
+        intro: 'Every read comes with a confidence score and the reasoning behind it. When the data is thin, the score drops. No black box.',
+        position: 'bottom' },
       { element: tierPill,    title: 'You stay in control',
-        intro: 'This sets how much the agent can do. Right now it can suggest moves, but nothing happens without your approval. It never touches your funds on its own.' },
+        intro: 'This sets how much the agent can do. Right now it can suggest moves, but nothing happens without your approval. It never touches your funds on its own.',
+        position: 'bottom' },
       { element: positions,   title: 'Here is what it is watching',
-        intro: 'Your real holdings on Mantle. The agent compares their yields and only speaks up when the gap is worth acting on.' },
+        intro: 'Your real holdings on Mantle. The agent compares their yields and only speaks up when the gap is worth acting on.',
+        position: 'bottom' },
       { element: history,     title: 'Every call is on the record',
-        intro: 'Each prediction is saved on Mantle, where anyone can check it. You do not have to take the agent’s word, you can verify it.' },
+        intro: 'Each prediction is saved on Mantle, where anyone can check it. You do not have to take the agent’s word, you can verify it.',
+        position: 'bottom' },
       { element: telegramBtn, title: 'Take it with you',
-        intro: 'Connect Telegram and the agent reaches you wherever you are. That is the tour, you are all set.' },
+        intro: 'Connect Telegram and the agent reaches you wherever you are. That is the tour, you are all set.',
+        position: 'bottom' },
     ];
     // Drop any step whose target vanished (defensive — selectors are checked
     // at audit time, but the markup may evolve).
@@ -2908,15 +2990,22 @@
     }
     var reduceMotion = false;
     try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    // Scroll to top before start so the helper layer sizes against a
+    // settled layout. Without this, Intro.js's first-paint sizing can
+    // under-size the helper layer and the dim disappears on step 1.
+    try { window.scrollTo(0, 0); } catch (_) {}
     var tour = introJs();
     tour.setOptions({
       steps:                steps,
-      showProgress:         true,
+      showProgress:         false,  // bullets are the only progress indicator
       showBullets:          true,
       exitOnOverlayClick:   true,
       exitOnEsc:            true,
       scrollToElement:      true,
-      scrollTo:             reduceMotion ? 'off' : 'element',
+      // scrollTo:'tooltip' scrolls the TOOLTIP into view (not just the
+      // highlighted element), so the Agent History step etc. never land
+      // with their tooltip below the fold.
+      scrollTo:             reduceMotion ? 'off' : 'tooltip',
       disableInteraction:   true,
       doneLabel:            'Done',
       nextLabel:            'Next',
@@ -2927,8 +3016,15 @@
     function persist() { markTourSeen(resolveTourWallet()); }
     tour.oncomplete(persist);
     tour.onexit(persist);
-    try { tour.start(); }
-    catch (e) { console.warn('[tour] start failed:', e && e.message); }
+    try {
+      tour.start();
+      // Recompute the helper-layer geometry one frame after start —
+      // known Intro.js issue where the first paint can mis-size the
+      // helper layer and leave the dashboard undimmed.
+      requestAnimationFrame(function () {
+        try { if (tour && typeof tour.refresh === 'function') tour.refresh(true); } catch (_) {}
+      });
+    } catch (e) { console.warn('[tour] start failed:', e && e.message); }
   }
   // Auto-start gate: runs at most once per page load. Re-armed on disconnect
   // so a returning user who connects a different wallet still gets the tour.

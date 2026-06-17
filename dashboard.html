@@ -1948,6 +1948,9 @@
     var alert = null, profile = null;
     try { var aRes = await fetch('/api/pending-alert'); alert = aRes.ok ? await aRes.json() : null; } catch (e) {}
     try { var pRes = await fetch('/api/profile'); profile = pRes.ok ? await pRes.json() : null; } catch (e) {}
+    // Cache so updateTotal (and any other reader) can use the canonical
+    // server-side total instead of recomputing from rounded DOM cells.
+    if (profile) { try { window.__rwai_profile = profile; } catch (_) {} }
 
     var state = determineHeroState(alert, profile);
 
@@ -2119,13 +2122,18 @@
     if (pc) pc.textContent = cmethVal > 0 ? '~' + cmethRounded + '%' : '';
   }
 
-  /* ── Total — reads from DOM so it's never wrong if one API fails ── */
+  /* ── Total — prefers /api/profile.userPositionUSD (canonical server-side
+     total) when cached, falls back to DOM sum when the profile is missing
+     so the KPI and the hero status panel never disagree by sub-cent rounding. ── */
   function updateTotal() {
     var usdyVal  = parseFloat((document.getElementById('usdy-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
     var methVal  = parseFloat((document.getElementById('meth-usd').textContent  || '').replace(/[^0-9.]/g, '')) || 0;
     var cmethVal = parseFloat((document.getElementById('cmeth-usd').textContent || '').replace(/[^0-9.]/g, '')) || 0;
     if (usdyVal === 0 && methVal === 0 && cmethVal === 0) return;
-    var total = usdyVal + methVal + cmethVal;
+    var cached = (typeof window !== 'undefined') ? window.__rwai_profile : null;
+    var canonical = (cached && typeof cached.userPositionUSD === 'number' && cached.userPositionUSD >= 0)
+      ? cached.userPositionUSD : null;
+    var total = (canonical != null) ? canonical : (usdyVal + methVal + cmethVal);
     var el = document.getElementById('total-value');
     el.classList.remove('muted');
     el.textContent = fmt(total);
@@ -2252,6 +2260,9 @@
       var r = await fetch('/api/profile?cb=' + Date.now());
       if (!r.ok) throw new Error('profile fetch ' + r.status);
       var p = await r.json();
+      // Cache profile so updateTotal (and any other reader) can read the
+      // canonical server-side total instead of recomputing from rounded DOM cells.
+      try { window.__rwai_profile = p; } catch (_) {}
       var pos = (p && p.positions) || {};
       USDY_BALANCE  = (pos.USDY  && typeof pos.USDY.balance  === 'number') ? pos.USDY.balance  : null;
       METH_BALANCE  = (pos.mETH  && typeof pos.mETH.balance  === 'number') ? pos.mETH.balance  : null;
@@ -2333,7 +2344,7 @@
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.accuracy !== null && data.accuracy !== undefined && data.resolved > 0) {
-        var sub = 'Across ' + data.resolved + ' resolved forecasts on Mantle';
+        var sub = data.resolved + ' of ' + data.total + ' predictions resolved on Mantle';
         if (data.usdyAccuracy === 100) sub += ' · USDY 100%';
         setAccuracy(data.accuracy + '%', sub, data.total);
       } else {
@@ -2344,34 +2355,57 @@
       setAccuracy('—', 'Building track record — accuracy resolves 24h after each prediction', 0);
     });
 
-  /* ── Header minute timer ── */
-  var lastChecked = null, nextCheck = null;
+  /* ── Unified scan timer — single source of truth.
+     Both the sidebar "Last scan / Next scan in" rows and the hero
+     MM:SS countdown derive from one seed (the agent's real loggedAt
+     from /api/latest-tx). When remaining <= 0 they both render the
+     same fallback ("Scanning…"). Pause state (renderPauseState)
+     still overrides both. ── */
+  var SCAN_INTERVAL_MIN = 30;
+  var scanLoggedAtMs = null;
   var lastEl = document.getElementById('last-checked');
   var nextEl = document.getElementById('next-check');
-  setInterval(function () {
-    if (lastChecked === null || nextCheck === null) return;
-    if (typeof nextCheck === 'string') return;
-    lastChecked += 1; nextCheck -= 1;
-    if (nextCheck <= 0) { lastChecked = 0; nextCheck = 'imminent'; }
-    if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
-    if (nextEl) nextEl.textContent = nextCheck;
-    var nextUnitTick = document.getElementById('next-check-unit');
-    if (nextUnitTick) nextUnitTick.style.display = (typeof nextCheck === 'string') ? 'none' : '';
-  }, 60000);
-
-  /* ── Next Action countdown (real seconds) ── */
   var countdownEl = document.getElementById('next-action-countdown');
-  var totalSeconds = 23 * 60;
-  function renderCountdown() {
-    var m = Math.floor(totalSeconds / 60), s = totalSeconds % 60;
-    countdownEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+
+  function getScanState() {
+    if (scanLoggedAtMs === null) return null;
+    var elapsedSec = Math.max(0, Math.floor((Date.now() - scanLoggedAtMs) / 1000));
+    var minsSince  = Math.floor(elapsedSec / 60);
+    var secsTillNext = SCAN_INTERVAL_MIN * 60 - elapsedSec;
+    return { minsSince: minsSince, secsTillNext: secsTillNext };
   }
-  renderCountdown();
-  setInterval(function () {
-    totalSeconds -= 1;
-    if (totalSeconds < 0) totalSeconds = 30 * 60;
-    renderCountdown();
-  }, 1000);
+
+  function renderScanRows() {
+    var s = getScanState();
+    var nextUnit = document.getElementById('next-check-unit');
+    if (!s) {
+      if (lastEl) lastEl.textContent = '—';
+      if (nextEl) nextEl.textContent = '—';
+      if (nextUnit) nextUnit.style.display = 'none';
+      return;
+    }
+    if (lastEl) lastEl.textContent = s.minsSince === 0 ? 'just now' : String(s.minsSince);
+    if (s.secsTillNext <= 0) {
+      if (nextEl) nextEl.textContent = 'Scanning…';
+      if (nextUnit) nextUnit.style.display = 'none';
+    } else {
+      if (nextEl) nextEl.textContent = String(Math.ceil(s.secsTillNext / 60));
+      if (nextUnit) nextUnit.style.display = '';
+    }
+  }
+
+  function renderScanCountdown() {
+    if (!countdownEl) return;
+    var s = getScanState();
+    if (!s) { countdownEl.textContent = '—:——'; return; }
+    if (s.secsTillNext <= 0) { countdownEl.textContent = 'Scanning…'; return; }
+    var m = Math.floor(s.secsTillNext / 60), sec = s.secsTillNext % 60;
+    countdownEl.textContent = String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }
+
+  renderScanCountdown();
+  setInterval(renderScanCountdown, 1000);
+  setInterval(renderScanRows, 30000);
 
   /* ── Tier badge dropdown ── */
   var tierBadge    = document.getElementById('tier-badge');
@@ -3010,16 +3044,14 @@
       if (linkEl)   linkEl.href          = 'https://mantlescan.xyz/tx/' + data.txHash;
       if (loggedEl) loggedEl.textContent = ago;
 
-      // Seed the last-scan / next-scan timer from real loggedAt
-      var minsSince = Math.floor((Date.now() - new Date(data.loggedAt).getTime()) / 60000);
-      lastChecked = minsSince;
-      nextCheck   = minsSince >= 30 ? 'imminent' : 30 - minsSince;
-      if (lastEl) lastEl.textContent = lastChecked === 0 ? 'just now' : lastChecked;
-      if (nextEl) nextEl.textContent = nextCheck;
+      // Seed the unified scan timer from real loggedAt. Both the sidebar
+      // rows and the hero MM:SS countdown derive from this one value, so
+      // they can never disagree.
+      scanLoggedAtMs = new Date(data.loggedAt).getTime();
       var lastUnit = document.getElementById('last-checked-unit');
-      var nextUnit = document.getElementById('next-check-unit');
       if (lastUnit) lastUnit.style.display = '';
-      if (nextUnit) nextUnit.style.display = (typeof nextCheck === 'string') ? 'none' : '';
+      renderScanRows();
+      renderScanCountdown();
     } catch(e) {
       console.warn('Latest tx fetch failed:', e);
     }

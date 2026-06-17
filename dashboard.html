@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RWAi — Yield Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <!-- Intro.js (spotlight onboarding tour). Loaded from cdnjs; the JS in
+       this page no-ops if introJs is undefined, so a blocked CDN never
+       breaks the dashboard. -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/introjs.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/intro.min.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -857,6 +862,100 @@
       .hero-metrics { flex-direction: column; gap: 16px; }
     }
 
+    /* ── Spotlight onboarding tour (Intro.js) ──
+       The Intro.js default skin is light and would clash with the dashboard.
+       These rules dark-theme the tooltip, helper-layer outline, and buttons
+       so the tour reads as part of the product. ── */
+    .introjs-tooltip {
+      background: rgba(20, 20, 22, 0.97) !important;
+      border: 1px solid rgba(29, 158, 117, 0.25) !important;
+      border-radius: 14px !important;
+      color: #e8e8e8 !important;
+      max-width: 340px !important;
+      min-width: 280px !important;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    .introjs-tooltip-title {
+      font-size: 1.05rem !important;
+      font-weight: 800 !important;
+      color: #ffffff !important;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px !important;
+    }
+    .introjs-tooltiptext {
+      font-size: 0.9rem !important;
+      line-height: 1.6 !important;
+      color: #c8d6cf !important;
+    }
+    .introjs-tooltip .introjs-arrow.top,    .introjs-tooltip .introjs-arrow.top-right,    .introjs-tooltip .introjs-arrow.top-middle    { border-bottom-color: rgba(20, 20, 22, 0.97) !important; }
+    .introjs-tooltip .introjs-arrow.bottom, .introjs-tooltip .introjs-arrow.bottom-right, .introjs-tooltip .introjs-arrow.bottom-middle { border-top-color:    rgba(20, 20, 22, 0.97) !important; }
+    .introjs-tooltip .introjs-arrow.left,   .introjs-tooltip .introjs-arrow.left-bottom                                                  { border-right-color:  rgba(20, 20, 22, 0.97) !important; }
+    .introjs-tooltip .introjs-arrow.right,  .introjs-tooltip .introjs-arrow.right-bottom                                                 { border-left-color:   rgba(20, 20, 22, 0.97) !important; }
+
+    .introjs-button {
+      background: transparent !important;
+      background-image: none !important;
+      color: #888 !important;
+      border: 1px solid rgba(255, 255, 255, 0.10) !important;
+      border-radius: 9999px !important;
+      padding: 7px 16px !important;
+      font-size: 0.78rem !important;
+      font-weight: 600 !important;
+      text-shadow: none !important;
+      box-shadow: none !important;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .introjs-button:hover { color: #c8d6cf !important; border-color: rgba(255, 255, 255, 0.22) !important; }
+    .introjs-button:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
+    .introjs-nextbutton, .introjs-donebutton {
+      background: #1D9E75 !important;
+      color: #ffffff !important;
+      border-color: #1D9E75 !important;
+    }
+    .introjs-nextbutton:hover, .introjs-donebutton:hover { background: #178a64 !important; border-color: #178a64 !important; color: #ffffff !important; }
+    .introjs-disabled, .introjs-disabled:hover { opacity: 0.4 !important; cursor: not-allowed !important; }
+
+    .introjs-helperLayer {
+      border-radius: 12px !important;
+      border: 2px solid rgba(29, 158, 117, 0.4) !important;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6) !important;
+    }
+    .introjs-overlay { background: transparent !important; }
+
+    .introjs-bullets ul li a {
+      background: rgba(255, 255, 255, 0.18) !important;
+      width: 7px !important; height: 7px !important;
+    }
+    .introjs-bullets ul li a.active { background: #1D9E75 !important; }
+    .introjs-bullets ul li a:hover  { background: rgba(255, 255, 255, 0.32) !important; }
+
+    .introjs-progress { background: rgba(255, 255, 255, 0.08) !important; }
+    .introjs-progressbar { background: #1D9E75 !important; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .introjs-helperLayer, .introjs-tooltipReferenceLayer { transition: none !important; }
+    }
+
+    /* ── Take a tour button in page header ── */
+    .page-header-tour-btn {
+      display: inline-block;
+      margin: 6px 0 14px 0;
+      background: none;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      color: #888;
+      font: inherit;
+      padding: 5px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .page-header-tour-btn:hover { color: #1D9E75; border-color: rgba(29, 158, 117, 0.4); }
+    .page-header-tour-btn:focus { outline: none; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35); }
+
     /* ── Rebalance simulation modal ── */
     #rebalance-modal {
       display: none; position: fixed; inset: 0;
@@ -1032,6 +1131,7 @@
   <!-- ── PAGE HEADER ── -->
   <div class="page-header">
     <h1>Your Yield Dashboard</h1>
+    <button type="button" id="btn-take-tour" class="page-header-tour-btn" aria-label="Take a tour of the dashboard">Take a tour</button>
     <div class="tier-wrap" id="tier-wrap">
       <div style="position:relative;">
       <button class="tier-badge" id="tier-badge">
@@ -2230,6 +2330,9 @@
       USDY_BALANCE = METH_BALANCE = CMETH_BALANCE = null;
     }
     rerenderPositions();
+    // Tour data signal: profile has arrived (success or failure both count,
+    // because the highlighted DOM elements exist either way).
+    if (typeof signalTourData === 'function') signalTourData('profile');
   }
 
   /* ── USDY price + 24h change ── */
@@ -2750,10 +2853,120 @@
 
   }
 
+  // ── Spotlight onboarding tour (Intro.js) ──────────────────────────────────
+  // Six-step dimmed-screen tour over the real dashboard elements. Auto-fires
+  // once per wallet after the dashboard data has populated (signalled by
+  // signalTourData), gated by localStorage. A 'Take a tour' button replays
+  // the tour anytime regardless of the gate. Intro.js is loaded from a CDN;
+  // if the load fails, startTour and maybeAutoStartTour both no-op so the
+  // dashboard keeps working as a degraded experience.
+  function tourSeenKey(wallet) { return 'rwai_tour_seen_' + String(wallet || '').toLowerCase(); }
+  function markTourSeen(wallet) {
+    if (!wallet) return;
+    try { localStorage.setItem(tourSeenKey(wallet), '1'); } catch (_) {}
+  }
+  function resolveTourWallet() {
+    var p = (typeof window !== 'undefined') ? window.__rwai_profile : null;
+    if (p && typeof p.walletAddress === 'string' && p.walletAddress) return p.walletAddress;
+    try { return sessionStorage.getItem('rwai_wallet') || null; } catch (_) { return null; }
+  }
+  function buildTourSteps() {
+    var hero        = document.querySelector('.hero-card');
+    var confValue   = document.getElementById('hero-confidence');
+    var confRow     = confValue && confValue.closest ? confValue.closest('.hero-metric') : null;
+    var tierPill    = document.getElementById('tier-badge');
+    var positions   = document.querySelector('.positions-section');
+    var history     = document.querySelector('.history-section');
+    var telegramBtn = document.querySelector('.tg-section .btn-telegram');
+    var steps = [
+      { element: hero,        title: 'This is your agent',
+        intro: 'It checks your positions around the clock and tells you, in plain English, what is happening and whether you should act. Right now it is just watching.' },
+      { element: confRow,     title: 'It tells you how sure it is',
+        intro: 'Every read comes with a confidence score and the reasoning behind it. When the data is thin, the score drops. No black box.' },
+      { element: tierPill,    title: 'You stay in control',
+        intro: 'This sets how much the agent can do. Right now it can suggest moves, but nothing happens without your approval. It never touches your funds on its own.' },
+      { element: positions,   title: 'Here is what it is watching',
+        intro: 'Your real holdings on Mantle. The agent compares their yields and only speaks up when the gap is worth acting on.' },
+      { element: history,     title: 'Every call is on the record',
+        intro: 'Each prediction is saved on Mantle, where anyone can check it. You do not have to take the agent’s word, you can verify it.' },
+      { element: telegramBtn, title: 'Take it with you',
+        intro: 'Connect Telegram and the agent reaches you wherever you are. That is the tour, you are all set.' },
+    ];
+    // Drop any step whose target vanished (defensive — selectors are checked
+    // at audit time, but the markup may evolve).
+    return steps.filter(function (s) { return s.element instanceof Element; });
+  }
+  function startTour() {
+    if (typeof introJs !== 'function') {
+      console.warn('[tour] Intro.js unavailable (CDN blocked?); skipping tour.');
+      return;
+    }
+    var steps = buildTourSteps();
+    if (steps.length === 0) {
+      console.warn('[tour] no tour targets found in DOM; skipping tour.');
+      return;
+    }
+    var reduceMotion = false;
+    try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    var tour = introJs();
+    tour.setOptions({
+      steps:                steps,
+      showProgress:         true,
+      showBullets:          true,
+      exitOnOverlayClick:   true,
+      exitOnEsc:            true,
+      scrollToElement:      true,
+      scrollTo:             reduceMotion ? 'off' : 'element',
+      disableInteraction:   true,
+      doneLabel:            'Done',
+      nextLabel:            'Next',
+      prevLabel:            'Back',
+      skipLabel:            'Skip',
+      overlayOpacity:       0.6,
+    });
+    function persist() { markTourSeen(resolveTourWallet()); }
+    tour.oncomplete(persist);
+    tour.onexit(persist);
+    try { tour.start(); }
+    catch (e) { console.warn('[tour] start failed:', e && e.message); }
+  }
+  // Auto-start gate: runs at most once per page load. Re-armed on disconnect
+  // so a returning user who connects a different wallet still gets the tour.
+  var tourAutoChecked = false;
+  function maybeAutoStartTour() {
+    if (tourAutoChecked) return;
+    var wallet = resolveTourWallet();
+    if (!wallet) return;
+    tourAutoChecked = true;
+    var seen = false;
+    try { seen = localStorage.getItem(tourSeenKey(wallet)) === '1'; }
+    catch (_) { return; }  // private mode — fail closed
+    if (seen) return;
+    if (typeof introJs !== 'function') return;  // CDN blocked — degrade silently
+    startTour();
+  }
+  // Data-ready signal. Both 'profile' and 'history' must arrive before we
+  // fire so the highlighted elements have real content, not 'Loading...'.
+  var tourDataFlags = { profile: false, history: false };
+  function signalTourData(source) {
+    if (source !== 'profile' && source !== 'history') return;
+    tourDataFlags[source] = true;
+    if (tourDataFlags.profile && tourDataFlags.history) maybeAutoStartTour();
+  }
+  // Expose for inline callers that live outside this IIFE (none today, but
+  // the symmetry with openTelegram keeps debugging straightforward).
+  window.rwaiStartTour = startTour;
+
   document.addEventListener('DOMContentLoaded', function() {
     updateSpread();
     renderSensitivityBadge();
     refreshHero();
+
+    // 'Take a tour' replays the tour ignoring the seen-gate. Completing or
+    // exiting still writes the gate (harmless), so a manual replay also
+    // marks the wallet as seen.
+    var tourBtn = document.getElementById('btn-take-tour');
+    if (tourBtn) tourBtn.addEventListener('click', function () { startTour(); });
 
     var activateBtn = document.getElementById('btn-activate-tier-3');
     if (activateBtn) activateBtn.addEventListener('click', activateTier3);
@@ -3784,6 +3997,8 @@
         }
       }
     } catch(e) {}
+    // Tour data signal: history + predictions have rendered (real or empty).
+    if (typeof signalTourData === 'function') signalTourData('history');
   }
 
 })();

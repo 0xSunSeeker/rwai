@@ -863,25 +863,27 @@
     }
 
     /* ── Spotlight onboarding tour (Intro.js) ──
-       Dark glass tooltip, brand-green helper-layer outline, ghost Back +
-       solid Next/Done buttons, bullet dots as the sole progress indicator.
-       Skip is muted top-right. Default Intro.js gradients, outlines, and
-       the hard divider above the buttons are explicitly overridden. ── */
+       Tour controls mirror the dashboard's own .btn-approve pill so the
+       tooltip reads as part of the product. Skip is a quiet bottom-left
+       text link (out of the title row, so wrapping titles can never
+       collide with it). Bullets sit directly above the button row as the
+       sole progress indicator; the default Intro.js progress bar and the
+       hard divider above the buttons are removed. ── */
     .introjs-tooltip {
       position: relative !important;
       background: rgba(20, 20, 22, 0.97) !important;
       border: 1px solid rgba(29, 158, 117, 0.25) !important;
       border-radius: 14px !important;
       color: #e8e8e8 !important;
-      max-width: 330px !important;
+      max-width: 300px !important;
       min-width: 280px !important;
-      padding: 20px 22px !important;
+      padding: 20px 20px 16px !important;
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
     }
     .introjs-tooltip-header {
       padding: 0 !important;
-      margin-bottom: 8px !important;
+      margin: 0 !important;
       min-height: 0 !important;
     }
     .introjs-tooltip-title {
@@ -890,13 +892,14 @@
       color: #ffffff !important;
       letter-spacing: -0.01em;
       line-height: 1.3 !important;
-      padding-right: 56px !important;  /* room so the title can't collide with Skip */
-      margin: 0 !important;
+      padding: 0 !important;          /* Skip moved to bottom — title can claim full width */
+      margin: 0 0 10px 0 !important;
     }
     .introjs-tooltiptext {
       padding: 0 !important;
+      margin: 0 0 16px 0 !important;
       font-size: 0.9rem !important;
-      line-height: 1.6 !important;
+      line-height: 1.55 !important;
       color: #c8d6cf !important;
     }
     /* Arrows match the tooltip background exactly */
@@ -905,82 +908,11 @@
     .introjs-tooltip .introjs-arrow.left,   .introjs-tooltip .introjs-arrow.left-bottom                                                  { border-right-color:  rgba(20, 20, 22, 0.97) !important; }
     .introjs-tooltip .introjs-arrow.right,  .introjs-tooltip .introjs-arrow.right-bottom                                                 { border-left-color:   rgba(20, 20, 22, 0.97) !important; }
 
-    /* Skip: muted compact, top-right, never competing with the title */
-    .introjs-skipbutton {
-      position: absolute !important;
-      top: 12px !important;
-      right: 14px !important;
-      padding: 4px 8px !important;
-      background: transparent !important;
-      background-image: none !important;
-      border: none !important;
-      color: #888 !important;
-      font-size: 0.78rem !important;
-      font-weight: 500 !important;
-      line-height: 1 !important;
-      text-shadow: none !important;
-      box-shadow: none !important;
-      border-radius: 6px !important;
-      cursor: pointer !important;
-      transition: color 0.15s ease;
-    }
-    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; }
-    .introjs-skipbutton:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
-
-    /* Button row: no hard divider, comfortable spacing above */
-    .introjs-tooltipbuttons {
-      border-top: none !important;
-      padding: 16px 0 0 0 !important;
-      margin-top: 4px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: flex-end !important;
-      gap: 8px !important;
-    }
-    .introjs-button {
-      background: transparent !important;
-      background-image: none !important;
-      color: #ccc !important;
-      border: 1px solid rgba(255, 255, 255, 0.12) !important;
-      border-radius: 9999px !important;
-      padding: 8px 18px !important;
-      min-height: 34px !important;
-      line-height: 1 !important;
-      font-size: 0.78rem !important;
-      font-weight: 600 !important;
-      text-shadow: none !important;
-      box-shadow: none !important;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-    }
-    .introjs-button:hover { color: #ffffff !important; border-color: rgba(255, 255, 255, 0.22) !important; background: transparent !important; }
-    .introjs-button:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
-    .introjs-prevbutton {
-      /* Ghost / text style */
-      color: #ccc !important;
-    }
-    .introjs-nextbutton, .introjs-donebutton {
-      background: #1D9E75 !important;
-      background-image: none !important;
-      color: #ffffff !important;
-      border-color: #1D9E75 !important;
-      font-weight: 700 !important;
-    }
-    .introjs-nextbutton:hover, .introjs-donebutton:hover {
-      background: #178a64 !important; border-color: #178a64 !important; color: #ffffff !important;
-    }
-    .introjs-disabled, .introjs-disabled:hover { opacity: 0.4 !important; cursor: not-allowed !important; }
-
-    /* Helper layer: subtle green outline + the dim itself */
-    .introjs-helperLayer {
-      border-radius: 12px !important;
-      border: 2px solid rgba(29, 158, 117, 0.4) !important;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6) !important;
-    }
-    .introjs-overlay { background: transparent !important; }
-
-    /* Bullets are the ONLY progress indicator. Inactive #444, active brand green. */
+    /* Bullets: sit immediately above the button row, equal breathing room
+       above (14px) and below (14px), no orphaned dead space. */
     .introjs-bullets {
-      padding: 14px 0 4px 0 !important;
+      padding: 0 !important;
+      margin: 14px 0 14px 0 !important;
       text-align: center !important;
     }
     .introjs-bullets ul          { display: inline-flex !important; gap: 7px !important; padding: 0 !important; margin: 0 !important; }
@@ -991,12 +923,107 @@
       border-radius: 50% !important;
       transition: background 0.2s ease;
     }
-    .introjs-bullets ul li a.active { background: #1D9E75 !important; }
-    .introjs-bullets ul li a:hover  { background: #666 !important; }
-    .introjs-bullets ul li a.active:hover { background: #1D9E75 !important; }
+    .introjs-bullets ul li a.active        { background: #1D9E75 !important; }
+    .introjs-bullets ul li a:hover         { background: #666 !important; }
+    .introjs-bullets ul li a.active:hover  { background: #1D9E75 !important; }
 
-    /* Redundant progress bar removed entirely — bullets carry progress */
+    /* Redundant progress bar removed — bullets carry progress */
     .introjs-progress, .introjs-progressbar { display: none !important; }
+
+    /* Button row: no divider, right-aligned, equal-height pills.
+       The row is the layout anchor for the bottom-left Skip too. */
+    .introjs-tooltipbuttons {
+      position: relative !important;   /* anchor for absolute-positioned Skip */
+      border-top: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      min-height: 38px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 10px !important;
+    }
+    /* Base: matches .btn-approve language — pill, 10x22 padding, 0.82rem/600.
+       Equal-height Back and Next: both include a 1px border in their box
+       (Next's border is the same colour as its fill) so heights align. */
+    .introjs-button {
+      padding: 10px 22px !important;
+      border-radius: 9999px !important;
+      font-size: 0.82rem !important;
+      font-weight: 600 !important;
+      line-height: 1 !important;
+      min-width: 120px !important;
+      text-align: center !important;
+      background: transparent !important;
+      background-image: none !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      color: #cccccc !important;
+      text-shadow: none !important;
+      box-shadow: none !important;
+      cursor: pointer !important;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .introjs-button:hover { color: #ffffff !important; border-color: rgba(255, 255, 255, 0.25) !important; background: transparent !important; }
+    .introjs-button:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; }
+    .introjs-button:active { transform: none !important; }
+    /* Back stays at the ghost defaults; explicit rule for clarity */
+    .introjs-prevbutton { color: #cccccc !important; }
+    /* Next / Done: solid green pill matching .btn-approve. Border is the
+       same #1D9E75 so the 1px-border box matches Back's height exactly. */
+    .introjs-nextbutton, .introjs-donebutton {
+      background: #1D9E75 !important;
+      background-image: none !important;
+      color: #ffffff !important;
+      border-color: #1D9E75 !important;
+      font-weight: 600 !important;
+    }
+    .introjs-nextbutton:hover, .introjs-donebutton:hover {
+      background: #178a64 !important; border-color: #178a64 !important; color: #ffffff !important;
+    }
+    /* Hide disabled Back (e.g. on step 1) cleanly — no greyed-out stub.
+       Scoped to prevbutton so a future disabled state on Next/Done would
+       still show as a dimmed control rather than vanish silently. */
+    .introjs-prevbutton.introjs-disabled,
+    .introjs-prevbutton.introjs-disabled:hover {
+      display: none !important;
+    }
+
+    /* Skip: bottom-left text link, aligned vertically with the button row.
+       In Intro.js v7 the skipbutton lives in the tooltip-header (top), so
+       it's absolute-positioned relative to .introjs-tooltip (which sets
+       position:relative) and anchored from the bottom. The bottom offset
+       matches the button row's vertical centre (tooltip bottom padding
+       16px + ~half the 38px button row height, minus ~half of skip's own
+       text height) so it sits at the same baseline as the pills. */
+    .introjs-skipbutton {
+      position: absolute !important;
+      left: 20px !important;
+      bottom: 28px !important;
+      top: auto !important;
+      right: auto !important;
+      padding: 0 !important;
+      background: transparent !important;
+      background-image: none !important;
+      border: none !important;
+      color: #888 !important;
+      font-size: 0.78rem !important;
+      font-weight: 500 !important;
+      line-height: 1 !important;
+      text-shadow: none !important;
+      box-shadow: none !important;
+      cursor: pointer !important;
+      transition: color 0.15s ease;
+    }
+    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; }
+    .introjs-skipbutton:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; border-radius: 3px !important; }
+
+    /* Helper layer: subtle green outline + the dim itself */
+    .introjs-helperLayer {
+      border-radius: 12px !important;
+      border: 2px solid rgba(29, 158, 117, 0.4) !important;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6) !important;
+    }
+    .introjs-overlay { background: transparent !important; }
 
     @media (prefers-reduced-motion: reduce) {
       .introjs-helperLayer, .introjs-tooltipReferenceLayer { transition: none !important; }

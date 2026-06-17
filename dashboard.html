@@ -930,10 +930,11 @@
     /* Redundant progress bar removed — bullets carry progress */
     .introjs-progress, .introjs-progressbar { display: none !important; }
 
-    /* Button row: no divider, right-aligned, equal-height pills.
-       The row is the layout anchor for the bottom-left Skip too. */
+    /* Button row: no divider, equal-height pills. Skip (moved here by the
+       tour's onafterchange callback) sits left as a text link; Back +
+       Next/Done sit right as a pair. margin-right:auto on Skip pushes the
+       button pair to the right edge without depending on space-between. */
     .introjs-tooltipbuttons {
-      position: relative !important;   /* anchor for absolute-positioned Skip */
       border-top: none !important;
       padding: 0 !important;
       margin: 0 !important;
@@ -988,19 +989,12 @@
       display: none !important;
     }
 
-    /* Skip: bottom-left text link, aligned vertically with the button row.
-       In Intro.js v7 the skipbutton lives in the tooltip-header (top), so
-       it's absolute-positioned relative to .introjs-tooltip (which sets
-       position:relative) and anchored from the bottom. The bottom offset
-       matches the button row's vertical centre (tooltip bottom padding
-       16px + ~half the 38px button row height, minus ~half of skip's own
-       text height) so it sits at the same baseline as the pills. */
+    /* Skip lives INSIDE the button row (relocated at runtime — see
+       relocateTourSkip in JS). margin-right:auto pushes Back + Next to
+       the far right while Skip stays on the left. No absolute positioning,
+       no floats — purely flex flow, so it can never escape the tooltip. */
     .introjs-skipbutton {
-      position: absolute !important;
-      left: 20px !important;
-      bottom: 28px !important;
-      top: auto !important;
-      right: auto !important;
+      margin: 0 auto 0 0 !important;
       padding: 0 !important;
       background: transparent !important;
       background-image: none !important;
@@ -1011,10 +1005,11 @@
       line-height: 1 !important;
       text-shadow: none !important;
       box-shadow: none !important;
+      min-width: 0 !important;        /* override the 120px from .introjs-button */
       cursor: pointer !important;
       transition: color 0.15s ease;
     }
-    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; }
+    .introjs-skipbutton:hover { color: #1D9E75 !important; background: transparent !important; border-color: transparent !important; }
     .introjs-skipbutton:focus { outline: none !important; box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.35) !important; border-radius: 3px !important; }
 
     /* Helper layer: subtle green outline + the dim itself */
@@ -3037,19 +3032,34 @@
       doneLabel:            'Done',
       nextLabel:            'Next',
       prevLabel:            'Back',
-      skipLabel:            'Skip',
+      skipLabel:            'Skip tour',
       overlayOpacity:       0.6,
     });
+    // Skip lives in the tooltip header by default in Intro.js v7 — relocate
+    // it into the button row on every step so it sits as a quiet left-aligned
+    // text link beside Back/Next, never floating outside the tooltip.
+    function relocateTourSkip() {
+      try {
+        var skip = document.querySelector('.introjs-skipbutton');
+        var row  = document.querySelector('.introjs-tooltipbuttons');
+        if (!skip || !row) return;
+        if (skip.parentNode === row && row.firstChild === skip) return; // already in place
+        row.insertBefore(skip, row.firstChild);
+      } catch (_) {}
+    }
     function persist() { markTourSeen(resolveTourWallet()); }
     tour.oncomplete(persist);
     tour.onexit(persist);
+    tour.onafterchange(relocateTourSkip);
     try {
       tour.start();
       // Recompute the helper-layer geometry one frame after start —
       // known Intro.js issue where the first paint can mis-size the
-      // helper layer and leave the dashboard undimmed.
+      // helper layer and leave the dashboard undimmed. Same frame is a
+      // good time to relocate the step-1 skip into the button row.
       requestAnimationFrame(function () {
         try { if (tour && typeof tour.refresh === 'function') tour.refresh(true); } catch (_) {}
+        relocateTourSkip();
       });
     } catch (e) { console.warn('[tour] start failed:', e && e.message); }
   }
